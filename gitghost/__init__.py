@@ -18,6 +18,7 @@ from gitghost.ai_triage import AITriage, AITriageResult
 from gitghost.scoring import HygieneScorer, HygieneScoreReport
 from gitghost.remediation import RemediationGenerator, RemediationPlan
 from gitghost.exporters import ReportExporter
+from gitghost.pipeline import PipelineResult, run_scan_pipeline
 from gitghost.ui_window import launch_ui
 from gitghost.ui_server import start_ui_server
 
@@ -38,6 +39,8 @@ __all__ = [
     "RemediationGenerator",
     "RemediationPlan",
     "ReportExporter",
+    "PipelineResult",
+    "run_scan_pipeline",
     "launch_ui",
     "start_ui_server",
 ]
