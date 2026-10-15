@@ -159,6 +159,16 @@ class ReportExporter:
             "version": "2.1.0",
             "runs": [{"tool": {"driver": {"name": "GitGhost", "version": "0.1.0", "rules": list(rules_dict.values())}}, "results": sarif_results}]
         }
+        if scan_result:
+            sarif_doc["runs"][0]["invocations"] = [{
+                "executionSuccessful": True,
+                "workingDirectory": {"uri": f"file://{Path(scan_result.repo_path).resolve().as_posix()}"},
+                "properties": {
+                    "total_objects_scanned": scan_result.total_objects_scanned,
+                    "dangling_commits_count": len(scan_result.dangling_commits),
+                    "dangling_blobs_count": len(scan_result.dangling_blobs),
+                }
+            }]
         return json.dumps(sarif_doc, indent=2)
 
     @classmethod
