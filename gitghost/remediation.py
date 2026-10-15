@@ -99,7 +99,7 @@ class RemediationGenerator:
             is_destructive=True,
         ))
 
-        bash_script = cls._build_bash_script(steps, sorted_files)
+        bash_script = cls._build_bash_script(clean_path, steps, sorted_files)
         ps_script = cls._build_powershell_script(steps, sorted_files)
 
         return RemediationPlan(
@@ -108,15 +108,59 @@ class RemediationGenerator:
         )
 
     @classmethod
-    def _build_bash_script(cls, steps: List[RemediationStep], affected_files: List[str]) -> str:
-        return """#!/usr/bin/env bash
-set -euo pipefail
-echo "==> Expiring reflogs..."
-git reflog expire --expire=now --expire-unreachable=now --all
-echo "==> Pruning unreachable objects..."
-git gc --prune=now --aggressive
-echo "Done!"
-"""
+    def _build_bash_script(
+        cls, repo_path: str, steps: List[RemediationStep], affected_files: List[str]
+    ) -> str:
+        clean_path = str(Path(repo_path).resolve())
+        backup_path = f"{clean_path}_safety_backup.git"
+        lines = [
+            "#!/usr/bin/env bash",
+            "# GitGhost Automated History Remediation Script (Bash)",
+            f"# Generated for: {clean_path}",
+            "set -euo pipefail",
+            "",
+            'echo "====================================================="',
+            'echo "  GitGhost History Remediation Playbook (Bash)"',
+            'echo "====================================================="',
+            'echo "CRITICAL: Purging Git history only prevents future exposure."',
+            'echo "Any exposed credentials must be revoked immediately in production!"',
+            'echo ""',
+            "",
+            'echo "==> [Step 1] Creating safety mirror backup..."',
+            f'git clone --mirror "{clean_path}" "{backup_path}"',
+            "",
+        ]
+
+        if affected_files:
+            file_args = " ".join([f'--path "{p}"' for p in affected_files])
+            lines.extend([
+                'echo "==> [Step 2] Purging sensitive files with git-filter-repo..."',
+                "if ! command -v git-filter-repo >/dev/null 2>&1; then",
+                '    echo "ERROR: git-filter-repo is required. Install via: pip install git-filter-repo"',
+                "    exit 1",
+                "fi",
+                f"git filter-repo --invert-paths {file_args} --force",
+                "",
+            ])
+        else:
+            lines.extend([
+                'echo "==> [Step 2] No named file paths detected; skipping git-filter-repo."',
+                "",
+            ])
+
+        lines.extend([
+            'echo "==> [Step 3] Expiring reflog entries across all references..."',
+            "git reflog expire --expire=now --expire-unreachable=now --all",
+            "",
+            'echo "==> [Step 4] Running aggressive garbage collection and pruning..."',
+            "git gc --prune=now --aggressive",
+            "",
+            'echo "==> [Step 5] History remediation complete!"',
+            'echo "Run 'gitghost scan .' to verify clean repository hygiene."',
+        ])
+
+        return "\n".join(lines)
+
 
     @classmethod
     def _build_powershell_script(cls, steps: List[RemediationStep], affected_files: List[str]) -> str:
