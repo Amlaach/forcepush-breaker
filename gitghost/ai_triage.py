@@ -83,3 +83,38 @@ Context:
 Return ONLY a valid JSON object matching this schema:
 {{
   "severity": "Critical" | "High" | "Medium" | "Low",
+  "is_false_positive": boolean,
+  "risk_score": float (1.0 to 10.0),
+  "technical_explanation": "concise explanation (1-2 sentences)",
+  "recommended_action": "recommended remediation step"
+}}"""
+
+    def _call_openai(self, prompt: str) -> AITriageResult:
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        model = self.model or "gpt-4o-mini"
+        url = "https://api.openai.com/v1/chat/completions"
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are a Git security forensics auditor. Always respond with strict JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1,
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"})
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            content = body["choices"][0]["message"]["content"]
+            parsed = self._extract_json(content)
+            return self._build_result_from_dict(parsed, f"OpenAI ({model})")
+
+    def _call_anthropic(self, prompt: str) -> AITriageResult:
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        model = self.model or "claude-3-5-sonnet-20241022"
+        url = "https://api.anthropic.com/v1/messages"
+        payload = {"model": model, "max_tokens": 512, "temperature": 0.1, "messages": [{"role": "user", "content": prompt}]}
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"})
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
