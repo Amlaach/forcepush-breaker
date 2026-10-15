@@ -99,3 +99,35 @@ class TestSecretRedactor:
         for finding in result.findings:
             assert raw_secret not in finding.masked_value
             assert raw_secret not in finding.context_line
+
+    def test_multiple_secrets_on_same_line(self, redactor):
+        raw_aws = "AKIAIOSFODNN7EXAMPLE"
+        raw_slack = "xoxb-123456789012-1234567890123-abcdef1234567890abcdef12"
+        line = f"export AWS_KEY={raw_aws} SLACK_TOKEN={raw_slack}\n"
+
+        result = redactor.scan_and_redact(line, file_path="deploy.sh")
+        assert len(result.findings) >= 2
+
+        # Verify that NEITHER raw secret appears in the redacted text
+        assert raw_aws not in result.redacted_text
+        assert raw_slack not in result.redacted_text
+
+        # Verify that for EVERY finding on this line, ALL raw secrets are masked in context_line
+        for finding in result.findings:
+            assert raw_aws not in finding.context_line
+            assert raw_slack not in finding.context_line
+            assert finding.context_line.count("AKIA") > 0 or "REDACTED" in finding.context_line
+            assert "****" in finding.context_line or "REDACTED" in finding.context_line
+
+    def test_private_key_real_shannon_entropy(self, redactor):
+        raw_key = (
+            "-----BEGIN RSA PRIVATE KEY-----\n"
+            "MIIEowIBAAKCAQEA0YqL9M1V4r8N+XYZABC1234567890abcdef\n"
+            "-----END RSA PRIVATE KEY-----\n"
+        )
+        result = redactor.scan_and_redact(raw_key, file_path="id_rsa")
+        pk_finding = next(f for f in result.findings if "Private Key" in f.rule_name)
+
+        # Entropy should be calculated accurately from data, not hardcoded to fixed 5.0
+        assert pk_finding.entropy != 5.0
+        assert pk_finding.entropy > 4.5

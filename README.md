@@ -119,6 +119,16 @@ gitghost ui /path/to/repo --port 8765
 
 ## 🚀 Quickstart & CLI Usage
 
+### ⚡ 5-Second Instant Sandbox Demo
+
+Test GitGhost in 5 seconds without touching any real repositories:
+
+```bash
+gitghost demo
+```
+
+> **What it does:** Automatically creates an isolated temporary Git sandbox, simulates a developer accidentally committing a `.env` file with live credentials and running `git reset --hard HEAD~1`, runs the full forensics pipeline to unearth the ghost commit, and cleanly disposes of the sandbox.
+
 ### Installation
 
 ```bash
@@ -128,6 +138,9 @@ cd gitghost
 
 # Install dependencies and package
 pip install -e .
+
+# Or with desktop UI support:
+pip install -e ".[desktop]"
 ```
 
 ### Live Forensics Scan

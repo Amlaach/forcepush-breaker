@@ -59,4 +59,28 @@ class TestUIServer:
             assert "dangling_blobs" in data
             assert "findings" in data
             assert "remediation" in data
+            assert "bash_script" in data["remediation"]
+            assert "powershell_script" in data["remediation"]
             assert 0 <= data["hygiene_score"]["score"] <= 100
+
+    def test_api_export_endpoint(self, running_server: str, tmp_path: Path):
+        # Create a small live repo fixture
+        subprocess.run(["git", "init"], cwd=str(tmp_path), check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Auditor"], cwd=str(tmp_path), check=True)
+        subprocess.run(["git", "config", "user.email", "auditor@gitghost.io"], cwd=str(tmp_path), check=True)
+        (tmp_path / "README.md").write_text("# Test\n", encoding="utf-8")
+        subprocess.run(["git", "add", "README.md"], cwd=str(tmp_path), check=True)
+        subprocess.run(["git", "commit", "-m", "feat: initial test commit"], cwd=str(tmp_path), check=True)
+
+        for fmt in ["json", "sarif", "markdown"]:
+            payload = json.dumps({"repo_path": str(tmp_path), "format": fmt}).encode("utf-8")
+            req = urllib.request.Request(
+                f"{running_server}/api/export",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                assert resp.status == 200
+                res_data = json.loads(resp.read().decode("utf-8"))
+                assert res_data["success"] is True
+                assert Path(res_data["file_path"]).exists()

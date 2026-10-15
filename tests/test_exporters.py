@@ -62,3 +62,29 @@ class TestReportExporter:
         sarif = json.loads(sarif_str)
         assert sarif["version"] == "2.1.0"
         assert len(sarif["runs"]) == 1
+
+        run = sarif["runs"][0]
+        assert "invocations" in run
+        assert run["invocations"][0]["executionSuccessful"] is True
+        assert run["invocations"][0]["properties"]["repositoryPath"] == "/test/repo"
+        assert run["properties"]["repository"] == "/test/repo"
+
+    def test_pre_push_hook_backup_on_existing_hook(self, tmp_path):
+        git_dir = tmp_path / ".git"
+        hooks_dir = git_dir / "hooks"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+
+        existing_hook = hooks_dir / "pre-push"
+        existing_hook.write_text("#!/bin/sh\necho 'custom team hook'\n", encoding="utf-8")
+
+        success, hook_path, notice = ReportExporter.install_pre_push_hook(tmp_path)
+        assert success is True
+        assert "pre-push" in hook_path
+        assert "pre-push.gitghost.bak" in notice
+
+        backup_file = hooks_dir / "pre-push.gitghost.bak"
+        assert backup_file.exists()
+        assert "custom team hook" in backup_file.read_text(encoding="utf-8")
+
+        new_content = existing_hook.read_text(encoding="utf-8")
+        assert "gitghost scan" in new_content
