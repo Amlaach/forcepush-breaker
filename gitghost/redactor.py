@@ -30,3 +30,16 @@ def shannon_entropy(data: str) -> float:
     return entropy
 
 
+def mask_credential(value: str, preserve_head: int = 4, preserve_tail: int = 4) -> str:
+    if len(value) <= (preserve_head + preserve_tail):
+        return "*" * len(value)
+    middle_len = len(value) - preserve_head - preserve_tail
+    return value[:preserve_head] + ("*" * min(middle_len, 12)) + value[-preserve_tail:]
+
+
+@dataclass
+class SecretFinding:
+    finding_id: str
+    rule_name: str
+    match_type: str
+    severity_estimate: str
