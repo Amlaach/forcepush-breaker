@@ -164,6 +164,91 @@ class GitForensics:
 
         return results
 
+    def _batch_reconstruct_commits(self, commit_hashes: List[str]) -> List[DanglingCommit]:
+        """Reconstructs commit metadata and diffs in streaming batches."""
+        if not commit_hashes:
+            return []
+
+        commits: List[DanglingCommit] = []
+        input_hashes = "\n".join(commit_hashes).encode("utf-8")
+        log_cmd = [
+            "git", "log", "--no-walk", "--stdin",
+            "--format=COMMIT_DELIM%n%H%n%an <%ae>%n%aI%n%P%n%B%nBODY_END"
+        ]
+        try:
+            log_proc = subprocess.run(
+                log_cmd,
+                cwd=str(self.repo_path),
+                input=input_hashes,
+                capture_output=True,
+                check=False,
+            )
+            raw_log = log_proc.stdout.decode("utf-8", errors="replace")
+            chunks = raw_log.split("COMMIT_DELIM\n")
+            meta_map = {}
+            for chunk in chunks:
+                chunk = chunk.strip()
+                if not chunk:
+                    continue
+                parts = chunk.split("\n", 4)
+                if len(parts) >= 4:
+                    chash = parts[0].strip()
+                    author = parts[1].strip()
+                    date_str = parts[2].strip()
+                    parents = parts[3].strip().split()
+                    body = ""
+                    if len(parts) == 5:
+                        body_parts = parts[4].rsplit("\nBODY_END", 1)
+                        body = body_parts[0].strip()
+                    meta_map[chash] = (author, date_str, parents, body)
+
+            diff_cmd = ["git", "diff-tree", "-p", "--root", "--stdin"]
+            diff_proc = subprocess.run(
+                diff_cmd,
+                cwd=str(self.repo_path),
+                input=input_hashes,
+                capture_output=True,
+                check=False,
+            )
+            raw_diff = diff_proc.stdout.decode("utf-8", errors="replace")
+            diff_chunks = raw_diff.split("\ncommit ")
+            diff_map = {}
+            for dchunk in diff_chunks:
+                dchunk = dchunk.strip()
+                if not dchunk:
+                    continue
+                lines = dchunk.split("\n", 1)
+                first_line = lines[0].strip()
+                diff_hash = first_line.split()[0] if first_line else ""
+                diff_text = lines[1] if len(lines) > 1 else ""
+                if diff_hash:
+                    diff_map[diff_hash] = diff_text
+
+            for chash in commit_hashes:
+                meta = meta_map.get(chash, ("Unknown", datetime.now(timezone.utc).isoformat(), [], ""))
+                diff_content = diff_map.get(chash, "")
+                changed_files = []
+                for line in diff_content.splitlines():
+                    if line.startswith("diff --git a/") and " b/" in line:
+                        p = line.split(" b/", 1)[-1].strip()
+                        if p and p not in changed_files:
+                            changed_files.append(p)
+
+                commits.append(DanglingCommit(
+                    commit_hash=chash,
+                    author=meta[0],
+                    date=meta[1],
+                    parents=meta[2],
+                    message=meta[3],
+                    changed_files=changed_files,
+                    diff_content=diff_content,
+                    is_dangling=True
+                ))
+        except Exception:
+            pass
+
+        return commits
+
     def _parse_fsck_output(self, output: str, bucket: Dict[str, Set[str]]) -> None:
         for line in output.splitlines():
             line = line.strip()
