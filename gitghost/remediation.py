@@ -63,3 +63,66 @@ class RemediationGenerator:
             commands=[f"git clone --mirror {repo_path} {repo_path}_safety_backup.git"],
             is_destructive=False,
         ))
+
+        if sorted_files:
+            file_args = " ".join([f"--path '{p}'" for p in sorted_files])
+            steps.append(RemediationStep(
+                order=2, title="Purge Sensitive Files from Entire History",
+                description="Use the official, ultra-fast `git-filter-repo` tool to purge affected paths across all branches and tags.",
+                commands=[
+                    "# Install git-filter-repo if not already present: pip install git-filter-repo",
+                    f"git filter-repo --invert-paths {file_args} --force"
+                ],
+                is_destructive=True,
+            ))
+
+        steps.append(RemediationStep(
+            order=3, title="Expire All Reflogs Immediately",
+            description="Invalidate reference logs so that orphaned commits are completely detached from local pointer heads.",
+            commands=["git reflog expire --expire=now --expire-unreachable=now --all"],
+            is_destructive=False,
+        ))
+
+        steps.append(RemediationStep(
+            order=4, title="Aggressive Physical Garbage Collection & Object Excision",
+            description="Permanently eradicate unreferenced objects and dangling packfiles from disk (.git/objects).",
+            commands=["git fsck --unreachable", "git gc --prune=now --aggressive"],
+            is_destructive=True,
+        ))
+
+        steps.append(RemediationStep(
+            order=5, title="Synchronize Upstream Remote (Coordinate with Team)",
+            description="Force-push the cleansed history to remote repositories. Ensure teammates re-clone rather than pulling.",
+            commands=["git push origin --force --all", "git push origin --force --tags"],
+            is_destructive=True,
+        ))
+
+        bash_script = cls._build_bash_script(steps, sorted_files)
+        ps_script = cls._build_powershell_script(steps, sorted_files)
+
+        return RemediationPlan(
+            repo_path=repo_path, affected_paths=sorted_files, steps=steps,
+            bash_script=bash_script, powershell_script=ps_script, rotation_warning=cls.ROTATION_NOTICE,
+        )
+
+    @classmethod
+    def _build_bash_script(cls, steps: List[RemediationStep], affected_files: List[str]) -> str:
+        return """#!/usr/bin/env bash
+set -euo pipefail
+echo "==> Expiring reflogs..."
+git reflog expire --expire=now --expire-unreachable=now --all
+echo "==> Pruning unreachable objects..."
+git gc --prune=now --aggressive
+echo "Done!"
+"""
+
+    @classmethod
+    def _build_powershell_script(cls, steps: List[RemediationStep], affected_files: List[str]) -> str:
+        return """# PowerShell Excision Script
+$ErrorActionPreference = 'Stop'
+Write-Host "==> Expiring reflogs..." -ForegroundColor Green
+git reflog expire --expire=now --expire-unreachable=now --all
+Write-Host "==> Pruning unreachable objects..." -ForegroundColor Green
+git gc --prune=now --aggressive
+Write-Host "Done!" -ForegroundColor Green
+"""
