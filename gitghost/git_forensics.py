@@ -13,7 +13,7 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Tuple
 
 
 @dataclass
@@ -126,6 +126,43 @@ class GitForensics:
             len(result.unreachable_trees) + len(result.unreachable_tags)
         )
         return result
+
+    def _batch_check(self, oids: List[str]) -> Dict[str, Tuple[str, int]]:
+        """Uses git cat-file --batch-check to query object types and sizes in bulk."""
+        if not oids:
+            return {}
+
+        results: Dict[str, Tuple[str, int]] = {}
+        batch_input = "\n".join(oids).encode("utf-8")
+
+        try:
+            proc = subprocess.run(
+                ["git", "cat-file", "--batch-check"],
+                cwd=str(self.repo_path),
+                input=batch_input,
+                capture_output=True,
+                check=False,
+            )
+            if proc.returncode == 0:
+                for line in proc.stdout.decode("utf-8", errors="replace").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        oid = parts[0]
+                        obj_type = parts[1]
+                        try:
+                            size = int(parts[2])
+                        except ValueError:
+                            size = 0
+                        results[oid] = (obj_type, size)
+                    elif len(parts) == 2 and parts[1] == "missing":
+                        results[parts[0]] = ("missing", 0)
+        except Exception:
+            pass
+
+        return results
 
     def _parse_fsck_output(self, output: str, bucket: Dict[str, Set[str]]) -> None:
         for line in output.splitlines():
