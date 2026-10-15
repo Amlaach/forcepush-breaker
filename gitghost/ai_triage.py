@@ -118,3 +118,33 @@ Return ONLY a valid JSON object matching this schema:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"})
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            parsed = self._extract_json(body["content"][0]["text"])
+            return self._build_result_from_dict(parsed, f"Anthropic ({model})")
+
+    def _call_gemini(self, prompt: str) -> AITriageResult:
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        model = self.model or "gemini-1.5-flash"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"responseMimeType": "application/json"}}
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            parsed = self._extract_json(body["candidates"][0]["content"]["parts"][0]["text"])
+            return self._build_result_from_dict(parsed, f"Gemini ({model})")
+
+    def _call_ollama(self, prompt: str) -> AITriageResult:
+        model = self.model or "llama3"
+        url = "http://localhost:11434/api/generate"
+        payload = {"model": model, "prompt": prompt, "stream": False, "format": "json"}
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            parsed = self._extract_json(body.get("response", "{}"))
+            return self._build_result_from_dict(parsed, f"Ollama ({model})")
+
+    def _heuristic_triage(self, finding_rule: str, masked_snippet: str, context_line: str, commit_message: Optional[str], file_path: Optional[str]) -> AITriageResult:
+        file_lower = (file_path or "").lower()
+        msg_lower = (commit_message or "").lower()
