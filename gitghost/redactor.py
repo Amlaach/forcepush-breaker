@@ -123,3 +123,23 @@ class SecretRedactor:
             "severity": "High",
             "mask_type": "env_secret",
         },
+        {
+            "name": "JSON Web Token (JWT)",
+            "regex": re.compile(r"\b(eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,})\b"),
+            "severity": "Medium",
+            "mask_type": "preserve_edges",
+        },
+    ]
+
+    FALSE_POSITIVE_TERMS: Set[str] = {
+        "your_api_key_here", "insert_token_here", "changeme", "placeholder",
+        "dummy_key", "fake_key", "test_key", "null", "undefined", "your_secret_here"
+    }
+
+    def __init__(self, entropy_threshold: float = ENTROPY_THRESHOLD):
+        self.entropy_threshold = entropy_threshold
+
+    def scan_and_redact(
+        self,
+        text: str,
+        file_path: Optional[str] = None,
