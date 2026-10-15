@@ -73,3 +73,38 @@ class HygieneScorer:
         fp_count = 0
 
         triage_map = triage_results or {}
+        for f in findings:
+            triage = triage_map.get(f.finding_id)
+            if triage and triage.is_false_positive:
+                fp_count += 1
+                continue
+            sev = triage.severity if triage else f.severity_estimate
+            if sev == "Critical": crit_count += 1
+            elif sev == "High": high_count += 1
+            elif sev == "Medium": med_count += 1
+            else: low_count += 1
+
+        if crit_count > 0:
+            deductions.append(DeductionItem("Critical Secrets", f"{crit_count} Critical credential(s) detected in unreachable objects", min(crit_count * 25, 100)))
+        if high_count > 0:
+            deductions.append(DeductionItem("High Risk Secrets", f"{high_count} High-risk credential(s) detected", min(high_count * 15, 45)))
+        if med_count > 0:
+            deductions.append(DeductionItem("Medium Risk Findings", f"{med_count} Suspicious token(s) or connection string(s)", min(med_count * 8, 25)))
+        if low_count > 0:
+            deductions.append(DeductionItem("Low Risk Findings", f"{low_count} Low-severity credential finding(s)", min(low_count * 3, 10)))
+
+        fresh_commits_with_secrets = 0
+        if commit_dates and (crit_count > 0 or high_count > 0):
+            now = datetime.now(timezone.utc)
+            for d_str in commit_dates:
+                try:
+                    c_date = datetime.fromisoformat(d_str.replace("Z", "+00:00"))
+                    if (now - c_date).total_seconds() / 86400 <= 7:
+                        fresh_commits_with_secrets += 1
+                except Exception: pass
+
+        if fresh_commits_with_secrets > 0:
+            deductions.append(DeductionItem("Active Threat Recency", "Leaked credentials were reset recently (< 7 days ago); secrets likely active in production", min(fresh_commits_with_secrets * 10, 20)))
+
+        total_deduction = sum(d.points for d in deductions)
+        final_score = max(0, min(100, base_score - total_deduction))
