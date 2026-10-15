@@ -108,3 +108,43 @@ class GitForensics:
 
         result.dangling_commits.sort(key=lambda c: c.date, reverse=True)
 
+        for blob_hash in unreachable_objects["blob"]:
+            blob_obj = self._extract_blob(blob_hash, associated_path=blob_path_map.get(blob_hash))
+            if blob_obj:
+                result.dangling_blobs.append(blob_obj)
+
+        result.total_objects_scanned = (
+            len(result.dangling_commits) + len(result.dangling_blobs) +
+            len(result.unreachable_trees) + len(result.unreachable_tags)
+        )
+        return result
+
+    def _parse_fsck_output(self, output: str, bucket: Dict[str, Set[str]]) -> None:
+        for line in output.splitlines():
+            line = line.strip()
+            if not line: continue
+            parts = line.split()
+            if len(parts) >= 3 and parts[0] in ("unreachable", "dangling"):
+                obj_type = parts[1].lower()
+                obj_hash = parts[2]
+                if obj_type in bucket:
+                    bucket[obj_type].add(obj_hash)
+
+    def _get_object_type(self, obj_hash: str) -> Optional[str]:
+        res = self._run_git(["cat-file", "-t", obj_hash], check=False)
+        return res.stdout.strip() if res.returncode == 0 else None
+
+    def _map_tree_blobs(self, trees: Set[str], commits: Set[str]) -> Dict[str, str]:
+        mapping: Dict[str, str] = {}
+        all_trees = set(trees)
+        for commit_hash in commits:
+            res = self._run_git(["show", "-s", "--format=%T", commit_hash], check=False)
+            if res.returncode == 0 and res.stdout.strip():
+                all_trees.add(res.stdout.strip())
+
+        for tree_hash in all_trees:
+            res = self._run_git(["ls-tree", "-r", tree_hash], check=False)
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    parts = line.strip().split(None, 3)
+                    if len(parts) >= 4 and parts[1] == "blob":
