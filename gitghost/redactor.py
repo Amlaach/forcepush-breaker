@@ -255,11 +255,13 @@ class SecretRedactor:
             fid = f"PK-{finding_counter:04d}"
             masked_pk = "-----BEGIN PRIVATE KEY-----\n[REDACTED_PRIVATE_KEY_BLOCK]\n-----END PRIVATE KEY-----"
             redacted_full_text = redacted_full_text.replace(match.group(0), masked_pk)
+            raw_pk = match.group(0)
+            entropy = shannon_entropy(raw_pk)
             findings.append(SecretFinding(
                 finding_id=fid, rule_name="Asymmetric Private Key Block", match_type="pattern",
                 severity_estimate="Critical", masked_value="[REDACTED_PRIVATE_KEY_BLOCK]",
                 line_number=1, context_line="-----BEGIN PRIVATE KEY----- ... [REDACTED_PRIVATE_KEY_BLOCK]",
-                entropy=5.0, file_path=file_path, commit_hash=commit_hash, blob_hash=blob_hash,
+                entropy=round(entropy, 2), file_path=file_path, commit_hash=commit_hash, blob_hash=blob_hash,
             ))
 
         return RedactionResult(redacted_text=redacted_full_text, findings=findings)
