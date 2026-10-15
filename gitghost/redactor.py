@@ -63,3 +63,23 @@ class SecretRedactor:
     MIN_ENTROPY_LEN = 16
 
     RULES = [
+        {
+            "name": "AWS Access Key ID",
+            "regex": re.compile(r"\b((?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16})\b"),
+            "severity": "Critical",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "AWS Secret Access Key",
+            "regex": re.compile(r"(?i)(?:aws_secret_access_key|aws_secret|secret_key)\s*[:=]\s*['\"]?([0-9a-zA-Z/+=]{40})['\"]?"),
+            "severity": "Critical",
+            "mask_type": "full",
+        },
+        {
+            "name": "GitHub Personal Access Token",
+            "regex": re.compile(r"\b(ghp_[0-9a-zA-Z]{36}|gho_[0-9a-zA-Z]{36}|ghu_[0-9a-zA-Z]{36}|ghs_[0-9a-zA-Z]{36}|ghr_[0-9a-zA-Z]{36}|github_pat_[0-9a-zA-Z_]{82})\b"),
+            "severity": "Critical",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "GitLab Personal Access Token",
