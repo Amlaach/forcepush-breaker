@@ -148,3 +148,42 @@ Return ONLY a valid JSON object matching this schema:
     def _heuristic_triage(self, finding_rule: str, masked_snippet: str, context_line: str, commit_message: Optional[str], file_path: Optional[str]) -> AITriageResult:
         file_lower = (file_path or "").lower()
         msg_lower = (commit_message or "").lower()
+        ctx_lower = context_line.lower()
+
+        is_test_file = any(t in file_lower for t in ["test", "tests", "mock", "fixture", "spec", "example", "sample"])
+        is_mock_code = any(t in ctx_lower for t in ["mock", "dummy", "fake", "fixture", "example", "placeholder"])
+        panic_signals = ["accident", "oops", "revert", "remove key", "remove secret", "leak", "fix credentials", "reset", "temp commit", "wip"]
+        is_panic_commit = any(p in msg_lower for p in panic_signals)
+
+        if is_test_file or is_mock_code:
+            return AITriageResult("Low", True, 2.0, "Appears to be a test mock or documentation example based on file path and context.", "Verify test fixture does not contain real active tokens.", "Heuristic Rule-Engine")
+        if "private key" in finding_rule.lower():
+            return AITriageResult("Critical", False, 9.8, "Asymmetric private key found in orphaned git tree. High risk of impersonation or decryption.", "Immediately revoke the corresponding public key and purge git history.", "Heuristic Rule-Engine")
+        if is_panic_commit:
+            return AITriageResult("Critical", False, 9.5, "Commit message indicates panicked credential removal. High likelihood of valid secret left in dangling commit.", "Rotate credentials immediately and run aggressive git-gc prune.", "Heuristic Rule-Engine")
+        if "database" in finding_rule.lower() or "uri" in finding_rule.lower():
+            return AITriageResult("High", False, 8.7, "Database connection URI with password embedded in dangling commit.", "Rotate database password and prune unreachable objects.", "Heuristic Rule-Engine")
+        return AITriageResult("High", False, 7.8, f"Potential credential ({finding_rule}) discovered in unreachable object history.", "Verify if credential is active in production, rotate if needed, and prune repo.", "Heuristic Rule-Engine")
+
+    def _extract_json(self, raw_text: str) -> Dict[str, Any]:
+        raw_text = raw_text.strip()
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_text)
+        if match: raw_text = match.group(1).strip()
+        try:
+            return json.loads(raw_text)
+        except json.JSONDecodeError:
+            start = raw_text.find("{")
+            end = raw_text.rfind("}")
+            if start != -1 and end != -1:
+                return json.loads(raw_text[start:end+1])
+            raise ValueError(f"Could not parse valid JSON from AI response: {raw_text[:100]}")
+
+    def _build_result_from_dict(self, data: Dict[str, Any], provider_name: str) -> AITriageResult:
+        severity = data.get("severity", "Medium")
+        if severity not in ("Critical", "High", "Medium", "Low"): severity = "Medium"
+        return AITriageResult(
+            severity=severity, is_false_positive=bool(data.get("is_false_positive", False)),
+            risk_score=float(data.get("risk_score", 5.0)), technical_explanation=str(data.get("technical_explanation", "AI analyzed finding context.")),
+            recommended_action=str(data.get("recommended_action", "Review finding and rotate credentials if exposed.")),
+            provider_used=provider_name,
+        )
