@@ -2,18 +2,20 @@
 Git Object Database Forensics Engine.
 
 Discovers dangling commits, unreachable trees, and orphaned blobs in local .git repositories.
-Recovers commit metadata (author, timestamp, commit message) and reconstructed file diffs.
+Recovers commit metadata (author, timestamp, commit message) and reconstructed file diffs
+using high-performance batch stream processing.
 """
 
 from __future__ import annotations
 
-import os
+import io
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional, Dict, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 
 @dataclass
@@ -71,298 +73,411 @@ class GitForensics:
                 "Git executable was not found on the system PATH. "
                 "Git is required to perform GitGhost forensics."
             )
+
         if not self.is_valid_repo():
             return ForensicsScanResult(
                 repo_path=str(self.repo_path),
                 is_git_repo=False,
-                errors=["Specified path is not a valid Git repository."]
+                errors=["Specified path is not a valid Git repository."],
             )
 
         result = ForensicsScanResult(repo_path=str(self.repo_path), is_git_repo=True)
         unreachable_objects: Dict[str, Set[str]] = {
-            "commit": set(), "blob": set(), "tree": set(), "tag": set(),
+            "commit": set(),
+            "blob": set(),
+            "tree": set(),
+            "tag": set(),
         }
 
-        fsck_res = self._run_git(["fsck", "--full", "--no-reflogs", "--unreachable", "--lost-found"], check=False)
-        self._parse_fsck_output(fsck_res.stdout + "\n" + fsck_res.stderr, unreachable_objects)
+        # Step 1: Collect candidates via git fsck
+        candidate_hashes: Set[str] = set()
 
-        dangling_res = self._run_git(["fsck", "--full", "--no-reflogs", "--dangling"], check=False)
-        self._parse_fsck_output(dangling_res.stdout + "\n" + dangling_res.stderr, unreachable_objects)
+        fsck_res = self._run_git(
+            ["fsck", "--full", "--no-reflogs", "--unreachable", "--lost-found"],
+            check=False,
+        )
+        self._parse_fsck_output(
+            fsck_res.stdout + "\n" + fsck_res.stderr,
+            unreachable_objects,
+            candidate_hashes,
+        )
 
+        dangling_res = self._run_git(
+            ["fsck", "--full", "--no-reflogs", "--dangling"],
+            check=False,
+        )
+        self._parse_fsck_output(
+            dangling_res.stdout + "\n" + dangling_res.stderr,
+            unreachable_objects,
+            candidate_hashes,
+        )
+
+        # Inspect .git/lost-found if present
         lost_found_dir = self.repo_path / ".git" / "lost-found"
         if lost_found_dir.exists():
             commit_dir = lost_found_dir / "commit"
             if commit_dir.exists() and commit_dir.is_dir():
                 for f in commit_dir.iterdir():
                     if len(f.name) in (40, 64):
+                        candidate_hashes.add(f.name)
                         unreachable_objects["commit"].add(f.name)
             other_dir = lost_found_dir / "other"
             if other_dir.exists() and other_dir.is_dir():
                 for f in other_dir.iterdir():
                     if len(f.name) in (40, 64):
-                        obj_type = self._get_object_type(f.name)
-                        if obj_type in unreachable_objects:
-                            unreachable_objects[obj_type].add(f.name)
+                        candidate_hashes.add(f.name)
 
-        result.unreachable_trees = list(unreachable_objects["tree"])
-        result.unreachable_tags = list(unreachable_objects["tag"])
+        if not candidate_hashes:
+            return result
 
-        blob_path_map = self._map_tree_blobs(unreachable_objects["tree"], unreachable_objects["commit"])
+        # Step 2: Batch check all candidate objects to identify exact types & sizes in ONE call
+        type_and_sizes = self._batch_check(candidate_hashes)
+        for obj_hash, (obj_type, size) in type_and_sizes.items():
+            if obj_type in unreachable_objects:
+                unreachable_objects[obj_type].add(obj_hash)
 
-        for commit_hash in unreachable_objects["commit"]:
-            commit_obj = self._reconstruct_commit(commit_hash)
-            if commit_obj:
-                result.dangling_commits.append(commit_obj)
+        result.unreachable_trees = sorted(list(unreachable_objects["tree"]))
+        result.unreachable_tags = sorted(list(unreachable_objects["tag"]))
 
-        result.dangling_commits.sort(key=lambda c: c.date, reverse=True)
+        # Step 3: Reconstruct commits in high-performance batch
+        commit_hashes = sorted(list(unreachable_objects["commit"]))
+        if commit_hashes:
+            result.dangling_commits = self._batch_reconstruct_commits(commit_hashes)
+            result.dangling_commits.sort(key=lambda c: c.date, reverse=True)
 
-        for blob_hash in unreachable_objects["blob"]:
-            blob_obj = self._extract_blob(blob_hash, associated_path=blob_path_map.get(blob_hash))
-            if blob_obj:
-                result.dangling_blobs.append(blob_obj)
+        # Step 4: Map blob paths from commit trees and unreachable trees
+        blob_path_map = self._map_tree_blobs_batch(commit_hashes, unreachable_objects["tree"])
+
+        # Step 5: Read dangling blobs in batch
+        blob_hashes = sorted(list(unreachable_objects["blob"]))
+        if blob_hashes:
+            result.dangling_blobs = self._batch_extract_blobs(
+                blob_hashes, type_and_sizes, blob_path_map
+            )
 
         result.total_objects_scanned = (
-            len(result.dangling_commits) + len(result.dangling_blobs) +
-            len(result.unreachable_trees) + len(result.unreachable_tags)
+            len(result.dangling_commits)
+            + len(result.dangling_blobs)
+            + len(result.unreachable_trees)
+            + len(result.unreachable_tags)
         )
         return result
 
-    def _batch_check(self, oids: List[str]) -> Dict[str, Tuple[str, int]]:
-        """Uses git cat-file --batch-check to query object types and sizes in bulk."""
-        if not oids:
-            return {}
-
-        results: Dict[str, Tuple[str, int]] = {}
-        batch_input = "\n".join(oids).encode("utf-8")
-
-        try:
-            proc = subprocess.run(
-                ["git", "cat-file", "--batch-check"],
-                cwd=str(self.repo_path),
-                input=batch_input,
-                capture_output=True,
-                check=False,
-            )
-            if proc.returncode == 0:
-                for line in proc.stdout.decode("utf-8", errors="replace").splitlines():
-                    line = line.strip()
-                    if not line:
-                        continue
-                    parts = line.split()
-                    if len(parts) >= 3:
-                        oid = parts[0]
-                        obj_type = parts[1]
-                        try:
-                            size = int(parts[2])
-                        except ValueError:
-                            size = 0
-                        results[oid] = (obj_type, size)
-                    elif len(parts) == 2 and parts[1] == "missing":
-                        results[parts[0]] = ("missing", 0)
-        except Exception:
-            pass
-
-        return results
-
-    def _batch_reconstruct_commits(self, commit_hashes: List[str]) -> List[DanglingCommit]:
-        """Reconstructs commit metadata and diffs in streaming batches."""
-        if not commit_hashes:
-            return []
-
-        commits: List[DanglingCommit] = []
-        input_hashes = "\n".join(commit_hashes).encode("utf-8")
-        log_cmd = [
-            "git", "log", "--no-walk", "--stdin",
-            "--format=COMMIT_DELIM%n%H%n%an <%ae>%n%aI%n%P%n%B%nBODY_END"
-        ]
-        try:
-            log_proc = subprocess.run(
-                log_cmd,
-                cwd=str(self.repo_path),
-                input=input_hashes,
-                capture_output=True,
-                check=False,
-            )
-            raw_log = log_proc.stdout.decode("utf-8", errors="replace")
-            chunks = raw_log.split("COMMIT_DELIM\n")
-            meta_map = {}
-            for chunk in chunks:
-                chunk = chunk.strip()
-                if not chunk:
-                    continue
-                parts = chunk.split("\n", 4)
-                if len(parts) >= 4:
-                    chash = parts[0].strip()
-                    author = parts[1].strip()
-                    date_str = parts[2].strip()
-                    parents = parts[3].strip().split()
-                    body = ""
-                    if len(parts) == 5:
-                        body_parts = parts[4].rsplit("\nBODY_END", 1)
-                        body = body_parts[0].strip()
-                    meta_map[chash] = (author, date_str, parents, body)
-
-            diff_cmd = ["git", "diff-tree", "-p", "--root", "--stdin"]
-            diff_proc = subprocess.run(
-                diff_cmd,
-                cwd=str(self.repo_path),
-                input=input_hashes,
-                capture_output=True,
-                check=False,
-            )
-            raw_diff = diff_proc.stdout.decode("utf-8", errors="replace")
-            diff_chunks = raw_diff.split("\ncommit ")
-            diff_map = {}
-            for dchunk in diff_chunks:
-                dchunk = dchunk.strip()
-                if not dchunk:
-                    continue
-                lines = dchunk.split("\n", 1)
-                first_line = lines[0].strip()
-                diff_hash = first_line.split()[0] if first_line else ""
-                diff_text = lines[1] if len(lines) > 1 else ""
-                if diff_hash:
-                    diff_map[diff_hash] = diff_text
-
-            for chash in commit_hashes:
-                meta = meta_map.get(chash, ("Unknown", datetime.now(timezone.utc).isoformat(), [], ""))
-                diff_content = diff_map.get(chash, "")
-                changed_files = []
-                for line in diff_content.splitlines():
-                    if line.startswith("diff --git a/") and " b/" in line:
-                        p = line.split(" b/", 1)[-1].strip()
-                        if p and p not in changed_files:
-                            changed_files.append(p)
-
-                commits.append(DanglingCommit(
-                    commit_hash=chash,
-                    author=meta[0],
-                    date=meta[1],
-                    parents=meta[2],
-                    message=meta[3],
-                    changed_files=changed_files,
-                    diff_content=diff_content,
-                    is_dangling=True
-                ))
-        except Exception:
-            pass
-
-        return commits
-
-    def _map_tree_blobs_batch(self, trees: Set[str], commits: Set[str]) -> Dict[str, str]:
-        """Decodes tree objects using git cat-file --batch binary stream parser."""
-        mapping: Dict[str, str] = {}
-        all_trees = set(trees)
-        for commit_hash in commits:
-            res = self._run_git(["show", "-s", "--format=%T", commit_hash], check=False)
-            if res.returncode == 0 and res.stdout.strip():
-                all_trees.add(res.stdout.strip())
-
-        for tree_hash in all_trees:
-            res = self._run_git(["ls-tree", "-r", tree_hash], check=False)
-            if res.returncode == 0:
-                for line in res.stdout.splitlines():
-                    parts = line.strip().split(None, 3)
-                    if len(parts) >= 4 and parts[1] == "blob":
-                        b_hash = parts[2]
-                        path_parts = line.split("\t", 1)
-                        if len(path_parts) == 2:
-                            mapping[b_hash] = path_parts[1].strip()
-        return mapping
-
-    def _parse_fsck_output(self, output: str, bucket: Dict[str, Set[str]]) -> None:
+    def _parse_fsck_output(
+        self, output: str, bucket: Dict[str, Set[str]], candidate_set: Set[str]
+    ) -> None:
         for line in output.splitlines():
             line = line.strip()
-            if not line: continue
+            if not line:
+                continue
             parts = line.split()
             if len(parts) >= 3 and parts[0] in ("unreachable", "dangling"):
                 obj_type = parts[1].lower()
                 obj_hash = parts[2]
+                candidate_set.add(obj_hash)
                 if obj_type in bucket:
                     bucket[obj_type].add(obj_hash)
 
-    def _get_object_type(self, obj_hash: str) -> Optional[str]:
-        res = self._run_git(["cat-file", "-t", obj_hash], check=False)
-        return res.stdout.strip() if res.returncode == 0 else None
-
-    def _map_tree_blobs(self, trees: Set[str], commits: Set[str]) -> Dict[str, str]:
-        mapping: Dict[str, str] = {}
-        all_trees = set(trees)
-        for commit_hash in commits:
-            res = self._run_git(["show", "-s", "--format=%T", commit_hash], check=False)
-            if res.returncode == 0 and res.stdout.strip():
-                all_trees.add(res.stdout.strip())
-
-        for tree_hash in all_trees:
-            res = self._run_git(["ls-tree", "-r", tree_hash], check=False)
-            if res.returncode == 0:
-                for line in res.stdout.splitlines():
-                    parts = line.strip().split(None, 3)
-                    if len(parts) >= 4 and parts[1] == "blob":
-                        b_hash = parts[2]
-                        path_parts = line.split("\t", 1)
-                        if len(path_parts) == 2:
-                            mapping[b_hash] = path_parts[1].strip()
+    def _batch_check(self, hashes: Set[str]) -> Dict[str, Tuple[str, int]]:
+        """Invokes 'git cat-file --batch-check' in a single call for all hashes."""
+        if not hashes:
+            return {}
+        p = subprocess.Popen(
+            ["git", "cat-file", "--batch-check"],
+            cwd=str(self.repo_path),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        stdout, _ = p.communicate("\n".join(hashes) + "\n")
+        mapping: Dict[str, Tuple[str, int]] = {}
+        for line in stdout.splitlines():
+            parts = line.strip().split()
+            if len(parts) >= 3:
+                obj_hash, obj_type, size_str = parts[0], parts[1].lower(), parts[2]
+                try:
+                    mapping[obj_hash] = (obj_type, int(size_str))
+                except ValueError:
+                    mapping[obj_hash] = (obj_type, 0)
         return mapping
 
-    def _reconstruct_commit(self, commit_hash: str) -> Optional[DanglingCommit]:
-        type_res = self._run_git(["cat-file", "-t", commit_hash], check=False)
-        if type_res.returncode != 0 or type_res.stdout.strip() != "commit":
-            return None
+    def _batch_reconstruct_commits(self, commit_hashes: List[str]) -> List[DanglingCommit]:
+        """Reconstructs commit metadata and diffs using batch log and diff-tree streams."""
+        if not commit_hashes:
+            return []
 
-        meta_res = self._run_git(["show", "-s", "--format=%an <%ae>%x1f%aI%x1f%P", commit_hash], check=False)
-        author, date_str, parents_str = "Unknown", datetime.now(timezone.utc).isoformat(), ""
-        if meta_res.returncode == 0 and meta_res.stdout.strip():
-            fields = meta_res.stdout.strip().split("\x1f")
-            if len(fields) >= 1 and fields[0]: author = fields[0]
-            if len(fields) >= 2 and fields[1]: date_str = fields[1]
-            if len(fields) >= 3 and fields[2]: parents_str = fields[2]
-
-        parents = parents_str.split() if parents_str else []
-        msg_res = self._run_git(["show", "-s", "--format=%B", commit_hash], check=False)
-        message = msg_res.stdout.strip() if msg_res.returncode == 0 else ""
-
-        files_res = self._run_git(["diff-tree", "--no-commit-id", "--name-only", "-r", commit_hash], check=False)
-        changed_files = [f.strip() for f in files_res.stdout.splitlines() if f.strip()]
-
-        diff_res = self._run_git(["diff-tree", "-p", "--root", commit_hash], check=False)
-        diff_content = diff_res.stdout if diff_res.returncode == 0 else ""
-
-        return DanglingCommit(
-            commit_hash=commit_hash, author=author, date=date_str, message=message,
-            parents=parents, changed_files=changed_files, diff_content=diff_content, is_dangling=True
+        # 1. Batch metadata via git log
+        meta_p = subprocess.Popen(
+            [
+                "git",
+                "log",
+                "--no-walk",
+                "--stdin",
+                "--format=%H%x1f%an <%ae>%x1f%aI%x1f%P%x1f%B%x1e",
+            ],
+            cwd=str(self.repo_path),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
+        meta_out, _ = meta_p.communicate("\n".join(commit_hashes) + "\n")
 
-    def _extract_blob(self, blob_hash: str, associated_path: Optional[str] = None) -> Optional[DanglingBlob]:
-        size_res = self._run_git(["cat-file", "-s", blob_hash], check=False)
-        if size_res.returncode != 0: return None
-        try: size = int(size_res.stdout.strip())
-        except ValueError: size = 0
+        commit_meta: Dict[str, Dict[str, any]] = {}
+        for record in meta_out.split("\x1e"):
+            rec = record.strip()
+            if not rec:
+                continue
+            fields = rec.split("\x1f")
+            h = fields[0].strip()
+            commit_meta[h] = {
+                "author": fields[1].strip() if len(fields) > 1 and fields[1] else "Unknown",
+                "date": fields[2].strip() if len(fields) > 2 and fields[2] else datetime.now(timezone.utc).isoformat(),
+                "parents": fields[3].strip().split() if len(fields) > 3 and fields[3] else [],
+                "message": fields[4].strip() if len(fields) > 4 else "",
+            }
 
-        if size > self.MAX_BLOB_SIZE_BYTES:
-            return DanglingBlob(
-                blob_hash=blob_hash, size=size,
-                content="[Binary or oversized file content omitted - size: %d bytes]" % size,
-                is_binary=True, associated_path=associated_path
+        # 2. Batch diffs via git diff-tree
+        diff_p = subprocess.Popen(
+            ["git", "diff-tree", "-p", "--root", "--stdin"],
+            cwd=str(self.repo_path),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        diff_out, _ = diff_p.communicate("\n".join(commit_hashes) + "\n")
+
+        commit_hashes_set = set(commit_hashes)
+        commit_diffs: Dict[str, str] = {}
+        commit_files: Dict[str, List[str]] = {}
+
+        current_commit: Optional[str] = None
+        cur_lines: List[str] = []
+        cur_files: List[str] = []
+
+        for line in diff_out.splitlines():
+            s = line.strip()
+            if s in commit_hashes_set:
+                if current_commit:
+                    commit_diffs[current_commit] = "\n".join(cur_lines)
+                    commit_files[current_commit] = list(dict.fromkeys(cur_files))
+                current_commit = s
+                cur_lines = []
+                cur_files = []
+            elif current_commit:
+                cur_lines.append(line)
+                if line.startswith("diff --git a/"):
+                    m = re.match(r"^diff --git a/.*? b/(.*)$", line)
+                    if m:
+                        cur_files.append(m.group(1))
+
+        if current_commit:
+            commit_diffs[current_commit] = "\n".join(cur_lines)
+            commit_files[current_commit] = list(dict.fromkeys(cur_files))
+
+        reconstructed: List[DanglingCommit] = []
+        for ch in commit_hashes:
+            meta = commit_meta.get(
+                ch,
+                {
+                    "author": "Unknown",
+                    "date": datetime.now(timezone.utc).isoformat(),
+                    "parents": [],
+                    "message": "",
+                },
+            )
+            reconstructed.append(
+                DanglingCommit(
+                    commit_hash=ch,
+                    author=meta["author"],
+                    date=meta["date"],
+                    message=meta["message"],
+                    parents=meta["parents"],
+                    changed_files=commit_files.get(ch, []),
+                    diff_content=commit_diffs.get(ch, ""),
+                    is_dangling=True,
+                )
             )
 
-        cmd = ["git", "cat-file", "-p", blob_hash]
-        try:
-            raw = subprocess.check_output(cmd, cwd=str(self.repo_path), stderr=subprocess.DEVNULL)
-            is_binary = b"\x00" in raw[:8000]
-            content = "[Binary blob data (%d bytes)]" % size if is_binary else raw.decode("utf-8", errors="replace")
-            return DanglingBlob(blob_hash=blob_hash, size=size, content=content, is_binary=is_binary, associated_path=associated_path)
-        except Exception: return None
+        return reconstructed
+
+    def _map_tree_blobs_batch(
+        self, commit_hashes: List[str], unreachable_trees: Set[str]
+    ) -> Dict[str, str]:
+        """Maps blob hashes to their file paths in batch from commit trees and standalone trees."""
+        import binascii
+        blob_path_map: Dict[str, str] = {}
+
+        if commit_hashes:
+            p = subprocess.Popen(
+                ["git", "diff-tree", "-r", "--root", "--stdin"],
+                cwd=str(self.repo_path),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            tree_out, _ = p.communicate("\n".join(commit_hashes) + "\n")
+            for line in tree_out.splitlines():
+                if "\t" in line:
+                    left, path = line.split("\t", 1)
+                    parts = left.split()
+                    if len(parts) >= 4:
+                        b_hash = parts[3]
+                        if len(b_hash) in (40, 64) and b_hash != "0" * len(b_hash):
+                            blob_path_map[b_hash] = path.strip()
+
+        trees_to_read = [t for t in unreachable_trees if t]
+        if trees_to_read:
+            p = subprocess.Popen(
+                ["git", "cat-file", "--batch"],
+                cwd=str(self.repo_path),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            raw_input = "\n".join(trees_to_read).encode("ascii") + b"\n"
+            raw_output, _ = p.communicate(raw_input)
+            stream = io.BytesIO(raw_output)
+            while True:
+                header_line = stream.readline()
+                if not header_line:
+                    break
+                header_parts = header_line.decode("utf-8", errors="replace").strip().split()
+                if len(header_parts) >= 3:
+                    try:
+                        size = int(header_parts[2])
+                    except ValueError:
+                        break
+                    tree_bytes = stream.read(size)
+                    stream.read(1)
+                    idx = 0
+                    while idx < len(tree_bytes):
+                        space_idx = tree_bytes.find(b" ", idx)
+                        null_idx = tree_bytes.find(b"\x00", space_idx)
+                        if space_idx == -1 or null_idx == -1 or null_idx + 21 > len(tree_bytes):
+                            break
+                        mode = tree_bytes[idx:space_idx].decode(errors="replace")
+                        name = tree_bytes[space_idx + 1:null_idx].decode(errors="replace")
+                        sha = binascii.hexlify(tree_bytes[null_idx + 1:null_idx + 21]).decode("ascii")
+                        if not mode.startswith("40000"):
+                            blob_path_map[sha] = name
+                        idx = null_idx + 21
+                elif len(header_parts) == 2 and header_parts[1] == "missing":
+                    continue
+                else:
+                    break
+
+        return blob_path_map
+
+    def _batch_extract_blobs(
+        self,
+        blob_hashes: List[str],
+        type_and_sizes: Dict[str, Tuple[str, int]],
+        blob_path_map: Dict[str, str],
+    ) -> List[DanglingBlob]:
+        """Extracts blob contents using a single streamed 'git cat-file --batch' process."""
+        blobs: List[DanglingBlob] = []
+        readable_hashes: List[str] = []
+
+        for b_hash in blob_hashes:
+            size = type_and_sizes.get(b_hash, ("blob", 0))[1]
+            path = blob_path_map.get(b_hash)
+            if size > self.MAX_BLOB_SIZE_BYTES:
+                blobs.append(
+                    DanglingBlob(
+                        blob_hash=b_hash,
+                        size=size,
+                        content="[Binary or oversized file content omitted - size: %d bytes]" % size,
+                        is_binary=True,
+                        associated_path=path,
+                    )
+                )
+            else:
+                readable_hashes.append(b_hash)
+
+        if readable_hashes:
+            p = subprocess.Popen(
+                ["git", "cat-file", "--batch"],
+                cwd=str(self.repo_path),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            raw_input = b"\n".join(h.encode("ascii") for h in readable_hashes) + b"\n"
+            raw_output, _ = p.communicate(raw_input)
+
+            stream = io.BytesIO(raw_output)
+            while True:
+                header_line = stream.readline()
+                if not header_line:
+                    break
+                header_parts = header_line.decode("utf-8", errors="replace").strip().split()
+                if len(header_parts) >= 3:
+                    obj_hash, _, size_str = header_parts[0], header_parts[1], header_parts[2]
+                    try:
+                        size = int(size_str)
+                    except ValueError:
+                        break
+                    raw_data = stream.read(size)
+                    stream.read(1)  # trailing newline from git cat-file
+                    is_binary = b"\x00" in raw_data[:8000]
+                    content = (
+                        "[Binary blob data (%d bytes)]" % size
+                        if is_binary
+                        else raw_data.decode("utf-8", errors="replace")
+                    )
+                    blobs.append(
+                        DanglingBlob(
+                            blob_hash=obj_hash,
+                            size=size,
+                            content=content,
+                            is_binary=is_binary,
+                            associated_path=blob_path_map.get(obj_hash),
+                        )
+                    )
+                elif len(header_parts) == 2 and header_parts[1] == "missing":
+                    continue
+                else:
+                    break
+
+        return blobs
 
     def _run_git(self, args: List[str], check: bool = True) -> subprocess.CompletedProcess[str]:
         full_cmd = ["git"] + args
         try:
             return subprocess.run(
-                full_cmd, cwd=str(self.repo_path), capture_output=True, text=True,
-                encoding="utf-8", errors="replace", check=check
+                full_cmd,
+                cwd=str(self.repo_path),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=check,
             )
         except subprocess.CalledProcessError as e:
-            if check: raise
-            return subprocess.CompletedProcess(args=full_cmd, returncode=e.returncode, stdout=e.stdout or "", stderr=e.stderr or "")
+            if check:
+                raise
+            return subprocess.CompletedProcess(
+                args=full_cmd,
+                returncode=e.returncode,
+                stdout=e.stdout or "",
+                stderr=e.stderr or "",
+            )
         except FileNotFoundError:
-            return subprocess.CompletedProcess(args=full_cmd, returncode=127, stdout="", stderr="git not found")
+            return subprocess.CompletedProcess(
+                args=full_cmd,
+                returncode=127,
+                stdout="",
+                stderr="git not found",
+            )
