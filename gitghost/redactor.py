@@ -203,3 +203,33 @@ class SecretRedactor:
                         ))
 
                     elif mask_type == "preserve_edges":
+                        raw_val = match.group(1)
+                        if self._is_dummy_value(raw_val):
+                            continue
+                        masked_val = mask_credential(raw_val)
+                        entropy = shannon_entropy(raw_val)
+                        current_line = current_line.replace(raw_val, masked_val)
+                        findings.append(SecretFinding(
+                            finding_id=fid, rule_name=rule_name, match_type="pattern",
+                            severity_estimate=severity, masked_value=masked_val, line_number=line_idx,
+                            context_line=self._mask_raw_line(line_without_newline, raw_val, masked_val),
+                            entropy=round(entropy, 2), file_path=file_path, commit_hash=commit_hash, blob_hash=blob_hash,
+                        ))
+
+                    elif mask_type == "full":
+                        raw_val = match.group(1)
+                        masked_val = "[REDACTED_AWS_SECRET_KEY]"
+                        entropy = shannon_entropy(raw_val)
+                        current_line = current_line.replace(raw_val, masked_val)
+                        findings.append(SecretFinding(
+                            finding_id=fid, rule_name=rule_name, match_type="pattern",
+                            severity_estimate=severity, masked_value=masked_val, line_number=line_idx,
+                            context_line=self._mask_raw_line(line_without_newline, raw_val, masked_val),
+                            entropy=round(entropy, 2), file_path=file_path, commit_hash=commit_hash, blob_hash=blob_hash,
+                        ))
+
+            tokens = re.findall(r"[A-Za-z0-9+/=_-]{16,}", current_line)
+            for token in tokens:
+                if "REDACTED" in token or "****" in token or self._is_dummy_value(token):
+                    continue
+                entropy = shannon_entropy(token)
