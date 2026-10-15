@@ -233,3 +233,46 @@ class SecretRedactor:
                 if "REDACTED" in token or "****" in token or self._is_dummy_value(token):
                     continue
                 entropy = shannon_entropy(token)
+                if entropy >= self.entropy_threshold:
+                    finding_counter += 1
+                    fid = f"ENT-{finding_counter:04d}"
+                    masked_token = mask_credential(token, 3, 3)
+                    current_line = current_line.replace(token, "[REDACTED_HIGH_ENTROPY_SECRET]")
+                    findings.append(SecretFinding(
+                        finding_id=fid, rule_name="High Entropy Suspicious Secret", match_type="entropy",
+                        severity_estimate="High" if entropy > 4.6 else "Medium", masked_value=masked_token,
+                        line_number=line_idx, context_line=self._mask_raw_line(line_without_newline, token, "[REDACTED_HIGH_ENTROPY_SECRET]"),
+                        entropy=round(entropy, 2), file_path=file_path, commit_hash=commit_hash, blob_hash=blob_hash,
+                    ))
+
+            sanitized_lines.append(current_line)
+
+        redacted_full_text = "".join(sanitized_lines)
+
+        pk_regex = re.compile(r"-----BEGIN (?:RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY-----[\s\S]*?-----END (?:RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY-----")
+        for match in pk_regex.finditer(redacted_full_text):
+            finding_counter += 1
+            fid = f"PK-{finding_counter:04d}"
+            masked_pk = "-----BEGIN PRIVATE KEY-----\n[REDACTED_PRIVATE_KEY_BLOCK]\n-----END PRIVATE KEY-----"
+            redacted_full_text = redacted_full_text.replace(match.group(0), masked_pk)
+            findings.append(SecretFinding(
+                finding_id=fid, rule_name="Asymmetric Private Key Block", match_type="pattern",
+                severity_estimate="Critical", masked_value="[REDACTED_PRIVATE_KEY_BLOCK]",
+                line_number=1, context_line="-----BEGIN PRIVATE KEY----- ... [REDACTED_PRIVATE_KEY_BLOCK]",
+                entropy=5.0, file_path=file_path, commit_hash=commit_hash, blob_hash=blob_hash,
+            ))
+
+        return RedactionResult(redacted_text=redacted_full_text, findings=findings)
+
+    def _is_dummy_value(self, value: str) -> bool:
+        val_lower = value.strip().lower()
+        if val_lower in ("null", "undefined", "none", "example", "placeholder", "changeme", "dummy"):
+            return True
+        if any(term in val_lower for term in ("your_api_key", "insert_token", "fake_secret", "dummy_value", "my_secret_key")):
+            return True
+        if len(set(value)) <= 2:
+            return True
+        return False
+
+    def _mask_raw_line(self, original_line: str, secret: str, replacement: str) -> str:
+        return original_line.replace(secret, replacement) if secret in original_line else original_line
