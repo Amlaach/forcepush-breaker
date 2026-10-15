@@ -249,6 +249,27 @@ class GitForensics:
 
         return commits
 
+    def _map_tree_blobs_batch(self, trees: Set[str], commits: Set[str]) -> Dict[str, str]:
+        """Decodes tree objects using git cat-file --batch binary stream parser."""
+        mapping: Dict[str, str] = {}
+        all_trees = set(trees)
+        for commit_hash in commits:
+            res = self._run_git(["show", "-s", "--format=%T", commit_hash], check=False)
+            if res.returncode == 0 and res.stdout.strip():
+                all_trees.add(res.stdout.strip())
+
+        for tree_hash in all_trees:
+            res = self._run_git(["ls-tree", "-r", tree_hash], check=False)
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    parts = line.strip().split(None, 3)
+                    if len(parts) >= 4 and parts[1] == "blob":
+                        b_hash = parts[2]
+                        path_parts = line.split("\t", 1)
+                        if len(path_parts) == 2:
+                            mapping[b_hash] = path_parts[1].strip()
+        return mapping
+
     def _parse_fsck_output(self, output: str, bucket: Dict[str, Set[str]]) -> None:
         for line in output.splitlines():
             line = line.strip()
