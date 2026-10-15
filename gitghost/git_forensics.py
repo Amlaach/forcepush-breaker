@@ -148,3 +148,38 @@ class GitForensics:
                 for line in res.stdout.splitlines():
                     parts = line.strip().split(None, 3)
                     if len(parts) >= 4 and parts[1] == "blob":
+                        b_hash = parts[2]
+                        path_parts = line.split("\t", 1)
+                        if len(path_parts) == 2:
+                            mapping[b_hash] = path_parts[1].strip()
+        return mapping
+
+    def _reconstruct_commit(self, commit_hash: str) -> Optional[DanglingCommit]:
+        type_res = self._run_git(["cat-file", "-t", commit_hash], check=False)
+        if type_res.returncode != 0 or type_res.stdout.strip() != "commit":
+            return None
+
+        meta_res = self._run_git(["show", "-s", "--format=%an <%ae>%x1f%aI%x1f%P", commit_hash], check=False)
+        author, date_str, parents_str = "Unknown", datetime.now(timezone.utc).isoformat(), ""
+        if meta_res.returncode == 0 and meta_res.stdout.strip():
+            fields = meta_res.stdout.strip().split("\x1f")
+            if len(fields) >= 1 and fields[0]: author = fields[0]
+            if len(fields) >= 2 and fields[1]: date_str = fields[1]
+            if len(fields) >= 3 and fields[2]: parents_str = fields[2]
+
+        parents = parents_str.split() if parents_str else []
+        msg_res = self._run_git(["show", "-s", "--format=%B", commit_hash], check=False)
+        message = msg_res.stdout.strip() if msg_res.returncode == 0 else ""
+
+        files_res = self._run_git(["diff-tree", "--no-commit-id", "--name-only", "-r", commit_hash], check=False)
+        changed_files = [f.strip() for f in files_res.stdout.splitlines() if f.strip()]
+
+        diff_res = self._run_git(["diff-tree", "-p", "--root", commit_hash], check=False)
+        diff_content = diff_res.stdout if diff_res.returncode == 0 else ""
+
+        return DanglingCommit(
+            commit_hash=commit_hash, author=author, date=date_str, message=message,
+            parents=parents, changed_files=changed_files, diff_content=diff_content, is_dangling=True
+        )
+
+    def _extract_blob(self, blob_hash: str, associated_path: Optional[str] = None) -> Optional[DanglingBlob]:
