@@ -43,3 +43,28 @@ class ForensicsScanResult:
     dangling_commits: List[DanglingCommit] = field(default_factory=list)
     dangling_blobs: List[DanglingBlob] = field(default_factory=list)
     unreachable_trees: List[str] = field(default_factory=list)
+    unreachable_tags: List[str] = field(default_factory=list)
+    total_objects_scanned: int = 0
+    scan_timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    errors: List[str] = field(default_factory=list)
+
+
+class GitForensics:
+    MAX_BLOB_SIZE_BYTES = 512 * 1024
+
+    def __init__(self, repo_path: str | Path = "."):
+        self.repo_path = Path(repo_path).resolve()
+
+    def is_valid_repo(self) -> bool:
+        git_dir = self.repo_path / ".git"
+        if git_dir.exists() and (git_dir.is_dir() or git_dir.is_file()):
+            return True
+        res = self._run_git(["rev-parse", "--is-inside-work-tree"], check=False)
+        return res.returncode == 0 and res.stdout.strip() == "true"
+
+    def scan(self) -> ForensicsScanResult:
+        if not self.is_valid_repo():
+            return ForensicsScanResult(
+                repo_path=str(self.repo_path),
+                is_git_repo=False,
+                errors=["Specified path is not a valid Git repository."]
