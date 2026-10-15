@@ -46,3 +46,20 @@ class TestLiveGitForensics:
 
     def test_live_dangling_commit_detection(self, live_ghost_repo: Path):
         forensics = GitForensics(live_ghost_repo)
+        assert forensics.is_valid_repo() is True
+
+        scan_result = forensics.scan()
+        assert scan_result.is_git_repo is True
+        assert len(scan_result.dangling_commits) >= 1
+
+        dangling = scan_result.dangling_commits[0]
+        assert "temporary test of db credentials" in dangling.message
+        assert ".env" in dangling.changed_files
+        assert "postgres://admin:" in dangling.diff_content
+
+        # Verify live secret redaction works on the discovered dangling commit
+        redactor = SecretRedactor()
+        redaction = redactor.scan_and_redact(dangling.diff_content, file_path=".env", commit_hash=dangling.commit_hash)
+        assert len(redaction.findings) >= 1
+        assert "SuperSecretPass123!" not in redaction.redacted_text
+        assert "[REDACTED_DB_PASSWORD]" in redaction.redacted_text
