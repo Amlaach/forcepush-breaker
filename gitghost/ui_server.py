@@ -6,22 +6,22 @@ Provides standard HTTP endpoints using Python's standard library http.server.
 from __future__ import annotations
 
 import json
-import os
+import shutil
 import subprocess
 import sys
 import threading
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Optional
+from typing import Dict
 
 from gitghost import __version__
-from gitghost.git_forensics import GitForensics, ForensicsScanResult
-from gitghost.redactor import SecretRedactor, SecretFinding
-from gitghost.ai_triage import AITriage, AITriageResult
-from gitghost.scoring import HygieneScorer, HygieneScoreReport
-from gitghost.remediation import RemediationGenerator, RemediationPlan
 from gitghost.exporters import ReportExporter
+from gitghost.git_forensics import GitForensics
+from gitghost.pipeline import PipelineResult, run_scan_pipeline
 from gitghost.ui_assets import HTML_PAGE
+
+# Thread-safe server-side cache for full pipeline scan results
+_SCAN_CACHE: Dict[str, PipelineResult] = {}
 
 
 class GitGhostRequestHandler(BaseHTTPRequestHandler):
@@ -113,6 +113,10 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
         self._send_json({"folder": folder or ""})
 
     def _handle_scan(self, data: dict):
+        if not shutil.which("git"):
+            self._send_error(500, "Git executable not found in system PATH. Git is required to perform forensics.")
+            return
+
         repo_path_str = data.get("repo_path", ".").strip() or "."
         repo_path = Path(repo_path_str).resolve()
 
@@ -128,70 +132,20 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
         ai_provider = data.get("ai_provider", "heuristic")
         entropy_thresh = float(data.get("entropy_threshold", 4.0))
 
-        # 1. Object Forensics Scan
-        scan_res = forensics.scan()
-
-        # 2. Secret Redaction & Shannon Entropy Sweep
-        redactor = SecretRedactor(entropy_threshold=entropy_thresh)
-        all_findings: list[SecretFinding] = []
-
-        for c in scan_res.dangling_commits:
-            msg_res = redactor.scan_and_redact(c.message, file_path="[Commit Message]", commit_hash=c.commit_hash)
-            all_findings.extend(msg_res.findings)
-            diff_res = redactor.scan_and_redact(
-                c.diff_content,
-                file_path=c.changed_files[0] if c.changed_files else "Diff",
-                commit_hash=c.commit_hash,
-            )
-            all_findings.extend(diff_res.findings)
-
-        for b in scan_res.dangling_blobs:
-            if not b.is_binary:
-                blob_res = redactor.scan_and_redact(
-                    b.content,
-                    file_path=b.associated_path or "Detached Blob",
-                    blob_hash=b.blob_hash,
-                )
-                all_findings.extend(blob_res.findings)
-
-        # 3. AI Triage
-        triage_map: dict[str, AITriageResult] = {}
-        if ai_provider != "none" and all_findings:
-            triage_engine = AITriage(provider=ai_provider)
-            for f in all_findings:
-                matched_c = next((c for c in scan_res.dangling_commits if c.commit_hash == f.commit_hash), None)
-                verdict = triage_engine.triage_finding(
-                    finding_rule=f.rule_name,
-                    masked_snippet=f.masked_value,
-                    context_line=f.context_line,
-                    commit_message=matched_c.message if matched_c else None,
-                    author=matched_c.author if matched_c else None,
-                    file_path=f.file_path,
-                )
-                triage_map[f.finding_id] = verdict
-
-        # 4. Hygiene Scoring
-        commit_dates = [c.date for c in scan_res.dangling_commits if c.date]
-        hygiene = HygieneScorer.calculate(
-            dangling_commits_count=len(scan_res.dangling_commits),
-            dangling_blobs_count=len(scan_res.dangling_blobs),
-            findings=all_findings,
-            triage_results=triage_map,
-            commit_dates=commit_dates,
+        # Run unified full scan pipeline
+        pipeline_res = run_scan_pipeline(
+            repo_path=repo_path,
+            ai_provider=ai_provider,
+            entropy_threshold=entropy_thresh,
         )
 
-        # 5. Remediation Playbook
-        remediation = RemediationGenerator.generate_plan(
-            repo_path=str(repo_path),
-            findings=all_findings,
-            dangling_commits_count=len(scan_res.dangling_commits),
-            dangling_blobs_count=len(scan_res.dangling_blobs),
-        )
+        # Cache result in memory for seamless export
+        _SCAN_CACHE[str(repo_path)] = pipeline_res
 
         # Format response payload
         findings_payload = []
-        for f in all_findings:
-            t = triage_map.get(f.finding_id)
+        for f in pipeline_res.findings:
+            t = pipeline_res.triage_map.get(f.finding_id)
             findings_payload.append({
                 "finding_id": f.finding_id,
                 "rule_name": f.rule_name,
@@ -202,6 +156,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 "entropy": round(f.entropy, 2),
                 "file_path": f.file_path,
                 "commit_hash": f.commit_hash,
+                "blob_hash": f.blob_hash,
                 "triage_severity": t.severity if t else f.severity_estimate,
                 "is_false_positive": t.is_false_positive if t else False,
                 "triage_risk_score": t.risk_score if t else None,
@@ -217,7 +172,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 "message": c.message,
                 "changed_files": c.changed_files,
             }
-            for c in scan_res.dangling_commits
+            for c in pipeline_res.scan_result.dangling_commits
         ]
 
         blobs_payload = [
@@ -227,27 +182,29 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 "is_binary": b.is_binary,
                 "associated_path": b.associated_path,
             }
-            for b in scan_res.dangling_blobs
+            for b in pipeline_res.scan_result.dangling_blobs
         ]
 
         hygiene_payload = {
-            "score": hygiene.score,
-            "grade": hygiene.grade,
-            "color": hygiene.color,
-            "summary": hygiene.summary,
-            "critical_findings_count": hygiene.critical_findings_count,
-            "high_findings_count": hygiene.high_findings_count,
-            "medium_findings_count": hygiene.medium_findings_count,
-            "low_findings_count": hygiene.low_findings_count,
-            "false_positives_count": hygiene.false_positives_count,
+            "score": pipeline_res.hygiene.score,
+            "grade": pipeline_res.hygiene.grade,
+            "color": pipeline_res.hygiene.color,
+            "summary": pipeline_res.hygiene.summary,
+            "critical_findings_count": pipeline_res.hygiene.critical_findings_count,
+            "high_findings_count": pipeline_res.hygiene.high_findings_count,
+            "medium_findings_count": pipeline_res.hygiene.medium_findings_count,
+            "low_findings_count": pipeline_res.hygiene.low_findings_count,
+            "false_positives_count": pipeline_res.hygiene.false_positives_count,
             "deductions": [
                 {"category": d.category, "points": d.points, "reason": d.reason}
-                for d in hygiene.deductions
+                for d in pipeline_res.hygiene.deductions
             ],
         }
 
         remediation_payload = {
-            "rotation_warning": remediation.rotation_warning,
+            "rotation_warning": pipeline_res.remediation.rotation_warning,
+            "bash_script": pipeline_res.remediation.bash_script,
+            "powershell_script": pipeline_res.remediation.powershell_script,
             "steps": [
                 {
                     "order": s.order,
@@ -255,13 +212,13 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                     "description": s.description,
                     "commands": s.commands,
                 }
-                for s in remediation.steps
+                for s in pipeline_res.remediation.steps
             ],
         }
 
         self._send_json({
             "repo_path": str(repo_path),
-            "total_objects_scanned": scan_res.total_objects_scanned,
+            "total_objects_scanned": pipeline_res.scan_result.total_objects_scanned,
             "dangling_commits": commits_payload,
             "dangling_blobs": blobs_payload,
             "findings": findings_payload,
@@ -291,6 +248,8 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 capture_output=True,
                 text=True,
             )
+            # Invalidate cached scan for this repository
+            _SCAN_CACHE.pop(str(repo_path), None)
             self._send_json({"success": True, "message": "All unreferenced objects permanently excised."})
         except subprocess.CalledProcessError as e:
             self._send_error(500, f"Git command failed: {e.stderr or e.stdout}")
@@ -300,40 +259,47 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
         repo_path = Path(repo_path_str).resolve()
         fmt = (data.get("format", "sarif") or "sarif").lower()
 
-        forensics = GitForensics(repo_path)
-        scan_res = forensics.scan()
-        redactor = SecretRedactor()
-        findings: list[SecretFinding] = []
-        for c in scan_res.dangling_commits:
-            diff_res = redactor.scan_and_redact(c.diff_content, file_path=c.changed_files[0] if c.changed_files else "Diff", commit_hash=c.commit_hash)
-            findings.extend(diff_res.findings)
-
-        triage_engine = AITriage(provider="heuristic")
-        triage_map = {
-            f.finding_id: triage_engine.triage_finding(f.rule_name, f.masked_value, f.context_line, file_path=f.file_path)
-            for f in findings
-        }
-        hygiene = HygieneScorer.calculate(len(scan_res.dangling_commits), len(scan_res.dangling_blobs), findings, triage_map)
-        remediation = RemediationGenerator.generate_plan(str(repo_path), findings)
+        # Use full cached pipeline result if available, or run unified scan pipeline
+        cached = _SCAN_CACHE.get(str(repo_path))
+        if cached:
+            pipeline_res = cached
+        else:
+            pipeline_res = run_scan_pipeline(repo_path, ai_provider="heuristic")
+            _SCAN_CACHE[str(repo_path)] = pipeline_res
 
         if fmt == "sarif":
             out_file = repo_path / "gitghost_report.sarif"
-            out_file.write_text(ReportExporter.to_sarif(scan_res, findings, triage_map), encoding="utf-8")
+            content = ReportExporter.to_sarif(
+                pipeline_res.scan_result, pipeline_res.findings, pipeline_res.triage_map
+            )
         elif fmt == "json":
             out_file = repo_path / "gitghost_report.json"
-            out_file.write_text(ReportExporter.to_json(scan_res, findings, triage_map, hygiene, remediation), encoding="utf-8")
+            content = ReportExporter.to_json(
+                pipeline_res.scan_result,
+                pipeline_res.findings,
+                pipeline_res.triage_map,
+                pipeline_res.hygiene,
+                pipeline_res.remediation,
+            )
         else:
             out_file = repo_path / "gitghost_report.md"
-            out_file.write_text(ReportExporter.to_markdown(scan_res, findings, triage_map, hygiene, remediation), encoding="utf-8")
+            content = ReportExporter.to_markdown(
+                pipeline_res.scan_result,
+                pipeline_res.findings,
+                pipeline_res.triage_map,
+                pipeline_res.hygiene,
+                pipeline_res.remediation,
+            )
 
+        out_file.write_text(content, encoding="utf-8")
         self._send_json({"success": True, "file_path": str(out_file)})
 
     def _handle_hook(self, data: dict):
         repo_path_str = data.get("repo_path", ".").strip() or "."
         repo_path = Path(repo_path_str).resolve()
-        success, hook_path = ReportExporter.install_pre_push_hook(repo_path)
+        success, hook_path, notice = ReportExporter.install_pre_push_hook(repo_path)
         if success:
-            self._send_json({"success": True, "hook_path": hook_path})
+            self._send_json({"success": True, "hook_path": hook_path, "notice": notice})
         else:
             self._send_error(400, f"Failed to install pre-push hook: {hook_path}")
 
