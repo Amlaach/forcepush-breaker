@@ -103,3 +103,23 @@ class SecretRedactor:
             "name": "OpenAI / Anthropic API Key",
             "regex": re.compile(r"\b(sk-proj-[a-zA-Z0-9_\-]{40,}|sk-ant-[a-zA-Z0-9_\-]{40,}|sk-[a-zA-Z0-9]{32,})\b"),
             "severity": "Critical",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "Private Key Block",
+            "regex": re.compile(r"-----BEGIN (?:RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY-----[\s\S]*?-----END (?:RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY-----"),
+            "severity": "Critical",
+            "mask_type": "private_key",
+        },
+        {
+            "name": "Database Connection URI with Password",
+            "regex": re.compile(r"\b((?:postgres|postgresql|mysql|mongodb|redis|amqp|mssql):\/\/[a-zA-Z0-9_.%+-]+:)([^@\s/]+)(@[a-zA-Z0-9.-]+(?::[0-9]+)?(?:\/[a-zA-Z0-9_.-]+)?)\b"),
+            "severity": "Critical",
+            "mask_type": "db_uri",
+        },
+        {
+            "name": "Generic Secret in Configuration / Env",
+            "regex": re.compile(r"(?i)\b(password|passwd|secret|token|api_key|apikey|access_token|auth_token|client_secret|private_key)\s*[:=]\s*['\"]?([^\s\"'#;]{8,})['\"]?"),
+            "severity": "High",
+            "mask_type": "env_secret",
+        },
