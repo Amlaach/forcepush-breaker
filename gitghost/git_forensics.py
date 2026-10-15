@@ -183,3 +183,35 @@ class GitForensics:
         )
 
     def _extract_blob(self, blob_hash: str, associated_path: Optional[str] = None) -> Optional[DanglingBlob]:
+        size_res = self._run_git(["cat-file", "-s", blob_hash], check=False)
+        if size_res.returncode != 0: return None
+        try: size = int(size_res.stdout.strip())
+        except ValueError: size = 0
+
+        if size > self.MAX_BLOB_SIZE_BYTES:
+            return DanglingBlob(
+                blob_hash=blob_hash, size=size,
+                content="[Binary or oversized file content omitted - size: %d bytes]" % size,
+                is_binary=True, associated_path=associated_path
+            )
+
+        cmd = ["git", "cat-file", "-p", blob_hash]
+        try:
+            raw = subprocess.check_output(cmd, cwd=str(self.repo_path), stderr=subprocess.DEVNULL)
+            is_binary = b"\x00" in raw[:8000]
+            content = "[Binary blob data (%d bytes)]" % size if is_binary else raw.decode("utf-8", errors="replace")
+            return DanglingBlob(blob_hash=blob_hash, size=size, content=content, is_binary=is_binary, associated_path=associated_path)
+        except Exception: return None
+
+    def _run_git(self, args: List[str], check: bool = True) -> subprocess.CompletedProcess[str]:
+        full_cmd = ["git"] + args
+        try:
+            return subprocess.run(
+                full_cmd, cwd=str(self.repo_path), capture_output=True, text=True,
+                encoding="utf-8", errors="replace", check=check
+            )
+        except subprocess.CalledProcessError as e:
+            if check: raise
+            return subprocess.CompletedProcess(args=full_cmd, returncode=e.returncode, stdout=e.stdout or "", stderr=e.stderr or "")
+        except FileNotFoundError:
+            return subprocess.CompletedProcess(args=full_cmd, returncode=127, stdout="", stderr="git not found")
