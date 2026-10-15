@@ -43,3 +43,23 @@ class SecretFinding:
     rule_name: str
     match_type: str
     severity_estimate: str
+    masked_value: str
+    line_number: int
+    context_line: str
+    entropy: float
+    file_path: Optional[str] = None
+    commit_hash: Optional[str] = None
+    blob_hash: Optional[str] = None
+
+
+@dataclass
+class RedactionResult:
+    redacted_text: str
+    findings: List[SecretFinding] = field(default_factory=list)
+
+
+class SecretRedactor:
+    ENTROPY_THRESHOLD = 4.3
+    MIN_ENTROPY_LEN = 16
+
+    RULES = [
