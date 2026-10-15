@@ -119,6 +119,27 @@ class ReportExporter:
             md.append(f"{step.description}\n\n```bash")
             for cmd in step.commands: md.append(cmd)
             md.append("```\n")
+
+        if remediation.bash_script:
+            md.extend([
+                "### Automated Remediation Scripts",
+                "",
+                "#### Bash Script (Linux / macOS / WSL):",
+                "```bash",
+                remediation.bash_script.strip(),
+                "```",
+                "",
+            ])
+
+        if remediation.powershell_script:
+            md.extend([
+                "#### PowerShell Script (Windows):",
+                "```powershell",
+                remediation.powershell_script.strip(),
+                "```",
+                "",
+            ])
+
         return "\n".join(md)
 
     @classmethod
