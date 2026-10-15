@@ -50,6 +50,8 @@ class RemediationGenerator:
         dangling_blobs_count: int = 0,
     ) -> RemediationPlan:
         steps: List[RemediationStep] = []
+        clean_path = str(Path(repo_path).resolve())
+        backup_path = f"{clean_path}_safety_backup.git"
         affected_files: Set[str] = set()
         for f in findings:
             if f.file_path and f.file_path not in ("Unknown", "N/A"):
@@ -60,7 +62,7 @@ class RemediationGenerator:
         steps.append(RemediationStep(
             order=1, title="Create Safety Mirror Backup",
             description="Before rewriting Git history, clone a safety mirror of your repository.",
-            commands=[f"git clone --mirror {repo_path} {repo_path}_safety_backup.git"],
+            commands=[f'git clone --mirror "{clean_path}" "{backup_path}"'],
             is_destructive=False,
         ))
 
