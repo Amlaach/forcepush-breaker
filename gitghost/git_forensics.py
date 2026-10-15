@@ -68,3 +68,43 @@ class GitForensics:
                 repo_path=str(self.repo_path),
                 is_git_repo=False,
                 errors=["Specified path is not a valid Git repository."]
+            )
+
+        result = ForensicsScanResult(repo_path=str(self.repo_path), is_git_repo=True)
+        unreachable_objects: Dict[str, Set[str]] = {
+            "commit": set(), "blob": set(), "tree": set(), "tag": set(),
+        }
+
+        fsck_res = self._run_git(["fsck", "--full", "--no-reflogs", "--unreachable", "--lost-found"], check=False)
+        self._parse_fsck_output(fsck_res.stdout + "\n" + fsck_res.stderr, unreachable_objects)
+
+        dangling_res = self._run_git(["fsck", "--full", "--no-reflogs", "--dangling"], check=False)
+        self._parse_fsck_output(dangling_res.stdout + "\n" + dangling_res.stderr, unreachable_objects)
+
+        lost_found_dir = self.repo_path / ".git" / "lost-found"
+        if lost_found_dir.exists():
+            commit_dir = lost_found_dir / "commit"
+            if commit_dir.exists() and commit_dir.is_dir():
+                for f in commit_dir.iterdir():
+                    if len(f.name) in (40, 64):
+                        unreachable_objects["commit"].add(f.name)
+            other_dir = lost_found_dir / "other"
+            if other_dir.exists() and other_dir.is_dir():
+                for f in other_dir.iterdir():
+                    if len(f.name) in (40, 64):
+                        obj_type = self._get_object_type(f.name)
+                        if obj_type in unreachable_objects:
+                            unreachable_objects[obj_type].add(f.name)
+
+        result.unreachable_trees = list(unreachable_objects["tree"])
+        result.unreachable_tags = list(unreachable_objects["tag"])
+
+        blob_path_map = self._map_tree_blobs(unreachable_objects["tree"], unreachable_objects["commit"])
+
+        for commit_hash in unreachable_objects["commit"]:
+            commit_obj = self._reconstruct_commit(commit_hash)
+            if commit_obj:
+                result.dangling_commits.append(commit_obj)
+
+        result.dangling_commits.sort(key=lambda c: c.date, reverse=True)
+
