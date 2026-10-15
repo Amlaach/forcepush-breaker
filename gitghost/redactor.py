@@ -62,6 +62,12 @@ class SecretRedactor:
     ENTROPY_THRESHOLD = 4.3
     MIN_ENTROPY_LEN = 16
 
+    FALSE_POSITIVE_TERMS: Set[str] = {
+        "null", "undefined", "none", "example", "placeholder", "changeme", "dummy",
+        "test", "fake", "mock", "sample", "your_key_here", "insert_token",
+        "my_secret_key", "todo", "fixme", "xxxx", "0000", "1234",
+    }
+
     RULES = [
         {
             "name": "AWS Access Key ID",
@@ -267,13 +273,16 @@ class SecretRedactor:
         return RedactionResult(redacted_text=redacted_full_text, findings=findings)
 
     def _is_dummy_value(self, value: str) -> bool:
-        val_lower = value.strip().lower()
-        if val_lower in ("null", "undefined", "none", "example", "placeholder", "changeme", "dummy"):
+        val_clean = value.strip().strip("'\"").lower()
+        if not val_clean:
             return True
-        if any(term in val_lower for term in ("your_api_key", "insert_token", "fake_secret", "dummy_value", "my_secret_key")):
+        if val_clean in self.FALSE_POSITIVE_TERMS:
             return True
-        if len(set(value)) <= 2:
+        if len(set(val_clean)) <= 2 and len(val_clean) > 3:
             return True
+        for term in self.FALSE_POSITIVE_TERMS:
+            if re.search(r"\b" + re.escape(term) + r"\b", val_clean):
+                return True
         return False
 
     def _mask_raw_line(self, original_line: str, secret: str, replacement: str) -> str:
