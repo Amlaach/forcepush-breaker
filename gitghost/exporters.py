@@ -138,3 +138,37 @@ class ReportExporter:
                 rules_dict[rule_id] = {
                     "id": rule_id, "name": f.rule_name, "shortDescription": {"text": f"Dangling secret detected: {f.rule_name}"},
                     "fullDescription": {"text": f"GitGhost detected an unreachable/dangling secret ({f.rule_name}) in Git history."},
+                    "defaultConfiguration": {"level": sarif_level},
+                }
+
+            loc_uri = f.file_path if (f.file_path and f.file_path not in ("Unknown", "N/A")) else ".git/objects"
+            sarif_results.append({
+                "ruleId": rule_id, "level": sarif_level,
+                "message": {"text": f"Credential ({f.rule_name}) discovered in unreachable Git commit/blob. Masked: {f.masked_value}."},
+                "locations": [{
+                    "physicalLocation": {
+                        "artifactLocation": {"uri": loc_uri.replace("\\", "/"), "uriBaseId": "%SRCROOT%"},
+                        "region": {"startLine": max(1, f.line_number), "snippet": {"text": f.context_line}}
+                    }
+                }],
+                "properties": {"commit_hash": f.commit_hash or "N/A", "entropy": f.entropy}
+            })
+
+        sarif_doc = {
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [{"tool": {"driver": {"name": "GitGhost", "version": "0.1.0", "rules": list(rules_dict.values())}}, "results": sarif_results}]
+        }
+        return json.dumps(sarif_doc, indent=2)
+
+    @classmethod
+    def install_pre_push_hook(cls, repo_path: str | Path) -> Tuple[bool, str]:
+        repo_dir = Path(repo_path).resolve()
+        hooks_dir = repo_dir / ".git" / "hooks"
+        if not hooks_dir.exists(): return False, f"Hooks dir not found at {hooks_dir}"
+        hook_file = hooks_dir / "pre-push"
+        hook_file.write_text("#!/usr/bin/env bash\ngitghost scan . --strict --no-ai\n", encoding="utf-8")
+        try:
+            hook_file.chmod(hook_file.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        except Exception: pass
+        return True, str(hook_file)
