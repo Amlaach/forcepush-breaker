@@ -8,6 +8,7 @@ Recovers commit metadata (author, timestamp, commit message) and reconstructed f
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -56,6 +57,8 @@ class GitForensics:
         self.repo_path = Path(repo_path).resolve()
 
     def is_valid_repo(self) -> bool:
+        if not shutil.which("git"):
+            return False
         git_dir = self.repo_path / ".git"
         if git_dir.exists() and (git_dir.is_dir() or git_dir.is_file()):
             return True
@@ -63,6 +66,11 @@ class GitForensics:
         return res.returncode == 0 and res.stdout.strip() == "true"
 
     def scan(self) -> ForensicsScanResult:
+        if not shutil.which("git"):
+            raise RuntimeError(
+                "Git executable was not found on the system PATH. "
+                "Git is required to perform GitGhost forensics."
+            )
         if not self.is_valid_repo():
             return ForensicsScanResult(
                 repo_path=str(self.repo_path),
