@@ -1,16 +1,16 @@
 """
 GitGhost Command Line Interface (CLI).
 
-Features rich terminal typography, ASCII art banners, live spinners,
+Features rich terminal typography, ASCII art banners, live progress bars,
 visual trees of dangling commits, structured findings tables, hygiene score gauges,
 automated excision recipes, and modern interactive desktop & web UI/UX.
 """
 
 from __future__ import annotations
 
-import os
-import sys
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -18,18 +18,20 @@ import typer
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
 from gitghost import __version__
-from gitghost.git_forensics import GitForensics, ForensicsScanResult
-from gitghost.redactor import SecretRedactor, RedactionResult, SecretFinding
-from gitghost.ai_triage import AITriage, AITriageResult
-from gitghost.scoring import HygieneScorer, HygieneScoreReport
-from gitghost.remediation import RemediationGenerator, RemediationPlan
+from gitghost.ai_triage import AITriageResult
+from gitghost.demo_builder import DemoBuilder
 from gitghost.exporters import ReportExporter
+from gitghost.git_forensics import ForensicsScanResult, GitForensics
+from gitghost.pipeline import run_scan_pipeline
+from gitghost.redactor import SecretFinding
+from gitghost.remediation import RemediationPlan
+from gitghost.scoring import HygieneScoreReport
 from gitghost.ui_window import launch_ui
 
 if sys.platform == "win32":
@@ -91,6 +93,11 @@ def scan_cmd(
 ) -> None:
     """Perform a comprehensive live forensics scan on a target Git repository."""
     print_banner()
+
+    if not shutil.which("git"):
+        console.print("[bold red]Error:[/bold red] Git executable was not found on the system PATH. Git is required to use GitGhost.")
+        raise typer.Exit(1)
+
     repo_path = Path(path).resolve()
     if not repo_path.exists():
         console.print(f"[bold red]Error:[/bold red] Target path does not exist: {repo_path}")
@@ -101,62 +108,114 @@ def scan_cmd(
         console.print(f"[bold red]Error:[/bold red] '{repo_path}' is not a valid Git repository (.git missing).")
         raise typer.Exit(1)
 
-    with console.status("[bold cyan]Exhuming git graveyard and unearthing unreachable objects...[/bold cyan]", spinner="dots"):
-        scan_result = forensics.scan()
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold cyan]{task.description}[/bold cyan]"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task_id = progress.add_task("Exhuming git graveyard and unearthing unreachable objects...", total=100)
 
-    _render_ghost_tree(scan_result)
-
-    redactor = SecretRedactor()
-    all_findings: list[SecretFinding] = []
-
-    with console.status("[bold magenta]Scanning unreferenced objects for secrets with Shannon entropy...[/bold magenta]", spinner="material"):
-        for c in scan_result.dangling_commits:
-            msg_res = redactor.scan_and_redact(c.message, file_path="[Commit Message]", commit_hash=c.commit_hash)
-            all_findings.extend(msg_res.findings)
-            diff_res = redactor.scan_and_redact(c.diff_content, file_path=c.changed_files[0] if c.changed_files else "Diff", commit_hash=c.commit_hash)
-            all_findings.extend(diff_res.findings)
-
-        for b in scan_result.dangling_blobs:
-            if not b.is_binary:
-                blob_res = redactor.scan_and_redact(b.content, file_path=b.associated_path or "Detached Blob", blob_hash=b.blob_hash)
-                all_findings.extend(blob_res.findings)
-
-    triage_map: dict[str, AITriageResult] = {}
-    effective_provider = "none" if no_ai else ai_provider
-
-    if effective_provider != "none" and all_findings:
-        triage_engine = AITriage(provider=effective_provider, model=model)
-        for f in all_findings:
-            matched = next((c for c in scan_result.dangling_commits if c.commit_hash == f.commit_hash), None)
-            verdict = triage_engine.triage_finding(
-                finding_rule=f.rule_name, masked_snippet=f.masked_value, context_line=f.context_line,
-                commit_message=matched.message if matched else None, author=matched.author if matched else None,
-                file_path=f.file_path,
+        def on_forensics_done(scan_res: ForensicsScanResult):
+            total_items = len(scan_res.dangling_commits) + len(scan_res.dangling_blobs)
+            progress.update(
+                task_id,
+                description=f"Scanning {total_items} unreachable objects for credentials...",
+                total=max(1, total_items),
+                completed=0,
             )
-            triage_map[f.finding_id] = verdict
 
-    commit_dates = [c.date for c in scan_result.dangling_commits if c.date]
-    hygiene = HygieneScorer.calculate(
-        dangling_commits_count=len(scan_result.dangling_commits),
-        dangling_blobs_count=len(scan_result.dangling_blobs),
-        findings=all_findings, triage_results=triage_map, commit_dates=commit_dates,
-    )
+        def on_item_scanned(current: int, total: int):
+            progress.update(task_id, completed=current, total=max(1, total))
 
-    remediation = RemediationGenerator.generate_plan(
-        repo_path=str(repo_path), findings=all_findings,
-        dangling_commits_count=len(scan_result.dangling_commits), dangling_blobs_count=len(scan_result.dangling_blobs),
-    )
+        pipeline_res = run_scan_pipeline(
+            repo_path=repo_path,
+            ai_provider="none" if no_ai else ai_provider,
+            model=model,
+            on_forensics_done=on_forensics_done,
+            on_item_scanned=on_item_scanned,
+        )
 
-    _render_findings_table(all_findings, triage_map)
-    _render_score_panel(hygiene)
-    _render_remediation_panel(remediation)
+    _render_ghost_tree(pipeline_res.scan_result)
+    _render_findings_table(pipeline_res.findings, pipeline_res.triage_map)
+    _render_score_panel(pipeline_res.hygiene)
+    _render_remediation_panel(pipeline_res.remediation)
 
     if output:
-        _handle_export(output, export_format, scan_result, all_findings, triage_map, hygiene, remediation)
+        _handle_export(
+            output,
+            export_format,
+            pipeline_res.scan_result,
+            pipeline_res.findings,
+            pipeline_res.triage_map,
+            pipeline_res.hygiene,
+            pipeline_res.remediation,
+        )
 
-    if strict and (hygiene.score < 70 or hygiene.critical_findings_count > 0):
-        console.print(f"\n[bold red]Strict Check Failed:[/bold red] Hygiene score {hygiene.score}/100.")
+    if strict and (pipeline_res.hygiene.score < 70 or pipeline_res.hygiene.critical_findings_count > 0):
+        console.print(f"\n[bold red]Strict Check Failed:[/bold red] Hygiene score {pipeline_res.hygiene.score}/100.")
         raise typer.Exit(1)
+
+
+@app.command(name="demo")
+def demo_cmd():
+    """Run an instant interactive sandbox demo of GitGhost forensics in 5 seconds."""
+    print_banner()
+
+    if not shutil.which("git"):
+        console.print("[bold red]Error:[/bold red] Git executable was not found on the system PATH. Git is required to use GitGhost.")
+        raise typer.Exit(1)
+
+    console.print("[bold cyan]🚀 Initializing GitGhost Interactive Sandbox Demo...[/bold cyan]")
+    console.print("[dim]Creating temporary sandbox repository with simulated accidental secret leak...[/dim]\n")
+
+    info = DemoBuilder.create_demo_repository()
+    try:
+        console.print(f"[bold green]✔[/bold green] Created temporary Git sandbox at: [cyan]{info.repo_path}[/cyan]")
+        console.print(
+            f"[bold yellow]Scenario:[/bold yellow] Developer committed [red]{info.leaked_filename}[/red] "
+            f"([italic]{info.dangling_commit_subject}[/italic]), then ran [bold cyan]git reset --hard HEAD~1[/bold cyan].\n"
+        )
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold cyan]{task.description}[/bold cyan]"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            task_id = progress.add_task("Exhuming sandbox git graveyard...", total=100)
+
+            def on_forensics_done(scan_res: ForensicsScanResult):
+                total_items = len(scan_res.dangling_commits) + len(scan_res.dangling_blobs)
+                progress.update(
+                    task_id,
+                    description=f"Scanning {total_items} unreachable sandbox objects...",
+                    total=max(1, total_items),
+                    completed=0,
+                )
+
+            def on_item_scanned(current: int, total: int):
+                progress.update(task_id, completed=current, total=max(1, total))
+
+            pipeline_res = run_scan_pipeline(
+                repo_path=info.repo_path,
+                ai_provider="none",
+                on_forensics_done=on_forensics_done,
+                on_item_scanned=on_item_scanned,
+            )
+
+        _render_ghost_tree(pipeline_res.scan_result)
+        _render_findings_table(pipeline_res.findings, pipeline_res.triage_map)
+        _render_score_panel(pipeline_res.hygiene)
+        _render_remediation_panel(pipeline_res.remediation)
+        console.print("[bold green]✔ Sandbox demo completed successfully![/bold green] Cleaning up temporary directory...")
+    finally:
+        DemoBuilder.cleanup(info.repo_path)
+        console.print("[dim]Temporary sandbox cleaned up.[/dim]\n")
 
 
 @app.command(name="ui")
@@ -187,9 +246,11 @@ def install_hook_cmd(path: str = typer.Argument(".", help="Target repository pat
     """Install a pre-push Git hook to prevent pushing unreferenced secrets."""
     print_banner()
     repo_path = Path(path).resolve()
-    success, hook_path = ReportExporter.install_pre_push_hook(repo_path)
+    success, hook_path, notice = ReportExporter.install_pre_push_hook(repo_path)
     if success:
         console.print(f"[bold green]Success![/bold green] Pre-push hook installed at: [cyan]{hook_path}[/cyan]")
+        if notice:
+            console.print(f"[bold yellow]{notice}[/bold yellow]")
     else:
         console.print(f"[bold red]Failed:[/bold red] {hook_path}")
         raise typer.Exit(1)
@@ -202,32 +263,83 @@ def clean_cmd(
 ):
     """Execute physical excision of all unreferenced and dangling objects."""
     print_banner()
+
+    if not shutil.which("git"):
+        console.print("[bold red]Error:[/bold red] Git executable was not found on the system PATH.")
+        raise typer.Exit(1)
+
     repo_path = Path(path).resolve()
+    if not (repo_path / ".git").exists():
+        console.print(f"[bold red]Error:[/bold red] '{repo_path}' is not a valid Git repository.")
+        raise typer.Exit(1)
+
     if dry_run:
         console.print("[cyan]Dry Run:[/cyan] git reflog expire --expire=now --all && git gc --prune=now --aggressive")
         return
+
     if typer.confirm("Permanently excise unreferenced objects?"):
-        subprocess.run(["git", "reflog", "expire", "--expire=now", "--all"], cwd=str(repo_path), check=True)
-        subprocess.run(["git", "gc", "--prune=now", "--aggressive"], cwd=str(repo_path), check=True)
-        console.print("[bold green]Success![/bold green] All dangling objects excised.")
+        try:
+            subprocess.run(
+                ["git", "reflog", "expire", "--expire=now", "--all"],
+                cwd=str(repo_path),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "gc", "--prune=now", "--aggressive"],
+                cwd=str(repo_path),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            console.print("[bold green]Success![/bold green] All dangling objects excised.")
+        except subprocess.CalledProcessError as e:
+            err_msg = e.stderr or e.stdout or str(e)
+            console.print(
+                f"[bold red]Excision Failed:[/bold red] Git command returned non-zero exit code ({e.returncode}):\n"
+                f"[dim]{err_msg.strip()}[/dim]"
+            )
+            raise typer.Exit(1)
+        except Exception as e:
+            console.print(f"[bold red]Excision Failed:[/bold red] {e}")
+            raise typer.Exit(1)
 
 
 def _render_ghost_tree(scan_result: ForensicsScanResult):
-    tree = Tree(f"[bold cyan]📁 Git Object Store ({Path(scan_result.repo_path).name})[/bold cyan] [dim]({scan_result.total_objects_scanned} unreachable objects)[/dim]")
+    tree = Tree(
+        f"[bold cyan]📁 Git Object Store ({Path(scan_result.repo_path).name})[/bold cyan] "
+        f"[dim]({scan_result.total_objects_scanned} unreachable objects)[/dim]"
+    )
     commits_branch = tree.add(f"[bold magenta]👻 Dangling Commits ({len(scan_result.dangling_commits)})[/bold magenta]")
-    for c in scan_result.dangling_commits:
-        c_branch = commits_branch.add(f"[bold red]commit {c.commit_hash[:10]}[/bold red] [yellow]{c.date[:10] if c.date else 'Unknown'}[/yellow] [dim]by {c.author}[/dim]")
+    for c in scan_result.dangling_commits[:8]:
+        c_branch = commits_branch.add(
+            f"[bold red]commit {c.commit_hash[:10]}[/bold red] [yellow]{c.date[:10] if c.date else 'Unknown'}[/yellow] [dim]by {c.author}[/dim]"
+        )
         subj = c.message.splitlines()[0] if c.message else ""
         c_branch.add(f'[italic]"{subj}"[/italic]')
+    if len(scan_result.dangling_commits) > 8:
+        commits_branch.add(f"[dim italic]... and {len(scan_result.dangling_commits) - 8} more dangling commits[/dim italic]")
+
     blobs_branch = tree.add(f"[bold yellow]📦 Dangling Blobs ({len(scan_result.dangling_blobs)})[/bold yellow]")
     for b in scan_result.dangling_blobs[:4]:
-        blobs_branch.add(f"[yellow]{b.blob_hash[:10]}[/yellow] - {b.size} bytes")
+        loc = f" ({b.associated_path})" if b.associated_path else ""
+        blobs_branch.add(f"[yellow]{b.blob_hash[:10]}[/yellow]{loc} - {b.size} bytes")
+    if len(scan_result.dangling_blobs) > 4:
+        blobs_branch.add(f"[dim italic]... and {len(scan_result.dangling_blobs) - 4} more dangling blobs[/dim italic]")
+
     console.print(tree)
     console.print("")
 
 
 def _render_findings_table(findings: list[SecretFinding], triage_map: dict[str, AITriageResult]):
-    table = Table(title="🔍 Discovered Credentials & Forensic Findings", title_style="bold cyan", box=box.ROUNDED, header_style="bold magenta", show_lines=True)
+    table = Table(
+        title="🔍 Discovered Credentials & Forensic Findings",
+        title_style="bold cyan",
+        box=box.ROUNDED,
+        header_style="bold magenta",
+        show_lines=True,
+    )
     table.add_column("ID", style="bold", width=9)
     table.add_column("Severity", width=10)
     table.add_column("Finding Type", width=24)
@@ -242,8 +354,20 @@ def _render_findings_table(findings: list[SecretFinding], triage_map: dict[str, 
         for f in findings:
             triage = triage_map.get(f.finding_id)
             sev = triage.severity if triage else f.severity_estimate
-            sev_styled = f"[bold red]{sev}[/bold red]" if sev == "Critical" else (f"[bold yellow]{sev}[/bold yellow]" if sev == "High" else f"[cyan]{sev}[/cyan]")
-            table.add_row(f.finding_id, sev_styled, f.rule_name, f"{f.file_path}:{f.line_number}", f"[yellow]{f.masked_value}[/yellow]", str(round(f.entropy, 2)), f"{triage.severity} (Risk: {triage.risk_score})" if triage else "N/A")
+            sev_styled = (
+                f"[bold red]{sev}[/bold red]"
+                if sev == "Critical"
+                else (f"[bold yellow]{sev}[/bold yellow]" if sev == "High" else f"[cyan]{sev}[/cyan]")
+            )
+            table.add_row(
+                f.finding_id,
+                sev_styled,
+                f.rule_name,
+                f"{f.file_path}:{f.line_number}",
+                f"[yellow]{f.masked_value}[/yellow]",
+                str(round(f.entropy, 2)),
+                f"{triage.severity} (Risk: {triage.risk_score})" if triage else "N/A",
+            )
     console.print(table)
     console.print("")
 
@@ -266,16 +390,23 @@ def _render_remediation_panel(remediation: RemediationPlan):
     lines = [f"[bold red]⚠️ {remediation.rotation_warning}[/bold red]\n"]
     for step in remediation.steps:
         lines.append(f"[bold yellow]Step {step.order}: {step.title}[/bold yellow]")
-        for cmd in step.commands: lines.append(f"  [bold green]$ {cmd}[/bold green]")
+        for cmd in step.commands:
+            lines.append(f"  [bold green]$ {cmd}[/bold green]")
+    if remediation.bash_script:
+        lines.append("\n[bold cyan]💡 Complete automated scripts available (Bash & PowerShell).[/bold cyan]")
+        lines.append("[dim]Inspect in exported reports or copy directly in the Web UI dashboard.[/dim]")
     console.print(Panel("\n".join(lines), title="[bold white on red] Remediation & Excision Playbook [/bold white on red]", border_style="cyan"))
 
 
 def _handle_export(output_path_str: str, format_arg: Optional[str], scan_result, findings, triage_map, hygiene, remediation):
     output_path = Path(output_path_str).resolve()
     fmt = (format_arg or output_path.suffix.lstrip(".").lower() or "markdown").lower()
-    if fmt == "sarif": content = ReportExporter.to_sarif(scan_result, findings, triage_map)
-    elif fmt == "json": content = ReportExporter.to_json(scan_result, findings, triage_map, hygiene, remediation)
-    else: content = ReportExporter.to_markdown(scan_result, findings, triage_map, hygiene, remediation)
+    if fmt == "sarif":
+        content = ReportExporter.to_sarif(scan_result, findings, triage_map)
+    elif fmt == "json":
+        content = ReportExporter.to_json(scan_result, findings, triage_map, hygiene, remediation)
+    else:
+        content = ReportExporter.to_markdown(scan_result, findings, triage_map, hygiene, remediation)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content, encoding="utf-8")
     console.print(f"[bold green]Report exported:[/bold green] {output_path}")
