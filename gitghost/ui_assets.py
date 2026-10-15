@@ -879,6 +879,24 @@ HTML_PAGE = r"""<!DOCTYPE html>
           <!-- Steps populated dynamically -->
         </div>
 
+        <h3 style="font-size: 1rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.5rem;">Automated Excision Scripts</h3>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <button id="btnScriptBash" class="tab-btn active" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" onclick="switchScriptTab('bash')">Bash Script (.sh)</button>
+          <button id="btnScriptPS" class="tab-btn" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" onclick="switchScriptTab('ps')">PowerShell Script (.ps1)</button>
+        </div>
+        <div id="bashScriptContainer" class="command-box" style="flex-direction: column; align-items: stretch;">
+          <pre id="remediationBashScript" style="font-family: monospace; font-size: 0.8rem; overflow-x: auto; max-height: 250px; white-space: pre-wrap; color: #a5f3fc;"># Run scan to generate customized Bash script</pre>
+          <div style="text-align: right; margin-top: 0.5rem;">
+            <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyScript('bash')">Copy Bash Script</button>
+          </div>
+        </div>
+        <div id="psScriptContainer" class="command-box" style="flex-direction: column; align-items: stretch; display: none;">
+          <pre id="remediationPSScript" style="font-family: monospace; font-size: 0.8rem; overflow-x: auto; max-height: 250px; white-space: pre-wrap; color: #a5f3fc;"># Run scan to generate customized PowerShell script</pre>
+          <div style="text-align: right; margin-top: 0.5rem;">
+            <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyScript('ps')">Copy PowerShell Script</button>
+          </div>
+        </div>
+
         <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <div>
             <div style="font-weight: 700; font-size: 0.9rem;">Execute Live Safe Cleanup</div>
@@ -1281,6 +1299,35 @@ HTML_PAGE = r"""<!DOCTYPE html>
         `;
         container.appendChild(card);
       });
+
+      if (rem.bash_script) {
+        document.getElementById('remediationBashScript').innerText = rem.bash_script;
+      }
+      if (rem.powershell_script) {
+        document.getElementById('remediationPSScript').innerText = rem.powershell_script;
+      }
+    }
+
+    function switchScriptTab(type) {
+      if (type === 'bash') {
+        document.getElementById('bashScriptContainer').style.display = 'flex';
+        document.getElementById('psScriptContainer').style.display = 'none';
+        document.getElementById('btnScriptBash').classList.add('active');
+        document.getElementById('btnScriptPS').classList.remove('active');
+      } else {
+        document.getElementById('bashScriptContainer').style.display = 'none';
+        document.getElementById('psScriptContainer').style.display = 'flex';
+        document.getElementById('btnScriptBash').classList.remove('active');
+        document.getElementById('btnScriptPS').classList.add('active');
+      }
+    }
+
+    function copyScript(type) {
+      const text = type === 'bash'
+        ? document.getElementById('remediationBashScript').innerText
+        : document.getElementById('remediationPSScript').innerText;
+      navigator.clipboard.writeText(text);
+      showToast(`${type === 'bash' ? 'Bash' : 'PowerShell'} script copied to clipboard!`, '📋');
     }
 
     function copyCommand(cmd) {
