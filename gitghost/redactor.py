@@ -143,3 +143,33 @@ class SecretRedactor:
         self,
         text: str,
         file_path: Optional[str] = None,
+        commit_hash: Optional[str] = None,
+        blob_hash: Optional[str] = None,
+    ) -> RedactionResult:
+        if not text:
+            return RedactionResult(redacted_text="", findings=[])
+
+        lines = text.splitlines(keepends=True)
+        sanitized_lines: List[str] = []
+        findings: List[SecretFinding] = []
+        finding_counter = 0
+
+        for line_idx, line in enumerate(lines, start=1):
+            current_line = line
+            line_without_newline = line.rstrip("\r\n")
+
+            for rule in self.RULES:
+                rule_name = rule["name"]
+                regex = rule["regex"]
+                severity = rule["severity"]
+                mask_type = rule["mask_type"]
+
+                if mask_type == "private_key":
+                    continue
+
+                for match in regex.finditer(current_line):
+                    finding_counter += 1
+                    fid = f"SEC-{finding_counter:04d}"
+
+                    if mask_type == "db_uri":
+                        prefix = match.group(1)
