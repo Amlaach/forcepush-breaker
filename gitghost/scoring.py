@@ -108,3 +108,22 @@ class HygieneScorer:
 
         total_deduction = sum(d.points for d in deductions)
         final_score = max(0, min(100, base_score - total_deduction))
+
+        if final_score >= 90:
+            grade, color, summary = "A+ (Pristine)", "green", "Repository history is clean, with minimal or no unreachable secrets."
+        elif final_score >= 75:
+            grade, color, summary = "B (Good)", "bright_green", "Good hygiene with minor unreferenced history debris. No critical secrets exposed."
+        elif final_score >= 60:
+            grade, color, summary = "C (Fair)", "yellow", "Moderate history debt or suspicious tokens lingering in dangling objects."
+        elif final_score >= 40:
+            grade, color, summary = "D (Warning)", "bright_red", "High risk: Sensitive credentials found in unreachable commits. Pruning required."
+        else:
+            grade, color, summary = "F (Critical Danger)", "bold red", "Active critical secrets exposed in orphaned git history! Immediate remediation required."
+
+        return HygieneScoreReport(
+            score=final_score, grade=grade, color=color, summary=summary,
+            dangling_commits_count=dangling_commits_count, dangling_blobs_count=dangling_blobs_count,
+            critical_findings_count=crit_count, high_findings_count=high_count,
+            medium_findings_count=med_count, low_findings_count=low_count,
+            false_positives_count=fp_count, deductions=deductions,
+        )
