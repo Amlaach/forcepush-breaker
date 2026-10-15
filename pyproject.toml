@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gitghost"
+version = "0.1.0"
+description = "Ghost Commit Forensics & Dangling Secret Hunter for Local Git Repositories and CI/CD."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "GitGhost Security Team", email = "security@gitghost.io" }
+]
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+gitghost = "gitghost.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["gitghost*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
