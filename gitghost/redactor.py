@@ -173,3 +173,33 @@ class SecretRedactor:
 
                     if mask_type == "db_uri":
                         prefix = match.group(1)
+                        raw_pwd = match.group(2)
+                        suffix = match.group(3)
+                        masked_pwd = "[REDACTED_DB_PASSWORD]"
+                        replacement = f"{prefix}{masked_pwd}{suffix}"
+                        entropy = shannon_entropy(raw_pwd)
+                        current_line = current_line.replace(match.group(0), replacement)
+                        findings.append(SecretFinding(
+                            finding_id=fid, rule_name=rule_name, match_type="pattern",
+                            severity_estimate=severity, masked_value=replacement, line_number=line_idx,
+                            context_line=self._mask_raw_line(line_without_newline, raw_pwd, "[REDACTED_DB_PASSWORD]"),
+                            entropy=round(entropy, 2), file_path=file_path, commit_hash=commit_hash, blob_hash=blob_hash,
+                        ))
+
+                    elif mask_type == "env_secret":
+                        key_name = match.group(1)
+                        raw_secret = match.group(2)
+                        if self._is_dummy_value(raw_secret):
+                            continue
+                        entropy = shannon_entropy(raw_secret)
+                        masked_val = "[REDACTED_SECRET_KEY]"
+                        replacement = f"{key_name}={masked_val}"
+                        current_line = current_line.replace(match.group(0), replacement)
+                        findings.append(SecretFinding(
+                            finding_id=fid, rule_name=f"{rule_name} ({key_name})", match_type="pattern",
+                            severity_estimate=severity, masked_value=masked_val, line_number=line_idx,
+                            context_line=self._mask_raw_line(line_without_newline, raw_secret, masked_val),
+                            entropy=round(entropy, 2), file_path=file_path, commit_hash=commit_hash, blob_hash=blob_hash,
+                        ))
+
+                    elif mask_type == "preserve_edges":
