@@ -83,3 +83,23 @@ class SecretRedactor:
         },
         {
             "name": "GitLab Personal Access Token",
+            "regex": re.compile(r"\b(glpat-[0-9a-zA-Z\-]{20,})\b"),
+            "severity": "Critical",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "Slack Token",
+            "regex": re.compile(r"\b(xox[baprs]-[0-9a-zA-Z\-]{20,80})\b"),
+            "severity": "High",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "Google API Key",
+            "regex": re.compile(r"\b(AIza[0-9A-Za-z\-_]{35})\b"),
+            "severity": "High",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "OpenAI / Anthropic API Key",
+            "regex": re.compile(r"\b(sk-proj-[a-zA-Z0-9_\-]{40,}|sk-ant-[a-zA-Z0-9_\-]{40,}|sk-[a-zA-Z0-9]{32,})\b"),
+            "severity": "Critical",
