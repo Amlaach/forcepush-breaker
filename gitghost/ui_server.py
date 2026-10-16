@@ -426,6 +426,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             "rotation_warning": pipeline_res.remediation.rotation_warning,
             "bash_script": pipeline_res.remediation.bash_script,
             "powershell_script": pipeline_res.remediation.powershell_script,
+            "github_support_ticket": getattr(pipeline_res.remediation, "github_support_ticket", ""),
             "steps": [
                 {
                     "order": s.order,

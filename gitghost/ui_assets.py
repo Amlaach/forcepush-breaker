@@ -1056,15 +1056,36 @@ HTML_PAGE = r"""<!DOCTYPE html>
           </div>
         </div>
 
+        <!-- GitHub Support Ticket Panel -->
+        <h3 style="font-size: 1rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.4rem; color: #a78bfa; display: flex; align-items: center; gap: 0.4rem;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          GitHub Support Ticket (Server-Side Cache Purge Request)
+        </h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+          GitHub continues to cache overwritten commit SHAs on its servers even after a force-push. Copy this pre-formatted ticket and submit it to GitHub Support to permanently purge cached commit objects.
+        </p>
+        <div class="command-box" style="flex-direction: column; align-items: stretch;">
+          <pre id="remediationSupportTicket" style="font-family: monospace; font-size: 0.8rem; overflow-x: auto; max-height: 220px; white-space: pre-wrap; color: #ddd6fe;"># Run scan to generate custom GitHub Support Ticket</pre>
+          <div style="text-align: right; margin-top: 0.5rem;">
+            <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copySupportTicket()">Copy Support Ticket</button>
+          </div>
+        </div>
+
         <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <div>
-            <div style="font-weight: 700; font-size: 0.9rem;">Execute Live Safe Cleanup</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">Permanently prunes unreferenced objects with git reflog expire & git gc.</div>
+            <div style="font-weight: 700; font-size: 0.9rem;">Repository Hardening & Local Cleanup</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Permanently prunes unreferenced objects with git reflog & gc, and installs push guards.</div>
           </div>
-          <button class="btn btn-danger" onclick="confirmExecuteCleanup()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-            Execute Cleanup (Purge Unreachable)
-          </button>
+          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <button class="btn btn-secondary" onclick="installPrePushHook()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              Install Pre-Push Hook
+            </button>
+            <button class="btn btn-danger" onclick="confirmExecuteCleanup()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+              Execute Cleanup (Purge Unreachable)
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1986,6 +2007,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
       if (rem.powershell_script) {
         document.getElementById('remediationPSScript').innerText = rem.powershell_script;
       }
+      if (rem.github_support_ticket) {
+        const ticketEl = document.getElementById('remediationSupportTicket');
+        if (ticketEl) ticketEl.innerText = rem.github_support_ticket;
+      }
     }
 
     function switchScriptTab(type) {
@@ -2008,6 +2033,33 @@ HTML_PAGE = r"""<!DOCTYPE html>
         : document.getElementById('remediationPSScript').innerText;
       navigator.clipboard.writeText(text);
       showToast(`${type === 'bash' ? 'Bash' : 'PowerShell'} script copied to clipboard!`, 'copy');
+    }
+
+    function copySupportTicket() {
+      const el = document.getElementById('remediationSupportTicket');
+      if (el) {
+        navigator.clipboard.writeText(el.innerText);
+        showToast('GitHub Support ticket template copied to clipboard!', 'copy');
+      }
+    }
+
+    async function installPrePushHook() {
+      const repoPath = (document.getElementById('repoPathInput').value || '.').trim();
+      try {
+        const res = await fetch('/api/hook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repo_path: repoPath })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Pre-push hook installed at: ' + data.hook_path, 'check');
+        } else {
+          showToast('Failed to install hook: ' + (data.error || 'Check repository permissions'), 'alert');
+        }
+      } catch (err) {
+        showToast('Hook installation error: ' + err.message, 'alert');
+      }
     }
 
     function copyCommand(cmd) {
