@@ -56,6 +56,7 @@ class ScanJobManager:
         cls,
         repo_target: str,
         ai_provider: str = "heuristic",
+        ai_api_key: Optional[str] = None,
         entropy_threshold: float = 4.0,
         github_token: Optional[str] = None,
         clone_source_override: Optional[str] = None,
@@ -69,8 +70,9 @@ class ScanJobManager:
                 cls._jobs.pop(oldest_key, None)
             cls._jobs[job_id] = job
 
-        # Ephemeral token passed only into worker closure; never stored on ScanJob
+        # Ephemeral tokens passed only into worker closure; never stored on ScanJob
         ephemeral_token = (github_token or "").strip() or None
+        ephemeral_ai_key = (ai_api_key or "").strip() or None
 
         def _worker():
             try:
@@ -94,6 +96,7 @@ class ScanJobManager:
                 pipeline_res = run_scan_pipeline(
                     repo_path=repo_target,
                     ai_provider=ai_provider,
+                    ai_api_key=ephemeral_ai_key,
                     entropy_threshold=entropy_threshold,
                     github_token=ephemeral_token,
                     clone_source_override=clone_source_override,
@@ -112,7 +115,10 @@ class ScanJobManager:
                 job.phase_message = "Forensics audit completed."
                 job.status = "completed"
             except Exception as exc:
-                job.error = sanitize_token_in_text(str(exc), ephemeral_token)
+                err_msg = sanitize_token_in_text(str(exc), ephemeral_token)
+                if ephemeral_ai_key:
+                    err_msg = err_msg.replace(ephemeral_ai_key, "[REDACTED_API_KEY]")
+                job.error = err_msg
                 job.phase_message = "Scan failed."
                 job.status = "failed"
 
@@ -264,6 +270,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             return
 
         ai_provider = data.get("ai_provider", "heuristic")
+        ai_api_key = data.get("ai_api_key")
         entropy_thresh = float(data.get("entropy_threshold", 4.0))
         github_token = data.get("github_token")
         clone_override = data.get("clone_source_override")
@@ -271,6 +278,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
         job = ScanJobManager.start_job(
             repo_target=validated,
             ai_provider=ai_provider,
+            ai_api_key=ai_api_key,
             entropy_threshold=entropy_thresh,
             github_token=github_token,
             clone_source_override=clone_override,
@@ -316,6 +324,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             return
 
         ai_provider = data.get("ai_provider", "heuristic")
+        ai_api_key = data.get("ai_api_key")
         entropy_thresh = float(data.get("entropy_threshold", 4.0))
         github_token = data.get("github_token")
         clone_override = data.get("clone_source_override")
@@ -324,12 +333,16 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             pipeline_res = run_scan_pipeline(
                 repo_path=validated,
                 ai_provider=ai_provider,
+                ai_api_key=ai_api_key,
                 entropy_threshold=entropy_thresh,
                 github_token=github_token,
                 clone_source_override=clone_override,
             )
         except Exception as exc:
-            self._send_error(500, sanitize_token_in_text(str(exc), github_token))
+            err_msg = sanitize_token_in_text(str(exc), github_token)
+            if ai_api_key:
+                err_msg = err_msg.replace(ai_api_key, "[REDACTED_API_KEY]")
+            self._send_error(500, err_msg)
             return
 
         with _CACHE_LOCK:
