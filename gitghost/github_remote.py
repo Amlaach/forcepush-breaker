@@ -10,11 +10,15 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import stat
+import subprocess
+import tempfile
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from gitghost.git_forensics import DanglingCommit
 
 _HTTPS_GITHUB_RE = re.compile(
@@ -346,4 +350,181 @@ class GitHubAPIForensicsClient:
             )
         except Exception:
             return None
+
+
+class SmartGitCloner:
+    """Performs smart mirror cloning of remote GitHub repositories and fetches orphaned SHAs.
+
+    Enforces network/git timeouts, keeps authentication tokens strictly in memory (never written to .git/config),
+    and provides guaranteed temporary directory cleanup.
+    """
+
+    CLONE_TIMEOUT_SECONDS = 120
+    FETCH_TIMEOUT_SECONDS = 30
+
+    @classmethod
+    def acquire(
+        cls,
+        target: ParsedGitHubTarget,
+        github_token: Optional[str] = None,
+        clone_source_override: Optional[str] = None,
+        on_phase: Optional[Callable[[str, int], None]] = None,
+    ) -> RemoteAcquisitionResult:
+        if not shutil.which("git"):
+            raise RuntimeError("Git executable was not found on the system PATH.")
+
+        resolved_token = (github_token or os.getenv("GITHUB_TOKEN") or "").strip() or None
+        api_client = GitHubAPIForensicsClient(github_token=resolved_token)
+
+        if on_phase:
+            on_phase(f"Querying GitHub API events for {target.full_name}...", 10)
+
+        history_events: List[HistoryOverwriteEvent] = []
+        candidate_shas: List[str] = []
+        warnings: List[str] = []
+
+        if not clone_source_override:
+            history_events, candidate_shas, warnings = api_client.discover_history_overwrite_events(target)
+
+        temp_dir = Path(tempfile.mkdtemp(prefix=f"gitghost_remote_{target.repo}_")).resolve()
+        effective_clone_url = clone_source_override or target.clone_url
+
+        try:
+            if on_phase:
+                on_phase(f"Smart mirror-cloning {target.full_name}...", 25)
+
+            cls._run_git_with_auth(
+                ["clone", "--mirror", effective_clone_url, str(temp_dir)],
+                cwd=temp_dir.parent,
+                token=resolved_token,
+                timeout=cls.CLONE_TIMEOUT_SECONDS,
+            )
+
+            # Attempt to fetch all pull request refs if not already included
+            try:
+                cls._run_git_with_auth(
+                    ["fetch", "origin", "+refs/pull/*:refs/pull/*"],
+                    cwd=temp_dir,
+                    token=resolved_token,
+                    timeout=cls.FETCH_TIMEOUT_SECONDS,
+                    check=False,
+                )
+            except Exception:
+                pass
+
+            api_recovered_commits: List[DanglingCommit] = []
+            if candidate_shas:
+                if on_phase:
+                    on_phase(f"Exhuming {len(candidate_shas)} overwritten/orphaned commit(s)...", 40)
+
+                for sha in candidate_shas[:25]:
+                    # Check if commit already exists in local object database
+                    exists_Locally = cls._object_exists(temp_dir, sha)
+                    if not exists_Locally:
+                        # Try explicit git fetch origin <sha> (leaves fetched object unreferenced in FETCH_HEAD)
+                        try:
+                            cls._run_git_with_auth(
+                                ["fetch", "origin", sha],
+                                cwd=temp_dir,
+                                token=resolved_token,
+                                timeout=cls.FETCH_TIMEOUT_SECONDS,
+                                check=False,
+                            )
+                        except Exception:
+                            pass
+                        exists_Locally = cls._object_exists(temp_dir, sha)
+
+                    if not exists_Locally:
+                        # Fallback to GitHub Commits REST API to recover commit & patch directly
+                        api_commit = api_client.fetch_orphan_commit_via_api(target, sha)
+                        if api_commit:
+                            api_recovered_commits.append(api_commit)
+
+            return RemoteAcquisitionResult(
+                target=target,
+                local_clone_path=temp_dir,
+                is_temporary=True,
+                history_events=history_events,
+                discovered_orphan_shas=candidate_shas,
+                api_recovered_commits=api_recovered_commits,
+                warnings=warnings,
+            )
+        except Exception as exc:
+            cls.cleanup_workspace(temp_dir)
+            safe_err = sanitize_token_in_text(str(exc), resolved_token)
+            raise RuntimeError(f"Failed to acquire remote GitHub repository '{target.full_name}': {safe_err}") from None
+
+    @classmethod
+    def _object_exists(cls, repo_dir: Path, sha: str) -> bool:
+        try:
+            res = subprocess.run(
+                ["git", "cat-file", "-t", sha],
+                cwd=str(repo_dir),
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            return res.returncode == 0 and res.stdout.strip() == "commit"
+        except Exception:
+            return False
+
+    @classmethod
+    def _run_git_with_auth(
+        cls,
+        args: List[str],
+        cwd: Path,
+        token: Optional[str],
+        timeout: int,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
+        cmd = ["git", "-c", "credential.helper=", "-c", "core.askPass="]
+        if token:
+            cmd.extend(["-c", f"http.extraHeader=Authorization: Bearer {token}"])
+        cmd.extend(args)
+
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
+
+        try:
+            return subprocess.run(
+                cmd,
+                cwd=str(cwd),
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                check=check,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"Git operation timed out after {timeout}s.") from None
+        except subprocess.CalledProcessError as exc:
+            raw_msg = (exc.stderr or exc.stdout or str(exc)).strip()
+            safe_msg = sanitize_token_in_text(raw_msg, token)
+            if check:
+                raise RuntimeError(safe_msg) from None
+            return subprocess.CompletedProcess(cmd, exc.returncode, exc.stdout or "", safe_msg)
+
+    @classmethod
+    def cleanup_workspace(cls, workspace_path: Optional[Path | str]) -> None:
+        """Guarantees removal of temporary clone directories, handling Windows read-only packfiles."""
+        if not workspace_path:
+            return
+        path_obj = Path(workspace_path)
+        if not path_obj.exists():
+            return
+
+        def _handle_readonly(func, p, exc_info):
+            try:
+                os.chmod(p, stat.S_IWRITE)
+                func(p)
+            except Exception:
+                pass
+
+        try:
+            shutil.rmtree(path_obj, onerror=_handle_readonly)
+        except Exception:
+            shutil.rmtree(path_obj, ignore_errors=True)
 
