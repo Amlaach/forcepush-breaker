@@ -48,13 +48,29 @@ class ParsedGitHubTarget:
 @dataclass
 class HistoryOverwriteEvent:
     event_id: str
-    event_type: str  # "force_push" | "branch_delete" | "closed_pr_orphan" | "push_before"
+    event_type: str  # "force_push" | "branch_delete" | "closed_pr_orphan" | "push_before" | "fork_divergence"
     ref: str
     before_sha: str
     after_sha: Optional[str]
     actor: str
     created_at: str
     description: str
+
+
+@dataclass(frozen=True)
+class ForkForensicsTarget:
+    owner: str
+    repo: str
+    clone_url: str
+    html_url: str
+    default_branch: str = "main"
+    pushed_at: str = ""
+    stargazers_count: int = 0
+    forks_count: int = 0
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.owner}/{self.repo}"
 
 
 @dataclass
@@ -66,6 +82,8 @@ class RemoteAcquisitionResult:
     discovered_orphan_shas: List[str] = field(default_factory=list)
     api_recovered_commits: List[DanglingCommit] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
+    discovered_forks: List[ForkForensicsTarget] = field(default_factory=list)
+
 
 
 def sanitize_token_in_text(text: str, token: Optional[str] = None) -> str:
@@ -288,7 +306,52 @@ class GitHubAPIForensicsClient:
 
         return events, candidate_shas, warnings
 
+    def query_public_forks(
+        self,
+        target: ParsedGitHubTarget,
+        limit: int = 20,
+    ) -> List[ForkForensicsTarget]:
+        """Queries public forks of the target repository via /repos/{owner}/{repo}/forks.
+
+        Sorted by newest first to identify branches and forks created before/after force-pushes.
+        """
+        forks_url = f"{target.api_repo_url}/forks?sort=newest&per_page={limit}"
+        forks: List[ForkForensicsTarget] = []
+        try:
+            raw_forks = self._get_json(forks_url)
+            if isinstance(raw_forks, list):
+                for item in raw_forks:
+                    if not isinstance(item, dict):
+                        continue
+                    owner_obj = item.get("owner") or {}
+                    owner = str(owner_obj.get("login") or "").strip()
+                    repo = str(item.get("name") or "").strip()
+                    clone_url = str(item.get("clone_url") or f"https://github.com/{owner}/{repo}.git")
+                    html_url = str(item.get("html_url") or f"https://github.com/{owner}/{repo}")
+                    default_branch = str(item.get("default_branch") or "main")
+                    pushed_at = str(item.get("pushed_at") or "")
+                    stars = int(item.get("stargazers_count") or 0)
+                    forks_cnt = int(item.get("forks_count") or 0)
+
+                    if owner and repo:
+                        forks.append(
+                            ForkForensicsTarget(
+                                owner=owner,
+                                repo=repo,
+                                clone_url=clone_url,
+                                html_url=html_url,
+                                default_branch=default_branch,
+                                pushed_at=pushed_at,
+                                stargazers_count=stars,
+                                forks_count=forks_cnt,
+                            )
+                        )
+        except Exception:
+            pass
+        return forks
+
     def fetch_orphan_commit_via_api(
+
         self,
         target: ParsedGitHubTarget,
         commit_sha: str,
