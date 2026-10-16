@@ -505,6 +505,8 @@ class SmartGitCloner:
         target: ParsedGitHubTarget,
         github_token: Optional[str] = None,
         clone_source_override: Optional[str] = None,
+        scan_forks: bool = True,
+        max_forks: int = 5,
         on_phase: Optional[Callable[[str, int], None]] = None,
     ) -> RemoteAcquisitionResult:
         if not shutil.which("git"):
@@ -519,9 +521,14 @@ class SmartGitCloner:
         history_events: List[HistoryOverwriteEvent] = []
         candidate_shas: List[str] = []
         warnings: List[str] = []
+        discovered_forks: List[ForkForensicsTarget] = []
 
         if not clone_source_override:
-            history_events, candidate_shas, warnings = api_client.discover_history_overwrite_events(target)
+            history_events, candidate_shas, warnings = api_client.discover_history_overwrite_events(
+                target, scan_forks=scan_forks, max_forks=max_forks
+            )
+            if scan_forks:
+                discovered_forks = api_client.query_public_forks(target, limit=max_forks)
 
         temp_dir = Path(tempfile.mkdtemp(prefix=f"gitghost_remote_{target.repo}_")).resolve()
         effective_clone_url = clone_source_override or target.clone_url
@@ -537,17 +544,35 @@ class SmartGitCloner:
                 timeout=cls.CLONE_TIMEOUT_SECONDS,
             )
 
-            # Attempt to fetch all pull request refs if not already included
-            try:
-                cls._run_git_with_auth(
-                    ["fetch", "origin", "+refs/pull/*:refs/pull/*"],
-                    cwd=temp_dir,
-                    token=resolved_token,
-                    timeout=cls.FETCH_TIMEOUT_SECONDS,
-                    check=False,
-                )
-            except Exception:
-                pass
+            # Extended refs: fetch pull requests and tags
+            for ref_spec in ("+refs/pull/*:refs/pull/*", "+refs/tags/*:refs/tags/*"):
+                try:
+                    cls._run_git_with_auth(
+                        ["fetch", "origin", ref_spec],
+                        cwd=temp_dir,
+                        token=resolved_token,
+                        timeout=cls.FETCH_TIMEOUT_SECONDS,
+                        check=False,
+                    )
+                except Exception:
+                    pass
+
+            # Fetch branches from discovered public forks into refs/forks/<owner>/*
+            if discovered_forks and not clone_source_override:
+                if on_phase:
+                    on_phase(f"Auditing and fetching {len(discovered_forks)} public fork(s)...", 35)
+
+                for fork in discovered_forks[:max_forks]:
+                    try:
+                        cls._run_git_with_auth(
+                            ["fetch", fork.clone_url, f"+refs/heads/*:refs/forks/{fork.owner}/*"],
+                            cwd=temp_dir,
+                            token=resolved_token,
+                            timeout=cls.FETCH_TIMEOUT_SECONDS,
+                            check=False,
+                        )
+                    except Exception:
+                        pass
 
             api_recovered_commits: List[DanglingCommit] = []
             if candidate_shas:
@@ -585,6 +610,7 @@ class SmartGitCloner:
                 discovered_orphan_shas=candidate_shas,
                 api_recovered_commits=api_recovered_commits,
                 warnings=warnings,
+                discovered_forks=discovered_forks,
             )
         except Exception as exc:
             cls.cleanup_workspace(temp_dir)

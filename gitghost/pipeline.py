@@ -16,6 +16,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from gitghost.ai_triage import AITriage, AITriageResult
 from gitghost.git_forensics import ForensicsScanResult, GitForensics, detect_ai_agent
 from gitghost.github_remote import (
+    ForkForensicsTarget,
     HistoryOverwriteEvent,
     RemoteAcquisitionResult,
     SmartGitCloner,
@@ -115,6 +116,7 @@ class PipelineResult:
     is_remote: bool = False
     remote_url: Optional[str] = None
     history_events: List[HistoryOverwriteEvent] = field(default_factory=list)
+    discovered_forks: List[ForkForensicsTarget] = field(default_factory=list)
 
 
 def run_scan_pipeline(
@@ -124,6 +126,7 @@ def run_scan_pipeline(
     entropy_threshold: float = SecretRedactor.ENTROPY_THRESHOLD,
     github_token: Optional[str] = None,
     clone_source_override: Optional[str] = None,
+    scan_forks: bool = True,
     on_forensics_done: Optional[Callable[[ForensicsScanResult], None]] = None,
     on_item_scanned: Optional[Callable[[int, int], None]] = None,
     on_phase: Optional[Callable[[str, int], None]] = None,
@@ -131,7 +134,7 @@ def run_scan_pipeline(
     """Executes the complete GitGhost forensics and security audit pipeline.
 
     Supports both local Git repositories and remote GitHub URLs (with smart mirror cloning,
-    GitHub API force-push/overwrite discovery, and guaranteed temporary directory cleanup).
+    GitHub API force-push/overwrite discovery, public fork auditing, and guaranteed temporary directory cleanup).
     """
     raw_target = str(repo_path).strip() or "."
     gh_target = parse_github_url(raw_target)
@@ -143,10 +146,12 @@ def run_scan_pipeline(
                 target=gh_target,
                 github_token=github_token,
                 clone_source_override=clone_source_override,
+                scan_forks=scan_forks,
                 on_phase=on_phase,
             )
             working_repo_path = remote_acq.local_clone_path
             display_repo_label = gh_target.clone_url
+
         else:
             working_repo_path = Path(raw_target).resolve()
             display_repo_label = str(working_repo_path)
@@ -311,6 +316,7 @@ def run_scan_pipeline(
             is_remote=gh_target is not None,
             remote_url=gh_target.clone_url if gh_target else None,
             history_events=remote_acq.history_events if remote_acq else [],
+            discovered_forks=remote_acq.discovered_forks if remote_acq else [],
         )
     finally:
         if remote_acq is not None and remote_acq.is_temporary:
