@@ -81,6 +81,7 @@ class ReportExporter:
                 "steps": [asdict(s) for s in remediation.steps],
                 "bash_script": remediation.bash_script,
                 "powershell_script": remediation.powershell_script,
+                "github_support_ticket": getattr(remediation, "github_support_ticket", ""),
             },
         }
         return json.dumps(data, indent=2, ensure_ascii=False)
@@ -196,6 +197,17 @@ class ReportExporter:
                 "#### PowerShell Script (Windows):",
                 "```powershell",
                 remediation.powershell_script.strip(),
+                "```",
+                "",
+            ])
+
+        if getattr(remediation, "github_support_ticket", ""):
+            md.extend([
+                "### GitHub Support Ticket (Server-Side Purge Request)",
+                "> Copy and submit this ticket template to GitHub Support to purge unreachable commit objects from server-side cache.",
+                "",
+                "```text",
+                remediation.github_support_ticket.strip(),
                 "```",
                 "",
             ])
