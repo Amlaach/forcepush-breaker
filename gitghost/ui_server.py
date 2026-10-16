@@ -21,6 +21,7 @@ from gitghost import __version__
 from gitghost.exporters import ReportExporter
 from gitghost.git_forensics import ForensicsScanResult, GitForensics
 from gitghost.github_remote import is_github_target, sanitize_token_in_text
+from gitghost.liveness import SafeKeyLivenessChecker
 from gitghost.pipeline import PipelineResult, run_scan_pipeline
 from gitghost.recovery import ObjectRecoveryEngine
 from gitghost.ui_assets import HTML_PAGE
@@ -172,6 +173,8 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._handle_download_bundle(data)
         elif self.path == "/api/recover/file":
             self._handle_recover_file(data)
+        elif self.path == "/api/verify/key":
+            self._handle_verify_key(data)
         elif self.path == "/api/hook":
             self._handle_hook(data)
         else:
@@ -677,6 +680,34 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"success": True, "hook_path": hook_path, "notice": notice})
         else:
             self._send_error(400, f"Failed to install pre-push hook: {hook_path}")
+
+    def _handle_verify_key(self, data: dict):
+        finding_id = str(data.get("finding_id") or "").strip()
+        rule_name = str(data.get("rule_name") or "").strip()
+        raw_token = str(data.get("raw_token") or "").strip()
+        repo_path = str(data.get("repo_path") or "").strip()
+
+        # If raw_token wasn't passed directly, attempt to resolve from cached scan findings
+        if not raw_token and finding_id:
+            with _CACHE_LOCK:
+                cached = _SCAN_CACHE.get(repo_path) or _SCAN_CACHE.get("__latest__")
+                if cached:
+                    for f in cached.findings:
+                        if f.finding_id == finding_id:
+                            rule_name = rule_name or f.rule_name
+                            raw_token = f.raw_value
+                            break
+
+        if not raw_token:
+            self._send_error(400, "Token value could not be resolved. Please run a scan first.")
+            return
+
+        result = SafeKeyLivenessChecker.check(
+            token=raw_token,
+            rule_name=rule_name,
+            finding_id=finding_id,
+        )
+        self._send_json(result.to_dict())
 
 
 def start_ui_server(host: str = "127.0.0.1", start_port: int = 8765) -> tuple[ThreadingHTTPServer, int]:
