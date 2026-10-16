@@ -873,8 +873,18 @@ HTML_PAGE = r"""<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- TAB 2: Graveyard (Dangling Commits & Blobs) -->
+    <!-- TAB 2: Graveyard (Dangling Commits, Blobs & History Overwrite Events) -->
     <div id="tabGraveyard" class="tab-content" style="display: none;">
+      <div class="card" style="margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h3 style="font-size: 1rem; font-weight: 700; color: var(--cyan);">⚡ GitHub Force-Push & History Overwrite Events</h3>
+          <span id="graveyardEventsCount" class="tab-pill">0 events</span>
+        </div>
+        <div id="historyEventsList" style="display: flex; flex-direction: column; gap: 0.65rem; max-height: 260px; overflow-y: auto;">
+          <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1.25rem;">No remote history overwrite events detected.</div>
+        </div>
+      </div>
+
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
         <!-- Dangling Commits Panel -->
         <div class="card">
@@ -1209,15 +1219,16 @@ HTML_PAGE = r"""<!DOCTYPE html>
       document.getElementById('statSecrets').style.color = allFindings.length > 0 ? 'var(--rose)' : 'var(--emerald)';
       document.getElementById('statSecretsBreakdown').innerText = `${data.hygiene_score.critical_findings_count} critical, ${data.hygiene_score.high_findings_count} high`;
 
+      const historyEvents = data.history_events || [];
       document.getElementById('tabCountFindings').innerText = allFindings.length;
-      document.getElementById('tabCountGraveyard').innerText = data.dangling_commits.length + data.dangling_blobs.length;
+      document.getElementById('tabCountGraveyard').innerText = data.dangling_commits.length + data.dangling_blobs.length + historyEvents.length;
       document.getElementById('tabCountDeductions').innerText = (data.hygiene_score.deductions || []).length;
 
       // 3. Render Findings Table
       renderFindingsTable(allFindings);
 
-      // 4. Render Graveyard
-      renderGraveyard(data.dangling_commits, data.dangling_blobs);
+      // 4. Render Graveyard (including GitHub History Overwrite Events)
+      renderGraveyard(data.dangling_commits, data.dangling_blobs, historyEvents);
 
       // 5. Render Deductions
       renderDeductions(data.hygiene_score.deductions || []);
@@ -1279,7 +1290,36 @@ HTML_PAGE = r"""<!DOCTYPE html>
       renderFindingsTable(filtered);
     }
 
-    function renderGraveyard(commits, blobs) {
+    function renderGraveyard(commits, blobs, historyEvents = []) {
+      const eventsList = document.getElementById('historyEventsList');
+      if (eventsList) {
+        eventsList.innerHTML = '';
+        document.getElementById('graveyardEventsCount').innerText = (historyEvents ? historyEvents.length : 0) + ' events';
+        if (!historyEvents || historyEvents.length === 0) {
+          eventsList.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1.25rem;">No remote history overwrite events detected.</div>';
+        } else {
+          historyEvents.forEach(ev => {
+            const evItem = document.createElement('div');
+            evItem.style.background = 'var(--bg-card)';
+            evItem.style.border = '1px solid var(--border)';
+            evItem.style.borderRadius = '8px';
+            evItem.style.padding = '0.65rem 1rem';
+            evItem.innerHTML = `
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="badge badge-high">${escapeHtml(ev.event_type || 'history_overwrite')}</span>
+                  <span class="code-badge">${escapeHtml(ev.ref || 'refs/heads/*')}</span>
+                  ${ev.before_sha ? `<span class="code-badge" style="color: var(--rose);">orphaned: ${escapeHtml(ev.before_sha.substring(0, 10))}</span>` : ''}
+                </div>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Actor: ${escapeHtml(ev.actor || 'unknown')} | ${escapeHtml(ev.created_at || '')}</span>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-main); margin-top: 0.35rem;">${escapeHtml(ev.description || '')}</div>
+            `;
+            eventsList.appendChild(evItem);
+          });
+        }
+      }
+
       const commitList = document.getElementById('danglingCommitsList');
       commitList.innerHTML = '';
       document.getElementById('graveyardCommitCount').innerText = commits.length + ' commits';
