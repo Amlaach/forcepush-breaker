@@ -153,18 +153,18 @@ class RemediationGenerator:
         backup_path = f"{clean_path}_safety_backup.git"
         lines = [
             "#!/usr/bin/env bash",
-            "# GitGhost Automated History Remediation Script (Bash)",
+            "# ForcePush-Breaker (UnForce) Automated History Remediation Script (Bash)",
             f"# Generated for: {clean_path}",
             "set -euo pipefail",
             "",
             'echo "====================================================="',
-            'echo "  GitGhost History Remediation Playbook (Bash)"',
+            'echo "  ForcePush-Breaker (UnForce) History Remediation Playbook"',
             'echo "====================================================="',
-            'echo "CRITICAL: Purging Git history only prevents future exposure."',
-            'echo "Any exposed credentials must be revoked immediately in production!"',
+            'echo "[!] CRITICAL: Purging Git history only prevents future exposure."',
+            'echo "[!] Any exposed credentials must be revoked immediately in production!"',
             'echo ""',
             "",
-            'echo "==> [Step 1] Creating safety mirror backup..."',
+            'echo "[*] [Step 1] Creating safety mirror backup..."',
             f'git clone --mirror "{clean_path}" "{backup_path}"',
             "",
         ]
@@ -208,18 +208,18 @@ class RemediationGenerator:
         clean_path = str(Path(repo_path).resolve())
         backup_path = f"{clean_path}_safety_backup.git"
         lines = [
-            "# GitGhost Automated History Remediation Script (PowerShell)",
+            "# ForcePush-Breaker (UnForce) Automated History Remediation Script (PowerShell)",
             f"# Generated for: {clean_path}",
             "$ErrorActionPreference = 'Stop'",
             "",
             'Write-Host "=====================================================" -ForegroundColor Cyan',
-            'Write-Host "  GitGhost History Remediation Playbook (PowerShell)" -ForegroundColor Cyan',
+            'Write-Host "  ForcePush-Breaker (UnForce) History Remediation Playbook" -ForegroundColor Cyan',
             'Write-Host "=====================================================" -ForegroundColor Cyan',
-            'Write-Host "CRITICAL: Purging Git history only prevents future exposure." -ForegroundColor Yellow',
-            'Write-Host "Any exposed credentials must be revoked immediately in production!" -ForegroundColor Yellow',
+            'Write-Host "[!] CRITICAL: Purging Git history only prevents future exposure." -ForegroundColor Yellow',
+            'Write-Host "[!] Any exposed credentials must be revoked immediately in production!" -ForegroundColor Yellow',
             'Write-Host ""',
             "",
-            'Write-Host "==> [Step 1] Creating safety mirror backup..." -ForegroundColor Green',
+            'Write-Host "[*] [Step 1] Creating safety mirror backup..." -ForegroundColor Green',
             f'git clone --mirror "{clean_path}" "{backup_path}"',
             "",
         ]
