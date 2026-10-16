@@ -50,6 +50,7 @@ class SecretFinding:
     file_path: Optional[str] = None
     commit_hash: Optional[str] = None
     blob_hash: Optional[str] = None
+    diff_hunk: str = ""
 
 
 @dataclass
@@ -366,6 +367,22 @@ class SecretRedactor:
 
             findings.extend(line_findings)
             sanitized_lines.append(current_line)
+
+        clean_sanitized = [ln.rstrip("\r\n") for ln in sanitized_lines]
+        for f in findings:
+            if f.finding_id.startswith("PK-"):
+                f.diff_hunk = (
+                    "-----BEGIN PRIVATE KEY-----\n"
+                    "[REDACTED_PRIVATE_KEY_BLOCK]\n"
+                    "-----END PRIVATE KEY-----"
+                )
+            elif clean_sanitized:
+                idx0 = max(0, f.line_number - 1)
+                start_idx = max(0, idx0 - 3)
+                end_idx = min(len(clean_sanitized), idx0 + 4)
+                f.diff_hunk = "\n".join(clean_sanitized[start_idx:end_idx])
+            else:
+                f.diff_hunk = f.context_line
 
         redacted_full_text = "".join(sanitized_lines)
         return RedactionResult(redacted_text=redacted_full_text, findings=findings)
