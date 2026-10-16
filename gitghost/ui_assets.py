@@ -517,19 +517,58 @@ HTML_PAGE = r"""<!DOCTYPE html>
       gap: 0.75rem;
     }
 
-    /* Code block inside modal */
+    /* Code block & Redacted Diff Viewer inside modal */
     .code-view {
       background: var(--code-bg);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 1rem;
+      padding: 0.75rem 0;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 0.825rem;
+      font-size: 0.8rem;
       color: #e2e8f0;
       overflow-x: auto;
+      max-height: 360px;
+      overflow-y: auto;
+      margin-top: 0.75rem;
+    }
+    .diff-line {
+      display: flex;
+      padding: 0.12rem 1rem;
       white-space: pre-wrap;
       word-break: break-all;
-      margin-top: 0.75rem;
+      line-height: 1.45;
+    }
+    .diff-lineno {
+      user-select: none;
+      width: 38px;
+      flex-shrink: 0;
+      color: #475569;
+      font-size: 0.72rem;
+      text-align: right;
+      padding-right: 0.75rem;
+    }
+    .diff-add {
+      background: rgba(16, 185, 129, 0.14);
+      color: #6ee7b7;
+      border-left: 3px solid var(--emerald);
+    }
+    .diff-del {
+      background: rgba(244, 63, 94, 0.14);
+      color: #fda4af;
+      border-left: 3px solid var(--rose);
+    }
+    .diff-hdr {
+      background: rgba(6, 182, 212, 0.12);
+      color: #67e8f9;
+      font-weight: 700;
+    }
+    .diff-secret-highlight {
+      background: rgba(245, 158, 11, 0.28);
+      border: 1px dashed rgba(245, 158, 11, 0.7);
+      color: #fef08a;
+      padding: 0.05rem 0.3rem;
+      border-radius: 4px;
+      font-weight: 700;
     }
 
     /* Remediation Commands */
@@ -919,7 +958,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
     </div>
   </main>
 
-  <!-- Finding Detail Modal -->
+  <!-- Finding / Commit Diff Inspection Modal -->
   <div id="detailModal" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
@@ -930,33 +969,41 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <button onclick="closeModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.25rem;">✕</button>
       </div>
       <div class="modal-body">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-          <div>
-            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Severity & AI Verdict</div>
-            <div id="modalSeverityBadge" style="margin-top: 0.25rem;"></div>
+        <div id="modalTriageMeta">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Severity & AI Verdict</div>
+              <div id="modalSeverityBadge" style="margin-top: 0.25rem;"></div>
+            </div>
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Shannon Entropy</div>
+              <div id="modalEntropyVal" style="font-weight: 700; margin-top: 0.25rem; color: var(--cyan);"></div>
+            </div>
           </div>
-          <div>
-            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Shannon Entropy</div>
-            <div id="modalEntropyVal" style="font-weight: 700; margin-top: 0.25rem; color: var(--cyan);"></div>
+
+          <div style="margin-bottom: 1rem;">
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">AI Technical Explanation</div>
+            <div id="modalExplanation" style="font-size: 0.85rem; margin-top: 0.25rem; line-height: 1.4; color: var(--text-main);"></div>
           </div>
-        </div>
 
-        <div style="margin-bottom: 1rem;">
-          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">AI Technical Explanation</div>
-          <div id="modalExplanation" style="font-size: 0.85rem; margin-top: 0.25rem; line-height: 1.4; color: var(--text-main);"></div>
-        </div>
-
-        <div style="margin-bottom: 1rem;">
-          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Recommended Security Action</div>
-          <div id="modalAction" style="font-size: 0.85rem; margin-top: 0.25rem; color: #a5f3fc;"></div>
+          <div style="margin-bottom: 1rem;">
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Recommended Security Action</div>
+            <div id="modalAction" style="font-size: 0.85rem; margin-top: 0.25rem; color: #a5f3fc;"></div>
+          </div>
         </div>
 
         <div>
-          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Strictly Redacted Code Diff / Context</div>
-          <pre id="modalCodeView" class="code-view"></pre>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Strictly Redacted Diff View</div>
+            <span style="font-size: 0.7rem; color: var(--emerald);">🔒 Cryptographic Secret Masking Enforced</span>
+          </div>
+          <div id="modalCodeView" class="code-view"></div>
         </div>
       </div>
       <div class="modal-footer">
+        <button id="modalRecoverBtn" class="btn btn-primary" style="display: none;" onclick="recoverFromActiveModal()">
+          ⬇️ Recover & Download Artifact
+        </button>
         <button class="btn btn-secondary" onclick="closeModal()">Close</button>
       </div>
     </div>
@@ -1380,9 +1427,44 @@ HTML_PAGE = r"""<!DOCTYPE html>
       showToast('Command copied to clipboard!', '📋');
     }
 
+    let activeModalRecoveryTarget = null;
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function renderDiffViewHtml(diffText) {
+      if (!diffText) return '<div class="diff-line" style="color: var(--text-muted);">No diff content available.</div>';
+      const lines = String(diffText).split('\n');
+      return lines.map((rawLine, idx) => {
+        let cls = 'diff-line';
+        if (rawLine.startsWith('+++') || rawLine.startsWith('---') || rawLine.startsWith('diff --git') || rawLine.startsWith('@@')) {
+          cls += ' diff-hdr';
+        } else if (rawLine.startsWith('+')) {
+          cls += ' diff-add';
+        } else if (rawLine.startsWith('-')) {
+          cls += ' diff-del';
+        }
+        let escaped = escapeHtml(rawLine);
+        // Highlight masked credentials (e.g. AKIA***REDACTED***1234 or [REDACTED_HIGH_ENTROPY_SECRET])
+        escaped = escaped.replace(
+          /([A-Za-z0-9_+=\/-]{0,6}\*{3,}[A-Za-z0-9_+=\/-]*|\[REDACTED[^\]]*\])/g,
+          '<span class="diff-secret-highlight">$1</span>'
+        );
+        return `<div class="${cls}"><span class="diff-lineno">${idx + 1}</span><span>${escaped}</span></div>`;
+      }).join('');
+    }
+
     function openDetailModal(f) {
       document.getElementById('modalTitle').innerText = f.rule_name;
-      document.getElementById('modalSubtitle').innerText = `ID: ${f.finding_id} | Path: ${f.file_path}:${f.line_number}`;
+      document.getElementById('modalSubtitle').innerText = `ID: ${f.finding_id} | Path: ${f.file_path}:${f.line_number}${f.commit_hash ? ' | Commit: ' + f.commit_hash.substring(0, 10) : ''}`;
+      document.getElementById('modalTriageMeta').style.display = 'block';
 
       const sev = f.triage_severity || f.severity_estimate;
       const sevClass = sev === 'Critical' ? 'badge-critical' : (sev === 'High' ? 'badge-high' : 'badge-medium');
@@ -1390,7 +1472,23 @@ HTML_PAGE = r"""<!DOCTYPE html>
       document.getElementById('modalEntropyVal').innerText = (f.entropy || 0).toFixed(2);
       document.getElementById('modalExplanation').innerText = f.triage_explanation || 'No AI explanation available.';
       document.getElementById('modalAction').innerText = f.triage_action || 'Rotate credentials and prune repository.';
-      document.getElementById('modalCodeView').innerText = f.context_line || f.masked_value;
+
+      const diffText = f.diff_hunk || f.context_line || f.masked_value;
+      document.getElementById('modalCodeView').innerHTML = renderDiffViewHtml(diffText);
+
+      const recBtn = document.getElementById('modalRecoverBtn');
+      if (f.commit_hash || f.blob_hash) {
+        activeModalRecoveryTarget = {
+          object_type: f.commit_hash ? 'file' : 'blob',
+          commit_hash: f.commit_hash || '',
+          blob_hash: f.blob_hash || '',
+          file_path: f.file_path || ''
+        };
+        recBtn.style.display = 'inline-flex';
+      } else {
+        activeModalRecoveryTarget = null;
+        recBtn.style.display = 'none';
+      }
 
       document.getElementById('detailModal').style.display = 'flex';
     }
