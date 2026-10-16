@@ -54,6 +54,8 @@ class ForensicsScanResult:
 
 class GitForensics:
     MAX_BLOB_SIZE_BYTES = 512 * 1024
+    MAX_TEXT_SCAN_BYTES = 10 * 1024 * 1024
+    GIT_CMD_TIMEOUT_SECONDS = 60
 
     def __init__(self, repo_path: str | Path = "."):
         self.repo_path = Path(repo_path).resolve()
@@ -61,11 +63,18 @@ class GitForensics:
     def is_valid_repo(self) -> bool:
         if not shutil.which("git"):
             return False
+        if not self.repo_path.exists():
+            return False
         git_dir = self.repo_path / ".git"
         if git_dir.exists() and (git_dir.is_dir() or git_dir.is_file()):
             return True
+        if (self.repo_path / "HEAD").is_file() and (self.repo_path / "objects").is_dir():
+            return True
         res = self._run_git(["rev-parse", "--is-inside-work-tree"], check=False)
-        return res.returncode == 0 and res.stdout.strip() == "true"
+        if res.returncode == 0 and res.stdout.strip() == "true":
+            return True
+        bare_res = self._run_git(["rev-parse", "--is-bare-repository"], check=False)
+        return bare_res.returncode == 0 and bare_res.stdout.strip() == "true"
 
     def scan(self) -> ForensicsScanResult:
         if not shutil.which("git"):
@@ -112,20 +121,20 @@ class GitForensics:
             candidate_hashes,
         )
 
-        # Inspect .git/lost-found if present
-        lost_found_dir = self.repo_path / ".git" / "lost-found"
-        if lost_found_dir.exists():
-            commit_dir = lost_found_dir / "commit"
-            if commit_dir.exists() and commit_dir.is_dir():
-                for f in commit_dir.iterdir():
-                    if len(f.name) in (40, 64):
-                        candidate_hashes.add(f.name)
-                        unreachable_objects["commit"].add(f.name)
-            other_dir = lost_found_dir / "other"
-            if other_dir.exists() and other_dir.is_dir():
-                for f in other_dir.iterdir():
-                    if len(f.name) in (40, 64):
-                        candidate_hashes.add(f.name)
+        # Inspect .git/lost-found or bare lost-found if present
+        for lost_found_dir in (self.repo_path / ".git" / "lost-found", self.repo_path / "lost-found"):
+            if lost_found_dir.exists():
+                commit_dir = lost_found_dir / "commit"
+                if commit_dir.exists() and commit_dir.is_dir():
+                    for f in commit_dir.iterdir():
+                        if len(f.name) in (40, 64):
+                            candidate_hashes.add(f.name)
+                            unreachable_objects["commit"].add(f.name)
+                other_dir = lost_found_dir / "other"
+                if other_dir.exists() and other_dir.is_dir():
+                    for f in other_dir.iterdir():
+                        if len(f.name) in (40, 64):
+                            candidate_hashes.add(f.name)
 
         if not candidate_hashes:
             return result
@@ -463,7 +472,17 @@ class GitForensics:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
+                timeout=self.GIT_CMD_TIMEOUT_SECONDS,
                 check=check,
+            )
+        except subprocess.TimeoutExpired:
+            if check:
+                raise RuntimeError(f"Git command timed out after {self.GIT_CMD_TIMEOUT_SECONDS}s: {' '.join(args)}")
+            return subprocess.CompletedProcess(
+                args=full_cmd,
+                returncode=124,
+                stdout="",
+                stderr="git command timed out",
             )
         except subprocess.CalledProcessError as e:
             if check:
@@ -481,3 +500,4 @@ class GitForensics:
                 stdout="",
                 stderr="git not found",
             )
+
