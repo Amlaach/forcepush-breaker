@@ -51,6 +51,9 @@ class SecretFinding:
     commit_hash: Optional[str] = None
     blob_hash: Optional[str] = None
     diff_hunk: str = ""
+    is_ai_agent: bool = False
+    ai_agent_name: Optional[str] = None
+    ai_agent_evidence: List[str] = field(default_factory=list)
 
 
 @dataclass
