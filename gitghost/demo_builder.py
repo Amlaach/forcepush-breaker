@@ -22,6 +22,7 @@ class DemoRepoInfo:
     dangling_commit_subject: str
     leaked_filename: str
     description: str
+    dangling_commit_sha: str = ""
 
 
 class DemoBuilder:
@@ -71,6 +72,7 @@ class DemoBuilder:
         (temp_dir / ".env").write_text(env_content, encoding="utf-8")
         _git(["add", ".env"])
         _git(["commit", "-m", "chore: temporary test of db credentials and s3 backup"])
+        dangling_sha = _git(["rev-parse", "HEAD"])
 
         # Developer panics and attempts to 'delete' the secret using git reset --hard
         _git(["reset", "--hard", "HEAD~1"])
@@ -88,6 +90,7 @@ class DemoBuilder:
             dangling_commit_subject="chore: temporary test of db credentials and s3 backup",
             leaked_filename=".env",
             description="Simulated repository with accidental secret commit followed by git reset --hard.",
+            dangling_commit_sha=dangling_sha,
         )
 
     @classmethod
