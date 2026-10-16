@@ -668,12 +668,21 @@ HTML_PAGE = r"""<!DOCTYPE html>
       <span class="brand-tag">v0.1.0 Enterprise</span>
     </div>
 
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-      <button class="btn btn-secondary" onclick="exportSARIF()" title="Export SARIF 2.1.0 for GitHub Code Scanning">
+    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+      <button class="btn btn-primary" style="padding: 0.5rem 0.9rem; font-size: 0.8rem;" onclick="downloadRecoveryBundle()" title="Download Full ZIP Bundle (Reports + Recovered Files + Commit Patches)">
+        📦 Recovery Bundle (.ZIP)
+      </button>
+      <button class="btn btn-secondary" style="padding: 0.5rem 0.8rem; font-size: 0.8rem;" onclick="downloadReport('json')" title="Download Audit Report as JSON">
+        ⬇️ JSON
+      </button>
+      <button class="btn btn-secondary" style="padding: 0.5rem 0.8rem; font-size: 0.8rem;" onclick="downloadReport('markdown')" title="Download Audit Report as Markdown">
+        ⬇️ Markdown
+      </button>
+      <button class="btn btn-secondary" style="padding: 0.5rem 0.8rem; font-size: 0.8rem;" onclick="exportSARIF()" title="Export SARIF 2.1.0 for GitHub Code Scanning">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         Export SARIF
       </button>
-      <button class="btn btn-secondary" onclick="installHook()" title="Install Pre-Push Protection Hook into repository">
+      <button class="btn btn-secondary" style="padding: 0.5rem 0.8rem; font-size: 0.8rem;" onclick="installHook()" title="Install Pre-Push Protection Hook into repository">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
         Install Hook
       </button>
@@ -1664,6 +1673,46 @@ HTML_PAGE = r"""<!DOCTYPE html>
       }
     }
 
+    // Direct browser download for JSON, Markdown, or SARIF reports
+    function downloadReport(fmt) {
+      if (!currentAuditData) {
+        alert('Please run a scan first before downloading reports.');
+        return;
+      }
+      const repoPath = document.getElementById('repoPathInput').value.trim() || '.';
+      const url = `/api/download/report?repo_path=${encodeURIComponent(repoPath)}&format=${encodeURIComponent(fmt)}`;
+      const a = document.createElement('a');
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast(`Downloading ${fmt.toUpperCase()} report...`, '📄');
+    }
+
+    // Direct browser download for Full Recovery Bundle (.ZIP)
+    function downloadRecoveryBundle() {
+      if (!currentAuditData) {
+        alert('Please run a scan first before downloading the Recovery Bundle.');
+        return;
+      }
+      const repoPath = document.getElementById('repoPathInput').value.trim() || '.';
+      const rawToggle = document.getElementById('includeRawToggle');
+      const includeRaw = rawToggle ? rawToggle.checked : false;
+
+      if (includeRaw) {
+        const proceed = confirm('⚠️ Unredacted (Raw) Recovery Mode is enabled.\nThe ZIP bundle will include unmasked recovered files and commit patches.\n\nProceed with raw bundle download?');
+        if (!proceed) return;
+      }
+
+      const url = `/api/download/bundle?repo_path=${encodeURIComponent(repoPath)}&include_raw=${includeRaw ? 'true' : 'false'}`;
+      const a = document.createElement('a');
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast(`Downloading Recovery Bundle (${includeRaw ? 'Raw' : 'Strictly Redacted'})...`, '📦');
+    }
+
     // Export SARIF report
     async function exportSARIF() {
       if (!currentAuditData) {
@@ -1679,6 +1728,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         });
         const data = await res.json();
         if (data.success) {
+          downloadReport('sarif');
           showToast('SARIF report exported to: ' + data.file_path, '📄');
         } else {
           alert('Export error: ' + data.error);
