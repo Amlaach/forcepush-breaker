@@ -13,14 +13,23 @@ __author__ = "GitGhost Security Team"
 __license__ = "MIT"
 
 from gitghost.git_forensics import GitForensics, DanglingCommit, DanglingBlob, ForensicsScanResult
+from gitghost.github_remote import (
+    GitHubForensicsClient,
+    GitHubHistoryOverwriteEvent,
+    GitHubRepoRef,
+    SmartGitCloner,
+    is_github_target,
+    parse_github_url,
+)
 from gitghost.redactor import SecretRedactor, SecretFinding, RedactionResult, shannon_entropy
 from gitghost.ai_triage import AITriage, AITriageResult
 from gitghost.scoring import HygieneScorer, HygieneScoreReport
 from gitghost.remediation import RemediationGenerator, RemediationPlan
 from gitghost.exporters import ReportExporter
 from gitghost.pipeline import PipelineResult, run_scan_pipeline
+from gitghost.recovery import ObjectRecoveryEngine, RecoveredArtifact
 from gitghost.ui_window import launch_ui
-from gitghost.ui_server import start_ui_server
+from gitghost.ui_server import ScanJob, ScanJobManager, start_ui_server
 
 __all__ = [
     "__version__",
@@ -28,6 +37,12 @@ __all__ = [
     "DanglingCommit",
     "DanglingBlob",
     "ForensicsScanResult",
+    "GitHubRepoRef",
+    "GitHubHistoryOverwriteEvent",
+    "GitHubForensicsClient",
+    "SmartGitCloner",
+    "parse_github_url",
+    "is_github_target",
     "SecretRedactor",
     "SecretFinding",
     "RedactionResult",
@@ -41,6 +56,10 @@ __all__ = [
     "ReportExporter",
     "PipelineResult",
     "run_scan_pipeline",
+    "ObjectRecoveryEngine",
+    "RecoveredArtifact",
+    "ScanJob",
+    "ScanJobManager",
     "launch_ui",
     "start_ui_server",
 ]
