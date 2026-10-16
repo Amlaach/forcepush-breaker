@@ -54,6 +54,7 @@ class SecretFinding:
     is_ai_agent: bool = False
     ai_agent_name: Optional[str] = None
     ai_agent_evidence: List[str] = field(default_factory=list)
+    raw_value: Optional[str] = None
 
 
 @dataclass
@@ -258,6 +259,7 @@ class SecretRedactor:
                                 file_path=file_path,
                                 commit_hash=commit_hash,
                                 blob_hash=blob_hash,
+                                raw_value=raw_pwd,
                             )
                         )
 
@@ -284,6 +286,7 @@ class SecretRedactor:
                                 file_path=file_path,
                                 commit_hash=commit_hash,
                                 blob_hash=blob_hash,
+                                raw_value=raw_secret,
                             )
                         )
 
@@ -308,6 +311,7 @@ class SecretRedactor:
                                 file_path=file_path,
                                 commit_hash=commit_hash,
                                 blob_hash=blob_hash,
+                                raw_value=raw_val,
                             )
                         )
 
@@ -330,6 +334,7 @@ class SecretRedactor:
                                 file_path=file_path,
                                 commit_hash=commit_hash,
                                 blob_hash=blob_hash,
+                                raw_value=raw_val,
                             )
                         )
 
@@ -359,6 +364,7 @@ class SecretRedactor:
                             file_path=file_path,
                             commit_hash=commit_hash,
                             blob_hash=blob_hash,
+                            raw_value=token,
                         )
                     )
 

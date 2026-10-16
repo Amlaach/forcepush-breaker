@@ -36,6 +36,7 @@ class ReportExporter:
         serialized_findings = []
         for f in findings:
             f_dict = asdict(f)
+            f_dict.pop("raw_value", None)
             triage = triage_map.get(f.finding_id)
             if triage:
                 f_dict["ai_triage"] = asdict(triage)
