@@ -63,3 +63,28 @@ class TestLiveGitForensics:
         assert len(redaction.findings) >= 1
         assert "SuperSecretPass123!" not in redaction.redacted_text
         assert "[REDACTED_DB_PASSWORD]" in redaction.redacted_text
+
+    def test_bare_mirror_repository_forensics_scan(self, live_ghost_repo: Path, tmp_path: Path):
+        mirror_dir = tmp_path / "mirror_clone.git"
+        subprocess.run(
+            ["git", "clone", "--mirror", str(live_ghost_repo), str(mirror_dir)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        # Create a new commit in live_ghost_repo, fetch its SHA into mirror_dir without updating a ref
+        leaked_file = live_ghost_repo / "aws.env"
+        leaked_file.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n", encoding="utf-8")
+        subprocess.run(["git", "add", "aws.env"], cwd=str(live_ghost_repo), check=True)
+        subprocess.run(["git", "commit", "-m", "chore: orphan aws key in mirror"], cwd=str(live_ghost_repo), check=True)
+        sha_out = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(live_ghost_repo), check=True, capture_output=True, text=True
+        ).stdout.strip()
+        subprocess.run(["git", "fetch", "origin", sha_out], cwd=str(mirror_dir), check=True, capture_output=True)
+
+        mirror_forensics = GitForensics(mirror_dir)
+        assert mirror_forensics.is_valid_repo() is True
+        res = mirror_forensics.scan()
+        assert res.is_git_repo is True
+        assert any(c.commit_hash == sha_out for c in res.dangling_commits)
+
