@@ -203,3 +203,83 @@ class TestSmartGitCloner:
             )
         assert fake_token not in str(exc_info.value)
 
+    def test_query_public_forks(self, monkeypatch):
+        from gitghost.github_remote import ForkForensicsTarget
+
+        target = parse_github_url("https://github.com/acme/vault")
+        assert target is not None
+        client = GitHubAPIForensicsClient()
+
+        fake_forks_payload = [
+            {
+                "name": "vault",
+                "owner": {"login": "attacker-org"},
+                "clone_url": "https://github.com/attacker-org/vault.git",
+                "html_url": "https://github.com/attacker-org/vault",
+                "default_branch": "main",
+                "pushed_at": "2026-10-15T15:30:00Z",
+                "stargazers_count": 5,
+                "forks_count": 1,
+            }
+        ]
+        monkeypatch.setattr(client, "_get_json", lambda url: fake_forks_payload)
+        forks = client.query_public_forks(target)
+        assert len(forks) == 1
+        assert forks[0].owner == "attacker-org"
+        assert forks[0].full_name == "attacker-org/vault"
+        assert forks[0].stargazers_count == 5
+
+    def test_compare_fork_with_parent_and_event_generation(self, monkeypatch):
+        from gitghost.github_remote import ForkForensicsTarget
+
+        target = parse_github_url("https://github.com/acme/vault")
+        assert target is not None
+        client = GitHubAPIForensicsClient()
+
+        fake_fork = ForkForensicsTarget(
+            owner="developer-bob",
+            repo="vault",
+            clone_url="https://github.com/developer-bob/vault.git",
+            html_url="https://github.com/developer-bob/vault",
+            default_branch="main",
+            pushed_at="2026-10-15T16:00:00Z",
+        )
+
+        def mock_get(url: str):
+            if "/events" in url:
+                return []
+            if "/pulls" in url:
+                return []
+            if "/forks" in url:
+                return [
+                    {
+                        "name": "vault",
+                        "owner": {"login": "developer-bob"},
+                        "clone_url": "https://github.com/developer-bob/vault.git",
+                        "html_url": "https://github.com/developer-bob/vault",
+                        "default_branch": "main",
+                        "pushed_at": "2026-10-15T16:00:00Z",
+                    }
+                ]
+            if "/compare" in url:
+                return {
+                    "commits": [
+                        {
+                            "sha": "aaaabbbbcccc1111222233334444555566667777",
+                            "author": {"login": "developer-bob"},
+                            "commit": {"message": "feat: retain leaked key locally"},
+                        }
+                    ]
+                }
+            return {}
+
+        monkeypatch.setattr(client, "_get_json", mock_get)
+        events, candidates, warnings = client.discover_history_overwrite_events(target, scan_forks=True)
+
+        assert len(events) == 1
+        assert events[0].event_type == "fork_divergence"
+        assert events[0].before_sha == "aaaabbbbcccc1111222233334444555566667777"
+        assert "aaaabbbbcccc1111222233334444555566667777" in candidates
+        assert "developer-bob" in events[0].actor
+
+
