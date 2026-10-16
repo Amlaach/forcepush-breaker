@@ -96,6 +96,7 @@ def scan_cmd(
     include_raw: bool = typer.Option(False, "--include-raw", "--raw", "--unredacted", help="Export unredacted (raw) files/patches in recovery ZIP bundle (default is redacted)."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompts."),
     configs_only: bool = typer.Option(False, "--configs-only", help="Filter and display only deleted sensitive configuration files (.env, keys, credentials)."),
+    scan_forks: bool = typer.Option(True, "--scan-forks/--no-forks", help="Scan public forks for overwritten/divergent commits."),
     strict: bool = typer.Option(False, "--strict", help="CI/CD mode: Exit with code 1 if score < 70 or critical leaks exist."),
     no_ai: bool = typer.Option(False, "--no-ai", help="Disable AI triage."),
 ) -> None:
@@ -152,6 +153,7 @@ def scan_cmd(
                 ai_provider="none" if no_ai else ai_provider,
                 model=model,
                 github_token=github_token,
+                scan_forks=scan_forks,
                 on_forensics_done=on_forensics_done,
                 on_item_scanned=on_item_scanned,
                 on_phase=on_phase,
@@ -169,6 +171,8 @@ def scan_cmd(
     _render_findings_table(pipeline_res.findings, pipeline_res.triage_map)
     if pipeline_res.scan_result.deleted_config_files:
         _render_config_time_machine(pipeline_res.scan_result.deleted_config_files)
+    if pipeline_res.is_remote:
+        _render_forks_panel(pipeline_res.discovered_forks, pipeline_res.history_events)
     _render_score_panel(pipeline_res.hygiene)
     _render_remediation_panel(pipeline_res.remediation)
 
@@ -553,6 +557,59 @@ def _render_remediation_panel(remediation: RemediationPlan):
         lines.append("\n[bold cyan][*] Complete automated scripts available (Bash & PowerShell).[/bold cyan]")
         lines.append("[dim]Inspect in exported reports or copy directly in the Web UI dashboard.[/dim]")
     console.print(Panel("\n".join(lines), title="[bold white on red] Remediation & Excision Playbook [/bold white on red]", border_style="cyan"))
+
+
+def _render_forks_panel(discovered_forks, history_events):
+    has_divergence = any(getattr(e, "event_type", "") == "fork_divergence" for e in history_events)
+    if not discovered_forks and not has_divergence:
+        return
+
+    table = Table(
+        title="Public Forks & Divergent Branch Audit",
+        box=box.ROUNDED,
+        header_style="bold magenta",
+        title_style="bold white on dark_magenta",
+    )
+    table.add_column("Fork Repository", width=30)
+    table.add_column("Default Branch", width=16)
+    table.add_column("Last Pushed", width=22)
+    table.add_column("Divergent Commits", width=18)
+    table.add_column("Audit Status", width=24)
+
+    div_by_fork = {}
+    for e in history_events:
+        if getattr(e, "event_type", "") == "fork_divergence":
+            fork_key = e.ref.split(":")[1] if ":" in e.ref else e.actor
+            div_by_fork[fork_key] = div_by_fork.get(fork_key, 0) + 1
+
+    if not discovered_forks:
+        for fork_key, count in div_by_fork.items():
+            table.add_row(
+                fork_key,
+                "—",
+                "—",
+                f"[bold red]{count} commit(s)[/bold red]",
+                "[yellow][!] Divergent commits exhumed[/yellow]",
+            )
+    else:
+        for fork in discovered_forks:
+            div_count = div_by_fork.get(fork.full_name, 0)
+            status_str = (
+                f"[bold red][!] {div_count} divergent commit(s)[/bold red]"
+                if div_count > 0
+                else "[green][OK] In sync or clean[/green]"
+            )
+            div_str = str(div_count) if div_count > 0 else "0"
+            pushed_str = fork.pushed_at[:19].replace("T", " ") if getattr(fork, "pushed_at", "") else "Unknown"
+            table.add_row(
+                fork.full_name,
+                fork.default_branch,
+                pushed_str,
+                div_str,
+                status_str,
+            )
+    console.print(table)
+    console.print("")
 
 
 def _handle_export(output_path_str: str, format_arg: Optional[str], scan_result, findings, triage_map, hygiene, remediation):
