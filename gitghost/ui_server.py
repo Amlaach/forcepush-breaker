@@ -140,6 +140,8 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"status": "ok", "version": __version__, "app": "GitGhost"})
         elif self.path.startswith("/api/scan/status"):
             self._handle_scan_status()
+        elif self.path.startswith("/api/download/report"):
+            self._handle_download_report_get()
         else:
             self._send_error(404, "Not Found")
 
@@ -162,6 +164,8 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._handle_cleanup(data)
         elif self.path == "/api/export":
             self._handle_export(data)
+        elif self.path == "/api/download/report":
+            self._handle_download_report(data)
         elif self.path == "/api/hook":
             self._handle_hook(data)
         else:
@@ -175,6 +179,16 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(content)
+
+    def _send_download(self, content_bytes: bytes, filename: str, content_type: str = "application/octet-stream"):
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Length", str(len(content_bytes)))
+        self.send_header("Connection", "close")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(content_bytes)
 
     def _send_json(self, payload: dict, status: int = 200):
         content = json.dumps(payload, indent=2).encode("utf-8")
@@ -449,26 +463,40 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
         except subprocess.CalledProcessError as e:
             self._send_error(500, f"Git command failed: {e.stderr or e.stdout}")
 
-    def _handle_export(self, data: dict):
-        repo_path_str = data.get("repo_path", ".").strip() or "."
-        repo_path = Path(repo_path_str).resolve()
-        fmt = (data.get("format", "sarif") or "sarif").lower()
+    def _resolve_pipeline_result(self, repo_path_str: str) -> Optional[PipelineResult]:
+        target = (repo_path_str or "").strip()
+        with _CACHE_LOCK:
+            if target and target in _SCAN_CACHE:
+                return _SCAN_CACHE[target]
+            if target and not is_github_target(target):
+                resolved = str(Path(target).resolve())
+                if resolved in _SCAN_CACHE:
+                    return _SCAN_CACHE[resolved]
+            if "__latest__" in _SCAN_CACHE and not target:
+                return _SCAN_CACHE["__latest__"]
 
-        # Use full cached pipeline result if available, or run unified scan pipeline
-        cached = _SCAN_CACHE.get(str(repo_path))
-        if cached:
-            pipeline_res = cached
-        else:
-            pipeline_res = run_scan_pipeline(repo_path, ai_provider="heuristic")
-            _SCAN_CACHE[str(repo_path)] = pipeline_res
+        validated = self._validate_target_or_error(target or ".")
+        if validated is None:
+            return None
+        try:
+            pipeline_res = run_scan_pipeline(validated, ai_provider="heuristic")
+            with _CACHE_LOCK:
+                _SCAN_CACHE[pipeline_res.repo_path] = pipeline_res
+                _SCAN_CACHE[validated] = pipeline_res
+                _SCAN_CACHE["__latest__"] = pipeline_res
+            return pipeline_res
+        except Exception as exc:
+            self._send_error(500, str(exc))
+            return None
 
-        if fmt == "sarif":
-            out_file = repo_path / "gitghost_report.sarif"
+    def _build_report_payload(self, pipeline_res: PipelineResult, fmt: str) -> tuple[str, str, str]:
+        fmt_norm = (fmt or "sarif").lower()
+        if fmt_norm == "sarif":
             content = ReportExporter.to_sarif(
                 pipeline_res.scan_result, pipeline_res.findings, pipeline_res.triage_map
             )
-        elif fmt == "json":
-            out_file = repo_path / "gitghost_report.json"
+            return content, "gitghost_report.sarif", "application/json; charset=utf-8"
+        if fmt_norm == "json":
             content = ReportExporter.to_json(
                 pipeline_res.scan_result,
                 pipeline_res.findings,
@@ -476,18 +504,45 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 pipeline_res.hygiene,
                 pipeline_res.remediation,
             )
-        else:
-            out_file = repo_path / "gitghost_report.md"
-            content = ReportExporter.to_markdown(
-                pipeline_res.scan_result,
-                pipeline_res.findings,
-                pipeline_res.triage_map,
-                pipeline_res.hygiene,
-                pipeline_res.remediation,
-            )
+            return content, "gitghost_report.json", "application/json; charset=utf-8"
+        content = ReportExporter.to_markdown(
+            pipeline_res.scan_result,
+            pipeline_res.findings,
+            pipeline_res.triage_map,
+            pipeline_res.hygiene,
+            pipeline_res.remediation,
+        )
+        return content, "gitghost_report.md", "text/markdown; charset=utf-8"
 
+    def _handle_download_report_get(self):
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        repo_path_str = (params.get("repo_path") or [""])[0]
+        fmt = (params.get("format") or ["json"])[0]
+        self._handle_download_report({"repo_path": repo_path_str, "format": fmt})
+
+    def _handle_download_report(self, data: dict):
+        repo_path_str = (data.get("repo_path") or "").strip()
+        fmt = (data.get("format") or "json").lower()
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+        content, filename, content_type = self._build_report_payload(pipeline_res, fmt)
+        self._send_download(content.encode("utf-8"), filename, content_type)
+
+    def _handle_export(self, data: dict):
+        repo_path_str = (data.get("repo_path") or ".").strip() or "."
+        fmt = (data.get("format", "sarif") or "sarif").lower()
+
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+
+        content, filename, _ = self._build_report_payload(pipeline_res, fmt)
+        target_dir = Path.cwd() if is_github_target(repo_path_str) else Path(repo_path_str).resolve()
+        out_file = target_dir / filename
         out_file.write_text(content, encoding="utf-8")
-        self._send_json({"success": True, "file_path": str(out_file)})
+        self._send_json({"success": True, "file_path": str(out_file), "filename": filename, "content": content})
 
     def _handle_hook(self, data: dict):
         repo_path_str = data.get("repo_path", ".").strip() or "."
