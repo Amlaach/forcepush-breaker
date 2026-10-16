@@ -8,9 +8,10 @@ for force-push/deleted branch discovery, and smart mirror cloning with resource 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional, Set, Tuple
+from gitghost.git_forensics import DanglingCommit
 
 _HTTPS_GITHUB_RE = re.compile(
     r"^https?://(?:www\.)?github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$"
@@ -34,6 +35,30 @@ class ParsedGitHubTarget:
     @property
     def full_name(self) -> str:
         return f"{self.owner}/{self.repo}"
+
+
+@dataclass
+class HistoryOverwriteEvent:
+    event_id: str
+    event_type: str  # "force_push" | "branch_delete" | "closed_pr_orphan" | "push_before"
+    ref: str
+    before_sha: str
+    after_sha: Optional[str]
+    actor: str
+    created_at: str
+    description: str
+
+
+@dataclass
+class RemoteAcquisitionResult:
+    target: ParsedGitHubTarget
+    local_clone_path: Path
+    is_temporary: bool = True
+    history_events: List[HistoryOverwriteEvent] = field(default_factory=list)
+    discovered_orphan_shas: List[str] = field(default_factory=list)
+    api_recovered_commits: List[DanglingCommit] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+
 
 
 def sanitize_token_in_text(text: str, token: Optional[str] = None) -> str:
