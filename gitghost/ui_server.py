@@ -10,18 +10,120 @@ import shutil
 import subprocess
 import sys
 import threading
+import urllib.parse
+import uuid
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict, Optional
 
 from gitghost import __version__
 from gitghost.exporters import ReportExporter
-from gitghost.git_forensics import GitForensics
+from gitghost.git_forensics import ForensicsScanResult, GitForensics
+from gitghost.github_remote import is_github_target, sanitize_token_in_text
 from gitghost.pipeline import PipelineResult, run_scan_pipeline
+from gitghost.recovery import ObjectRecoveryEngine
 from gitghost.ui_assets import HTML_PAGE
 
 # Thread-safe server-side cache for full pipeline scan results
 _SCAN_CACHE: Dict[str, PipelineResult] = {}
+_CACHE_LOCK = threading.Lock()
+
+
+@dataclass
+class ScanJob:
+    job_id: str
+    repo_target: str
+    status: str = "queued"  # "queued" | "running" | "completed" | "failed"
+    progress_pct: int = 0
+    phase_message: str = "Initializing forensics scan..."
+    scanned_objects: int = 0
+    total_objects: int = 0
+    error: Optional[str] = None
+    result: Optional[PipelineResult] = None
+
+
+class ScanJobManager:
+    """Manages asynchronous background repository scans with real-time progress and memory bounds."""
+
+    MAX_JOBS = 25
+    _jobs: Dict[str, ScanJob] = {}
+    _lock = threading.Lock()
+
+    @classmethod
+    def start_job(
+        cls,
+        repo_target: str,
+        ai_provider: str = "heuristic",
+        entropy_threshold: float = 4.0,
+        github_token: Optional[str] = None,
+        clone_source_override: Optional[str] = None,
+    ) -> ScanJob:
+        job_id = uuid.uuid4().hex[:12]
+        job = ScanJob(job_id=job_id, repo_target=repo_target, status="running", progress_pct=5)
+
+        with cls._lock:
+            if len(cls._jobs) >= cls.MAX_JOBS:
+                oldest_key = next(iter(cls._jobs))
+                cls._jobs.pop(oldest_key, None)
+            cls._jobs[job_id] = job
+
+        # Ephemeral token passed only into worker closure; never stored on ScanJob
+        ephemeral_token = (github_token or "").strip() or None
+
+        def _worker():
+            try:
+                def on_phase(msg: str, pct: int):
+                    job.phase_message = msg
+                    job.progress_pct = max(job.progress_pct, min(99, pct))
+
+                def on_forensics_done(scan_res: ForensicsScanResult):
+                    total = len(scan_res.dangling_commits) + len(scan_res.dangling_blobs)
+                    job.total_objects = total
+                    job.phase_message = f"Scanning {total} unreachable objects for secrets..."
+                    job.progress_pct = max(job.progress_pct, 60)
+
+                def on_item_scanned(current: int, total: int):
+                    job.scanned_objects = current
+                    job.total_objects = total
+                    if total > 0:
+                        ratio = current / total
+                        job.progress_pct = min(90, 60 + int(ratio * 25))
+
+                pipeline_res = run_scan_pipeline(
+                    repo_path=repo_target,
+                    ai_provider=ai_provider,
+                    entropy_threshold=entropy_threshold,
+                    github_token=ephemeral_token,
+                    clone_source_override=clone_source_override,
+                    on_forensics_done=on_forensics_done,
+                    on_item_scanned=on_item_scanned,
+                    on_phase=on_phase,
+                )
+
+                with _CACHE_LOCK:
+                    _SCAN_CACHE[pipeline_res.repo_path] = pipeline_res
+                    _SCAN_CACHE[repo_target] = pipeline_res
+                    _SCAN_CACHE["__latest__"] = pipeline_res
+
+                job.result = pipeline_res
+                job.progress_pct = 100
+                job.phase_message = "Forensics audit completed."
+                job.status = "completed"
+            except Exception as exc:
+                job.error = sanitize_token_in_text(str(exc), ephemeral_token)
+                job.phase_message = "Scan failed."
+                job.status = "failed"
+
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+        return job
+
+    @classmethod
+    def get_job(cls, job_id: str) -> Optional[ScanJob]:
+        with cls._lock:
+            return cls._jobs.get(job_id)
+
 
 
 class GitGhostRequestHandler(BaseHTTPRequestHandler):
