@@ -414,8 +414,9 @@ def _render_ghost_tree(scan_result: ForensicsScanResult):
     )
     commits_branch = tree.add(f"[bold magenta][COMMITS] Dangling Commits ({len(scan_result.dangling_commits)})[/bold magenta]")
     for c in scan_result.dangling_commits[:8]:
+        agent_tag = f" [bold magenta][AI: {c.ai_agent.agent_name}][/bold magenta]" if (c.ai_agent and c.ai_agent.is_ai_agent) else ""
         c_branch = commits_branch.add(
-            f"[bold red]commit {c.commit_hash[:10]}[/bold red] [yellow]{c.date[:10] if c.date else 'Unknown'}[/yellow] [dim]by {c.author}[/dim]"
+            f"[bold red]commit {c.commit_hash[:10]}[/bold red]{agent_tag} [yellow]{c.date[:10] if c.date else 'Unknown'}[/yellow] [dim]by {c.author}[/dim]"
         )
         subj = c.message.splitlines()[0] if c.message else ""
         c_branch.add(f'[italic]"{subj}"[/italic]')
@@ -460,10 +461,13 @@ def _render_findings_table(findings: list[SecretFinding], triage_map: dict[str, 
                 if sev == "Critical"
                 else (f"[bold yellow]{sev}[/bold yellow]" if sev == "High" else f"[cyan]{sev}[/cyan]")
             )
+            finding_type_str = f.rule_name
+            if getattr(f, "is_ai_agent", False):
+                finding_type_str += f"\n[dim magenta][AI: {f.ai_agent_name}][/dim magenta]"
             table.add_row(
                 f.finding_id,
                 sev_styled,
-                f.rule_name,
+                finding_type_str,
                 f"{f.file_path}:{f.line_number}",
                 f"[yellow]{f.masked_value}[/yellow]",
                 str(round(f.entropy, 2)),
