@@ -15,12 +15,12 @@
 
 *"Think `git push --force` deleted your leaked API keys? Think again."*
 
-[![CI](https://github.com/your-username/forcepush-breaker/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/forcepush-breaker/actions)
+[![CI](https://github.com/Amlaach/forcepush-breaker/actions/workflows/ci.yml/badge.svg)](https://github.com/Amlaach/forcepush-breaker/actions)
 [![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/unforce/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![SARIF 2.1.0](https://img.shields.io/badge/SARIF-2.1.0%20Compliant-purple.svg)](https://sarifweb.azurewebsites.net/)
 [![UI Desktop & Web](https://img.shields.io/badge/UI-Desktop%20%26%20Web-cyan.svg)](#interactive-desktop--web-uiux)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/your-username/forcepush-breaker/pulls)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Amlaach/forcepush-breaker/pulls)
 
 </div>
 
