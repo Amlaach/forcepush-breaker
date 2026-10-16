@@ -88,3 +88,33 @@ class TestLiveGitForensics:
         assert res.is_git_repo is True
         assert any(c.commit_hash == sha_out for c in res.dangling_commits)
 
+    def test_pipeline_multi_file_diff_attribution_and_redaction(self, tmp_path: Path):
+        from gitghost.pipeline import _scan_unified_diff_by_file
+
+        redactor = SecretRedactor()
+        multi_diff = (
+            "diff --git a/src/safe.py b/src/safe.py\n"
+            "--- a/src/safe.py\n"
+            "+++ b/src/safe.py\n"
+            "@@ -1,2 +1,3 @@\n"
+            " def ok():\n"
+            "+    return 1\n"
+            "diff --git a/config/prod.env b/config/prod.env\n"
+            "--- a/config/prod.env\n"
+            "+++ b/config/prod.env\n"
+            "@@ -10,2 +10,3 @@\n"
+            " PORT=8080\n"
+            "+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n"
+        )
+        res = _scan_unified_diff_by_file(
+            redactor=redactor,
+            diff_content=multi_diff,
+            fallback_file="src/safe.py",
+            commit_hash="deadbeef",
+        )
+        assert len(res.findings) >= 1
+        aws_finding = next(f for f in res.findings if "AWS" in f.rule_name)
+        assert aws_finding.file_path == "config/prod.env"
+        assert aws_finding.line_number == 11
+        assert "AKIAIOSFODNN7EXAMPLE" not in res.redacted_text
+
