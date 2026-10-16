@@ -83,3 +83,53 @@ class TestCliCommands:
         assert fake_token not in result.output
         assert "[REDACTED_GITHUB_TOKEN]" in result.output
 
+    def test_recover_missing_arguments(self):
+        result = runner.invoke(app, ["recover", "."])
+        assert result.exit_code == 1
+        assert "Must specify either --commit" in result.output
+
+    def test_recover_command_flow(self, tmp_path: Path):
+        info = DemoBuilder.create_demo_repository()
+        try:
+            # 1. Recover commit diff in redacted mode
+            res_redacted = runner.invoke(
+                app,
+                ["recover", str(info.repo_path), "--commit", info.dangling_commit_sha],
+            )
+            assert res_redacted.exit_code == 0
+            assert "Recovered Artifact" in res_redacted.output
+            assert "STRICTLY REDACTED" in res_redacted.output
+            assert "AKIAIOSFODNN7EXAMPLE" not in res_redacted.output
+
+            # 2. Raw mode without --yes prompts confirmation; declining aborts
+            res_declined = runner.invoke(
+                app,
+                ["recover", str(info.repo_path), "--commit", info.dangling_commit_sha, "--raw"],
+                input="n\n",
+            )
+            assert res_declined.exit_code != 0
+
+            # 3. Raw mode with --yes recovers unmasked secret
+            out_file = tmp_path / "recovered_diff.patch"
+            res_raw = runner.invoke(
+                app,
+                [
+                    "recover",
+                    str(info.repo_path),
+                    "--commit",
+                    info.dangling_commit_sha,
+                    "--raw",
+                    "--yes",
+                    "--output",
+                    str(out_file),
+                ],
+            )
+            assert res_raw.exit_code == 0
+            assert out_file.exists()
+            content = out_file.read_text(encoding="utf-8")
+            assert "AKIAIOSFODNN7EXAMPLE" in content
+            assert "UNREDACTED (RAW)" in res_raw.output
+        finally:
+            DemoBuilder.cleanup(info.repo_path)
+
+
