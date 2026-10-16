@@ -5,6 +5,7 @@ Unit tests for Remote GitHub URL parsing, token sanitization, API forensics, and
 from pathlib import Path
 import pytest
 from gitghost.github_remote import (
+    GitHubAPIForensicsClient,
     is_github_target,
     parse_github_url,
     sanitize_token_in_text,
@@ -58,3 +59,102 @@ class TestGitHubUrlParser:
         cleaned = sanitize_token_in_text(raw_err, secret_tok)
         assert secret_tok not in cleaned
         assert "[REDACTED_GITHUB_TOKEN]" in cleaned
+
+
+class TestGitHubAPIForensicsClient:
+    def test_discover_history_overwrite_events_parses_force_push_and_pr(self, monkeypatch):
+        target = parse_github_url("https://github.com/acme/payments")
+        assert target is not None
+        client = GitHubAPIForensicsClient(github_token="ghp_SuperSecretTokenForTestOnly999")
+        assert "ghp_SuperSecretTokenForTestOnly999" not in repr(client)
+
+        fake_events = [
+            {
+                "id": "1001",
+                "type": "PushEvent",
+                "actor": {"login": "dev-alice"},
+                "created_at": "2026-10-15T10:00:00Z",
+                "payload": {
+                    "ref": "refs/heads/main",
+                    "before": "deadbeef11111111111111111111111111111111",
+                    "head": "cafebabe22222222222222222222222222222222",
+                    "forced": True,
+                    "size": 0,
+                },
+            },
+            {
+                "id": "1002",
+                "type": "DeleteEvent",
+                "actor": {"login": "dev-bob"},
+                "created_at": "2026-10-15T11:00:00Z",
+                "payload": {"ref_type": "branch", "ref": "feature/temp-secrets"},
+            },
+        ]
+        fake_pulls = [
+            {
+                "number": 42,
+                "title": "WIP: add database config",
+                "merged_at": None,
+                "closed_at": "2026-10-15T12:00:00Z",
+                "user": {"login": "dev-charlie"},
+                "head": {
+                    "sha": "1234567890abcdef1234567890abcdef12345678",
+                    "ref": "wip-db",
+                },
+            }
+        ]
+
+        def mock_get_json(url: str):
+            if "/events" in url:
+                return fake_events
+            if "/pulls" in url:
+                return fake_pulls
+            return []
+
+        monkeypatch.setattr(client, "_get_json", mock_get_json)
+        events, orphan_shas, warnings = client.discover_history_overwrite_events(target)
+
+        assert len(warnings) == 0
+        assert len(events) == 3
+        assert events[0].event_type == "force_push"
+        assert events[0].before_sha == "deadbeef11111111111111111111111111111111"
+        assert events[1].event_type == "branch_delete"
+        assert events[2].event_type == "closed_pr_orphan"
+        assert "deadbeef11111111111111111111111111111111" in orphan_shas
+        assert "1234567890abcdef1234567890abcdef12345678" in orphan_shas
+
+    def test_fetch_orphan_commit_via_api_reconstructs_diff(self, monkeypatch):
+        target = parse_github_url("https://github.com/acme/payments")
+        assert target is not None
+        client = GitHubAPIForensicsClient()
+
+        fake_commit = {
+            "sha": "deadbeef11111111111111111111111111111111",
+            "commit": {
+                "author": {
+                    "name": "Alice Dev",
+                    "email": "alice@acme.io",
+                    "date": "2026-10-15T09:30:00Z",
+                },
+                "message": "chore: add temporary prod keys",
+            },
+            "parents": [{"sha": "0000111122223333444455556666777788889999"}],
+            "files": [
+                {
+                    "filename": ".env.prod",
+                    "patch": "@@ -0,0 +1,2 @@\n+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n",
+                }
+            ],
+        }
+
+        monkeypatch.setattr(client, "_get_json", lambda url: fake_commit)
+        commit = client.fetch_orphan_commit_via_api(
+            target, "deadbeef11111111111111111111111111111111"
+        )
+        assert commit is not None
+        assert commit.commit_hash == "deadbeef11111111111111111111111111111111"
+        assert commit.author == "Alice Dev <alice@acme.io>"
+        assert ".env.prod" in commit.changed_files
+        assert "diff --git a/.env.prod b/.env.prod" in commit.diff_content
+        assert "+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE" in commit.diff_content
+
