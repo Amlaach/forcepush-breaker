@@ -46,21 +46,22 @@ if sys.platform == "win32":
         pass
 
 app = typer.Typer(
-    name="gitghost",
-    help="👻 GitGhost - Forensics & Ghost Commit Secret Hunter for Git Repositories.",
+    name="unforce",
+    help="ForcePush-Breaker (UnForce) - Overwritten Commit Forensics & Secret Hunter.",
     add_completion=False,
 )
 console = Console(legacy_windows=False)
 
 BANNER_ART = r"""
- [bold cyan]  ██████╗ ██╗████████╗ ██████╗ ██╗  ██╗ ██████╗ ███████╗████████╗[/bold cyan]
- [bold cyan] ██╔════╝ ██║╚══██╔══╝██╔════╝ ██║  ██║██╔═══██╗██╔════╝╚══██╔══╝[/bold cyan]
- [bold cyan] ██║  ███╗██║   ██║   ██║  ███╗███████║██║   ██║███████╗   ██║   [/bold cyan]
- [bold cyan] ██║   ██║██║   ██║   ██║   ██║██╔══██║██║   ██║╚════██║   ██║   [/bold cyan]
- [bold cyan] ╚██████╔╝██║   ██║   ╚██████╔╝██║  ██║╚██████╔╝███████║   ██║   [/bold cyan]
- [bold cyan]  ╚═════╝ ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   [/bold cyan]
-      [bold magenta]👻 Exhuming Dangling Commits & Hunting Forgotten Secrets 👻[/bold magenta]
-                 [dim]v{version} | Enterprise Git Security Forensics[/dim]
+ [bold cyan] ███████╗ ██████╗ ██████╗  ██████╗███████╗██████╗ ██╗   ██╗███████╗██╗  ██╗[/bold cyan]
+ [bold cyan] ██╔════╝██╔═══██╗██╔══██╗██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██║  ██║[/bold cyan]
+ [bold cyan] █████╗  ██║   ██║██████╔╝██║     █████╗  ██████╔╝██║   ██║███████╗███████║[/bold cyan]
+ [bold cyan] ██╔══╝  ██║   ██║██╔══██╗██║     ██╔══╝  ██╔═══╝ ██║   ██║╚════██║██╔══██║[/bold cyan]
+ [bold cyan] ██║     ╚██████╔╝██║  ██║╚██████╗███████╗██║     ╚██████╔╝███████║██║  ██║[/bold cyan]
+ [bold cyan] ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚══════╝╚═╝      ╚═════╝ ╚══════╝╚═╝  ╚═╝[/bold cyan]
+              [bold magenta]ForcePush-Breaker (UnForce) | Enterprise Forensics[/bold magenta]
+                 [dim]v{version} | Overwritten Commit Secret Hunter[/dim]
+ [dim]Think `git push --force` deleted your leaked API keys? Think again.[/dim]
 """.format(version=__version__)
 
 
@@ -70,7 +71,7 @@ def print_banner() -> None:
 
 def version_callback(value: bool):
     if value:
-        console.print(f"[bold cyan]GitGhost[/bold cyan] version [bold green]{__version__}[/bold green]")
+        console.print(f"[bold cyan]ForcePush-Breaker (UnForce)[/bold cyan] [GitGhost version [bold green]{__version__}[/bold green]]")
         raise typer.Exit()
 
 
@@ -198,12 +199,12 @@ def demo_cmd():
         console.print("[bold red]Error:[/bold red] Git executable was not found on the system PATH. Git is required to use GitGhost.")
         raise typer.Exit(1)
 
-    console.print("[bold cyan]🚀 Initializing GitGhost Interactive Sandbox Demo...[/bold cyan]")
+    console.print("[bold cyan][*] Initializing GitGhost Interactive Sandbox Demo...[/bold cyan]")
     console.print("[dim]Creating temporary sandbox repository with simulated accidental secret leak...[/dim]\n")
 
     info = DemoBuilder.create_demo_repository()
     try:
-        console.print(f"[bold green]✔[/bold green] Created temporary Git sandbox at: [cyan]{info.repo_path}[/cyan]")
+        console.print(f"[bold green][OK][/bold green] Created temporary Git sandbox at: [cyan]{info.repo_path}[/cyan]")
         console.print(
             f"[bold yellow]Scenario:[/bold yellow] Developer committed [red]{info.leaked_filename}[/red] "
             f"([italic]{info.dangling_commit_subject}[/italic]), then ran [bold cyan]git reset --hard HEAD~1[/bold cyan].\n"
@@ -242,7 +243,7 @@ def demo_cmd():
         _render_findings_table(pipeline_res.findings, pipeline_res.triage_map)
         _render_score_panel(pipeline_res.hygiene)
         _render_remediation_panel(pipeline_res.remediation)
-        console.print("[bold green]✔ Sandbox demo completed successfully![/bold green] Cleaning up temporary directory...")
+        console.print("[bold green][OK] Sandbox demo completed successfully.[/bold green] Cleaning up temporary directory...")
     finally:
         DemoBuilder.cleanup(info.repo_path)
         console.print("[dim]Temporary sandbox cleaned up.[/dim]\n")
@@ -338,10 +339,10 @@ def clean_cmd(
 
 def _render_ghost_tree(scan_result: ForensicsScanResult):
     tree = Tree(
-        f"[bold cyan]📁 Git Object Store ({Path(scan_result.repo_path).name})[/bold cyan] "
+        f"[bold cyan][DIR] Git Object Store ({Path(scan_result.repo_path).name})[/bold cyan] "
         f"[dim]({scan_result.total_objects_scanned} unreachable objects)[/dim]"
     )
-    commits_branch = tree.add(f"[bold magenta]👻 Dangling Commits ({len(scan_result.dangling_commits)})[/bold magenta]")
+    commits_branch = tree.add(f"[bold magenta][COMMITS] Dangling Commits ({len(scan_result.dangling_commits)})[/bold magenta]")
     for c in scan_result.dangling_commits[:8]:
         c_branch = commits_branch.add(
             f"[bold red]commit {c.commit_hash[:10]}[/bold red] [yellow]{c.date[:10] if c.date else 'Unknown'}[/yellow] [dim]by {c.author}[/dim]"
@@ -351,7 +352,7 @@ def _render_ghost_tree(scan_result: ForensicsScanResult):
     if len(scan_result.dangling_commits) > 8:
         commits_branch.add(f"[dim italic]... and {len(scan_result.dangling_commits) - 8} more dangling commits[/dim italic]")
 
-    blobs_branch = tree.add(f"[bold yellow]📦 Dangling Blobs ({len(scan_result.dangling_blobs)})[/bold yellow]")
+    blobs_branch = tree.add(f"[bold yellow][BLOBS] Dangling Blobs ({len(scan_result.dangling_blobs)})[/bold yellow]")
     for b in scan_result.dangling_blobs[:4]:
         loc = f" ({b.associated_path})" if b.associated_path else ""
         blobs_branch.add(f"[yellow]{b.blob_hash[:10]}[/yellow]{loc} - {b.size} bytes")
@@ -364,7 +365,7 @@ def _render_ghost_tree(scan_result: ForensicsScanResult):
 
 def _render_findings_table(findings: list[SecretFinding], triage_map: dict[str, AITriageResult]):
     table = Table(
-        title="🔍 Discovered Credentials & Forensic Findings",
+        title="[FINDINGS] Discovered Credentials & Forensic Findings",
         title_style="bold cyan",
         box=box.ROUNDED,
         header_style="bold magenta",
@@ -417,13 +418,13 @@ def _render_score_panel(hygiene: HygieneScoreReport):
 
 
 def _render_remediation_panel(remediation: RemediationPlan):
-    lines = [f"[bold red]⚠️ {remediation.rotation_warning}[/bold red]\n"]
+    lines = [f"[bold red][!] {remediation.rotation_warning}[/bold red]\n"]
     for step in remediation.steps:
         lines.append(f"[bold yellow]Step {step.order}: {step.title}[/bold yellow]")
         for cmd in step.commands:
             lines.append(f"  [bold green]$ {cmd}[/bold green]")
     if remediation.bash_script:
-        lines.append("\n[bold cyan]💡 Complete automated scripts available (Bash & PowerShell).[/bold cyan]")
+        lines.append("\n[bold cyan][*] Complete automated scripts available (Bash & PowerShell).[/bold cyan]")
         lines.append("[dim]Inspect in exported reports or copy directly in the Web UI dashboard.[/dim]")
     console.print(Panel("\n".join(lines), title="[bold white on red] Remediation & Excision Playbook [/bold white on red]", border_style="cyan"))
 
