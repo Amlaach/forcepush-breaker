@@ -8,15 +8,94 @@ Used identically across CLI, Web UI, and CI/CD runners.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from gitghost.ai_triage import AITriage, AITriageResult
 from gitghost.git_forensics import ForensicsScanResult, GitForensics
 from gitghost.redactor import RedactionResult, SecretFinding, SecretRedactor
 from gitghost.remediation import RemediationGenerator, RemediationPlan
 from gitghost.scoring import HygieneScoreReport, HygieneScorer
+
+_DIFF_HEADER_RE = re.compile(r"^diff --git a/.*? b/(.+)$")
+_HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
+def _scan_unified_diff_by_file(
+    redactor: SecretRedactor,
+    diff_content: str,
+    fallback_file: str,
+    commit_hash: str,
+) -> RedactionResult:
+    """Splits a unified diff by file headers, scanning each file chunk with accurate file_path and line numbers."""
+    if not diff_content:
+        return RedactionResult(redacted_text="", findings=[])
+
+    if len(diff_content.encode("utf-8", errors="replace")) > GitForensics.MAX_TEXT_SCAN_BYTES:
+        return RedactionResult(
+            redacted_text="[Oversized diff omitted from text scan (>10MB)]",
+            findings=[],
+        )
+
+    lines = diff_content.splitlines(keepends=True)
+    sections: List[Tuple[str, List[str]]] = []
+    current_file = fallback_file
+    current_lines: List[str] = []
+
+    for line in lines:
+        m = _DIFF_HEADER_RE.match(line.rstrip("\r\n"))
+        if m:
+            if current_lines:
+                sections.append((current_file, current_lines))
+            current_file = m.group(1).strip()
+            current_lines = [line]
+        else:
+            current_lines.append(line)
+
+    if current_lines:
+        sections.append((current_file, current_lines))
+
+    redacted_chunks: List[str] = []
+    all_findings: List[SecretFinding] = []
+
+    for file_path, sec_lines in sections:
+        sec_text = "".join(sec_lines)
+        if "Binary files " in sec_text and " differ" in sec_text:
+            redacted_chunks.append(sec_text)
+            continue
+
+        # Map relative section line index (1-based) to actual file line number from @@ hunk headers
+        line_map: Dict[int, int] = {}
+        real_line: Optional[int] = None
+        for idx, raw_ln in enumerate(sec_lines, start=1):
+            stripped = raw_ln.rstrip("\r\n")
+            hm = _HUNK_HEADER_RE.match(stripped)
+            if hm:
+                real_line = int(hm.group(1))
+                line_map[idx] = real_line
+            elif real_line is not None:
+                if stripped.startswith("---") or stripped.startswith("+++"):
+                    line_map[idx] = real_line
+                elif stripped.startswith("-"):
+                    line_map[idx] = real_line
+                else:
+                    line_map[idx] = real_line
+                    real_line += 1
+
+        sec_res = redactor.scan_and_redact(
+            sec_text,
+            file_path=file_path,
+            commit_hash=commit_hash,
+        )
+        for f in sec_res.findings:
+            if f.line_number in line_map:
+                f.line_number = line_map[f.line_number]
+            all_findings.append(f)
+        redacted_chunks.append(sec_res.redacted_text)
+
+    return RedactionResult(redacted_text="".join(redacted_chunks), findings=all_findings)
 
 
 @dataclass
@@ -65,9 +144,10 @@ def run_scan_pipeline(
         findings.extend(msg_res.findings)
 
         primary_file = commit.changed_files[0] if commit.changed_files else "Diff"
-        diff_res: RedactionResult = redactor.scan_and_redact(
-            commit.diff_content,
-            file_path=primary_file,
+        diff_res: RedactionResult = _scan_unified_diff_by_file(
+            redactor=redactor,
+            diff_content=commit.diff_content,
+            fallback_file=primary_file,
             commit_hash=commit.commit_hash,
         )
         findings.extend(diff_res.findings)
@@ -89,6 +169,10 @@ def run_scan_pipeline(
         scanned_counter += 1
         if on_item_scanned:
             on_item_scanned(scanned_counter, total_items)
+
+    for idx, f in enumerate(findings, start=1):
+        prefix = f.finding_id.split("-")[0] if "-" in f.finding_id else "SEC"
+        f.finding_id = f"{prefix}-{idx:04d}"
 
     triage_map: Dict[str, AITriageResult] = {}
     effective_provider = (ai_provider or "none").lower()
