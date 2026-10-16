@@ -296,11 +296,13 @@ def run_scan_pipeline(
             commit_dates=commit_dates,
         )
 
+        orphaned_shas = [c.commit_hash for c in scan_result.dangling_commits]
         remediation = RemediationGenerator.generate_plan(
             repo_path=display_repo_label,
             findings=findings,
             dangling_commits_count=len(scan_result.dangling_commits),
             dangling_blobs_count=len(scan_result.dangling_blobs),
+            orphaned_commit_shas=orphaned_shas,
         )
 
         if on_phase:
