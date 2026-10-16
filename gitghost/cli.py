@@ -28,7 +28,9 @@ from gitghost.ai_triage import AITriageResult
 from gitghost.demo_builder import DemoBuilder
 from gitghost.exporters import ReportExporter
 from gitghost.git_forensics import ForensicsScanResult, GitForensics
+from gitghost.github_remote import is_github_target, sanitize_token_in_text
 from gitghost.pipeline import run_scan_pipeline
+from gitghost.recovery import ObjectRecoveryEngine
 from gitghost.redactor import SecretFinding
 from gitghost.remediation import RemediationPlan
 from gitghost.scoring import HygieneScoreReport
@@ -83,60 +85,78 @@ def main_callback(
 
 @app.command(name="scan")
 def scan_cmd(
-    path: str = typer.Argument(".", help="Path to the target Git repository."),
+    path: str = typer.Argument(".", help="Local repository path or remote GitHub URL (https://github.com/owner/repo)."),
     ai_provider: str = typer.Option("auto", "--ai-provider", "-p", help="AI provider: auto, gemini, openai, anthropic, ollama, heuristic, none."),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="Custom model name."),
+    github_token: Optional[str] = typer.Option(None, "--github-token", envvar="GITHUB_TOKEN", help="GitHub token for remote API & private clone (in-memory only)."),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Path to export report file."),
     export_format: Optional[str] = typer.Option(None, "--format", "-f", help="Format: markdown, json, sarif."),
+    recover_zip: Optional[str] = typer.Option(None, "--recover-zip", help="Path to export full recovery ZIP bundle (reports, patches, recovered files)."),
+    include_raw: bool = typer.Option(False, "--include-raw", help="Export unredacted (raw) files/patches in recovery ZIP bundle (default is redacted)."),
     strict: bool = typer.Option(False, "--strict", help="CI/CD mode: Exit with code 1 if score < 70 or critical leaks exist."),
     no_ai: bool = typer.Option(False, "--no-ai", help="Disable AI triage."),
 ) -> None:
-    """Perform a comprehensive live forensics scan on a target Git repository."""
+    """Perform a comprehensive live forensics scan on a local or remote GitHub repository."""
     print_banner()
 
     if not shutil.which("git"):
         console.print("[bold red]Error:[/bold red] Git executable was not found on the system PATH. Git is required to use GitGhost.")
         raise typer.Exit(1)
 
-    repo_path = Path(path).resolve()
-    if not repo_path.exists():
-        console.print(f"[bold red]Error:[/bold red] Target path does not exist: {repo_path}")
-        raise typer.Exit(1)
+    target: str | Path
+    if is_github_target(path):
+        target = path.strip()
+    else:
+        repo_path = Path(path).resolve()
+        if not repo_path.exists():
+            console.print(f"[bold red]Error:[/bold red] Target path does not exist: {repo_path}")
+            raise typer.Exit(1)
 
-    forensics = GitForensics(repo_path)
-    if not forensics.is_valid_repo():
-        console.print(f"[bold red]Error:[/bold red] '{repo_path}' is not a valid Git repository (.git missing).")
-        raise typer.Exit(1)
+        forensics = GitForensics(repo_path)
+        if not forensics.is_valid_repo():
+            console.print(f"[bold red]Error:[/bold red] '{repo_path}' is not a valid Git repository (.git missing).")
+            raise typer.Exit(1)
+        target = repo_path
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold cyan]{task.description}[/bold cyan]"),
-        BarColumn(),
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task_id = progress.add_task("Exhuming git graveyard and unearthing unreachable objects...", total=100)
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold cyan]{task.description}[/bold cyan]"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            task_id = progress.add_task("Exhuming git graveyard and unearthing unreachable objects...", total=100)
 
-        def on_forensics_done(scan_res: ForensicsScanResult):
-            total_items = len(scan_res.dangling_commits) + len(scan_res.dangling_blobs)
-            progress.update(
-                task_id,
-                description=f"Scanning {total_items} unreachable objects for credentials...",
-                total=max(1, total_items),
-                completed=0,
+            def on_phase(msg: str, pct: int):
+                progress.update(task_id, description=msg, completed=pct, total=100)
+
+            def on_forensics_done(scan_res: ForensicsScanResult):
+                total_items = len(scan_res.dangling_commits) + len(scan_res.dangling_blobs)
+                progress.update(
+                    task_id,
+                    description=f"Scanning {total_items} unreachable objects for credentials...",
+                    total=max(1, total_items),
+                    completed=0,
+                )
+
+            def on_item_scanned(current: int, total: int):
+                progress.update(task_id, completed=current, total=max(1, total))
+
+            pipeline_res = run_scan_pipeline(
+                repo_path=target,
+                ai_provider="none" if no_ai else ai_provider,
+                model=model,
+                github_token=github_token,
+                on_forensics_done=on_forensics_done,
+                on_item_scanned=on_item_scanned,
+                on_phase=on_phase,
             )
-
-        def on_item_scanned(current: int, total: int):
-            progress.update(task_id, completed=current, total=max(1, total))
-
-        pipeline_res = run_scan_pipeline(
-            repo_path=repo_path,
-            ai_provider="none" if no_ai else ai_provider,
-            model=model,
-            on_forensics_done=on_forensics_done,
-            on_item_scanned=on_item_scanned,
-        )
+    except Exception as exc:
+        safe_err = sanitize_token_in_text(str(exc), github_token)
+        console.print(f"[bold red]Error:[/bold red] {safe_err}")
+        raise typer.Exit(1)
 
     _render_ghost_tree(pipeline_res.scan_result)
     _render_findings_table(pipeline_res.findings, pipeline_res.triage_map)
@@ -153,6 +173,16 @@ def scan_cmd(
             pipeline_res.hygiene,
             pipeline_res.remediation,
         )
+
+    if recover_zip:
+        zip_path = Path(recover_zip).resolve()
+        zip_path.parent.mkdir(parents=True, exist_ok=True)
+        zip_bytes = ObjectRecoveryEngine.build_recovery_zip_bundle(
+            pipeline_res, include_raw=include_raw
+        )
+        zip_path.write_bytes(zip_bytes)
+        mode_str = "UNREDACTED (RAW)" if include_raw else "STRICTLY REDACTED"
+        console.print(f"[bold green]Recovery ZIP bundle exported ({mode_str}):[/bold green] {zip_path}")
 
     if strict and (pipeline_res.hygiene.score < 70 or pipeline_res.hygiene.critical_findings_count > 0):
         console.print(f"\n[bold red]Strict Check Failed:[/bold red] Hygiene score {pipeline_res.hygiene.score}/100.")
