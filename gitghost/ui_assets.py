@@ -59,7 +59,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
       gap: 0.75rem;
     }
     .brand-icon {
-      font-size: 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cyan);
       filter: drop-shadow(0 0 10px rgba(6, 182, 212, 0.6));
     }
     .brand-title {
@@ -80,6 +83,40 @@ HTML_PAGE = r"""<!DOCTYPE html>
       text-transform: uppercase;
       font-weight: 700;
       letter-spacing: 0.05em;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+    }
+    .status-pill-active {
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #a7f3d0;
+    }
+    .status-pill-neutral {
+      color: var(--text-muted);
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+    .status-dot-green {
+      background-color: var(--emerald);
+      box-shadow: 0 0 6px var(--emerald);
+    }
+    .status-dot-neutral {
+      background-color: var(--text-muted);
+    }
+    .status-dot-amber {
+      background-color: var(--amber);
+      box-shadow: 0 0 6px var(--amber);
     }
 
     /* Repository Control Bar */
@@ -660,23 +697,46 @@ HTML_PAGE = r"""<!DOCTYPE html>
   <!-- Top Navigation Header -->
   <header>
     <div class="brand">
-      <span class="brand-icon">👻</span>
+      <span class="brand-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polygon points="13 6 8 14 12 14 11 18 16 10 12 10 13 6"></polygon></svg>
+      </span>
       <div>
-        <div class="brand-title">GitGhost</div>
-        <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">Git Object Forensics & Ghost Commit Hunter</div>
+        <div class="brand-title">ForcePush-Breaker <span style="font-size: 0.85rem; color: var(--cyan); font-weight: 700;">(UnForce)</span></div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 500;">
+          Think <code style="color: var(--cyan); background: rgba(6,182,212,0.12); padding: 1px 4px; border-radius: 3px;">git push --force</code> deleted your leaked API keys? Think again.
+        </div>
       </div>
       <span class="brand-tag">v0.1.0 Enterprise</span>
     </div>
 
     <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+      <!-- Subtle Status Indicators -->
+      <div id="aiStatusPill" class="status-pill status-pill-active" title="AI Triage Status">
+        <span class="status-dot status-dot-green"></span>
+        <span id="aiStatusText">AI: Heuristic</span>
+      </div>
+      <div id="ghStatusPill" class="status-pill status-pill-neutral" title="GitHub Token Status">
+        <span class="status-dot status-dot-neutral" id="ghStatusDot"></span>
+        <span id="ghStatusText">GitHub: Public</span>
+      </div>
+
+      <!-- Settings Button (Cog) -->
+      <button class="btn btn-secondary" onclick="openSettingsModal()" title="Settings & Secure API Keys" style="padding: 0.5rem 0.75rem; font-size: 0.8rem;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Settings
+      </button>
+
       <button class="btn btn-primary" style="padding: 0.5rem 0.9rem; font-size: 0.8rem;" onclick="downloadRecoveryBundle()" title="Download Full ZIP Bundle (Reports + Recovered Files + Commit Patches)">
-        📦 Recovery Bundle (.ZIP)
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        Recovery Bundle (.ZIP)
       </button>
       <button class="btn btn-secondary" style="padding: 0.5rem 0.8rem; font-size: 0.8rem;" onclick="downloadReport('json')" title="Download Audit Report as JSON">
-        ⬇️ JSON
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        JSON
       </button>
       <button class="btn btn-secondary" style="padding: 0.5rem 0.8rem; font-size: 0.8rem;" onclick="downloadReport('markdown')" title="Download Audit Report as Markdown">
-        ⬇️ Markdown
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        Markdown
       </button>
       <button class="btn btn-secondary" style="padding: 0.5rem 0.8rem; font-size: 0.8rem;" onclick="exportSARIF()" title="Export SARIF 2.1.0 for GitHub Code Scanning">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -696,17 +756,20 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
         <input type="text" id="repoPathInput" class="repo-input" placeholder="https://github.com/owner/repo, owner/repo, or /local/path/to/repo" value="." oninput="updateTargetTypeBadge()">
       </div>
-      <span id="repoTargetBadge" class="code-badge" style="padding: 0.45rem 0.65rem; font-size: 0.75rem; color: var(--cyan);">📁 Local Repo</span>
+      <span id="repoTargetBadge" class="code-badge" style="padding: 0.45rem 0.65rem; font-size: 0.75rem; color: var(--cyan); display: inline-flex; align-items: center; gap: 0.35rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        Local Repo
+      </span>
       <button class="btn btn-secondary" onclick="browseFolder()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 8 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 8 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
         Browse
       </button>
       <button class="btn btn-primary" id="scanBtn" onclick="startScan()">
         <svg id="scanIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <span id="scanBtnText">Scan Repository</span>
       </button>
-      <button class="settings-dropdown-toggle" onclick="toggleSettings()" title="Scan Configuration & GitHub Token">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+      <button class="btn btn-secondary" onclick="openSettingsModal()" title="Scan Configuration & API Keys" style="padding: 0.5rem 0.75rem;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
       </button>
     </div>
 
@@ -778,7 +841,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <div class="stat-card">
           <div class="stat-header">
             <span>Dangling Commits</span>
-            <span>👻</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
           </div>
           <div id="statCommits" class="stat-value">0</div>
           <div class="stat-sub">Orphaned commits in .git/objects</div>
@@ -787,7 +850,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <div class="stat-card">
           <div class="stat-header">
             <span>Dangling Blobs</span>
-            <span>📦</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
           </div>
           <div id="statBlobs" class="stat-value">0</div>
           <div class="stat-sub">Unreachable file blobs</div>
@@ -796,7 +859,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <div class="stat-card">
           <div class="stat-header">
             <span>Secrets Detected</span>
-            <span>🔑</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
           </div>
           <div id="statSecrets" class="stat-value" style="color: var(--emerald);">0</div>
           <div id="statSecretsBreakdown" class="stat-sub">Strictly masked & triaged</div>
@@ -805,7 +868,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <div class="stat-card">
           <div class="stat-header">
             <span>Total Ghost Objects</span>
-            <span>🪦</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
           </div>
           <div id="statTotalObjects" class="stat-value">0</div>
           <div class="stat-sub">Evaluated via git fsck</div>
@@ -852,8 +915,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
             <option value="LOW">Low</option>
           </select>
         </div>
-        <div style="font-size: 0.75rem; color: var(--text-muted);">
-          🔒 Strict Redaction Active: Raw tokens are cryptographically masked before render.
+        <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          Strict Redaction Active: Raw tokens are cryptographically masked before render.
         </div>
       </div>
 
@@ -886,7 +950,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
     <div id="tabGraveyard" class="tab-content" style="display: none;">
       <div class="card" style="margin-bottom: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-          <h3 style="font-size: 1rem; font-weight: 700; color: var(--cyan);">⚡ GitHub Force-Push & History Overwrite Events</h3>
+          <h3 style="font-size: 1rem; font-weight: 700; color: var(--cyan); display: flex; align-items: center; gap: 0.4rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            GitHub Force-Push & History Overwrite Events
+          </h3>
           <span id="graveyardEventsCount" class="tab-pill">0 events</span>
         </div>
         <div id="historyEventsList" style="display: flex; flex-direction: column; gap: 0.65rem; max-height: 260px; overflow-y: auto;">
@@ -898,7 +965,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <!-- Dangling Commits Panel -->
         <div class="card">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="font-size: 1rem; font-weight: 700; color: var(--magenta);">👻 Dangling Commits</h3>
+            <h3 style="font-size: 1rem; font-weight: 700; color: var(--magenta); display: flex; align-items: center; gap: 0.4rem;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>
+              Dangling Commits
+            </h3>
             <span id="graveyardCommitCount" class="tab-pill">0 objects</span>
           </div>
           <div id="danglingCommitsList" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 520px; overflow-y: auto;">
@@ -909,7 +979,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <!-- Dangling Blobs Panel -->
         <div class="card">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="font-size: 1rem; font-weight: 700; color: var(--amber);">📦 Dangling Blobs</h3>
+            <h3 style="font-size: 1rem; font-weight: 700; color: var(--amber); display: flex; align-items: center; gap: 0.4rem;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+              Dangling Blobs
+            </h3>
             <span id="graveyardBlobCount" class="tab-pill">0 objects</span>
           </div>
           <div id="danglingBlobsList" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 520px; overflow-y: auto;">
@@ -927,7 +1000,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
           The GitGhost Hygiene Score is calculated from 100 points, penalizing orphaned secrets, unreachable commit accumulation, and threat recency.
         </p>
         <div id="deductionsList" style="display: flex; flex-direction: column; gap: 0.75rem;">
-          <div style="color: var(--emerald); font-size: 0.875rem;">✨ No deductions. Repository is in pristine health!</div>
+          <div style="color: var(--emerald); font-size: 0.875rem;">[OK] No deductions. Repository is in pristine health!</div>
         </div>
       </div>
     </div>
@@ -936,7 +1009,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
     <div id="tabRemediation" class="tab-content" style="display: none;">
       <div class="card">
         <div style="background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.4); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; color: #fecdd3; font-size: 0.875rem;">
-          <strong>⚠️ Critical Credential Rotation Notice:</strong>
+          <strong>[!] Critical Credential Rotation Notice:</strong>
           <span id="remediationRotationWarning">Always rotate any compromised credentials with your identity provider or cloud dashboard before deleting git history objects.</span>
         </div>
 
@@ -985,7 +1058,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
           <h3 id="modalTitle" style="font-size: 1.1rem; font-weight: 700;">Finding Details</h3>
           <div id="modalSubtitle" style="font-size: 0.75rem; color: var(--text-muted);">ID: SEC-0000</div>
         </div>
-        <button onclick="closeModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.25rem;">✕</button>
+        <button onclick="closeModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.25rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div id="modalTriageMeta">
@@ -1014,23 +1089,114 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <div>
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Strictly Redacted Diff View</div>
-            <span style="font-size: 0.7rem; color: var(--emerald);">🔒 Cryptographic Secret Masking Enforced</span>
+            <span style="font-size: 0.7rem; color: var(--emerald); display: inline-flex; align-items: center; gap: 0.3rem;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              Cryptographic Secret Masking Enforced
+            </span>
           </div>
           <div id="modalCodeView" class="code-view"></div>
         </div>
       </div>
       <div class="modal-footer">
         <button id="modalRecoverBtn" class="btn btn-primary" style="display: none;" onclick="recoverFromActiveModal()">
-          ⬇️ Recover & Download Artifact
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Recover & Download Artifact
         </button>
         <button class="btn btn-secondary" onclick="closeModal()">Close</button>
       </div>
     </div>
   </div>
 
+  <!-- Set & Forget Settings Modal -->
+  <div id="settingsModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="max-width: 580px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <h3 style="font-size: 1.1rem; font-weight: 700;">Settings & API Configuration</h3>
+        </div>
+        <button onclick="closeSettingsModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.25rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- AI Key Config -->
+        <div style="margin-bottom: 1.25rem;">
+          <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem; color: var(--cyan);">AI Context Triage Engine</div>
+          <div style="display: flex; gap: 0.75rem; margin-bottom: 0.5rem; align-items: center;">
+            <select id="aiProviderSelect" class="select-input" style="flex: 1;" onchange="updateAISettingsUI()">
+              <option value="heuristic" selected>Heuristic Rule-Engine (Offline / Fast)</option>
+              <option value="auto">Auto-Detect Available LLM</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI GPT-4o</option>
+              <option value="anthropic">Anthropic Claude</option>
+              <option value="ollama">Local Ollama</option>
+              <option value="none">Disabled (No Triage)</option>
+            </select>
+          </div>
+          <!-- In-memory AI API key: set and forget -->
+          <div id="aiKeyInputRow" style="display: none; margin-bottom: 0.5rem;">
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="password" id="aiApiKeyInput" class="select-input" style="flex: 1;" placeholder="Enter AI API Key (held in-memory, never stored on disk)" autocomplete="off">
+              <button class="btn btn-secondary" onclick="saveAIKey()">Save Key</button>
+            </div>
+          </div>
+          <div id="aiKeyConfiguredRow" style="display: none; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.8rem; color: var(--emerald); font-weight: 600;">[OK] AI API Key Configured (In-Memory)</span>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="replaceAIKey()">Replace</button>
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="clearAIKey()">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- GitHub Token Config -->
+        <div style="margin-bottom: 1.25rem;">
+          <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem; color: var(--cyan);">GitHub API & Private Access Token</div>
+          <div id="ghTokenInputRow" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input type="password" id="githubTokenInput" class="select-input" style="flex: 1;" placeholder="ghp_... (held in-memory, never stored on disk)" autocomplete="off">
+            <button class="btn btn-secondary" onclick="saveGHToken()">Save Token</button>
+          </div>
+          <div id="ghTokenConfiguredRow" style="display: none; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.8rem; color: var(--emerald); font-weight: 600;">[OK] GitHub Token Configured (In-Memory)</span>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="replaceGHToken()">Replace</button>
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="clearGHToken()">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Forensics Sensitivity & Recovery Options -->
+        <div>
+          <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem; color: var(--cyan);">Forensics Sensitivity & Guardrails</div>
+          <div style="margin-bottom: 0.75rem;">
+            <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Shannon Entropy Sensitivity:</label>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <input type="range" id="entropyThreshold" min="3.0" max="5.5" step="0.1" value="4.0" oninput="document.getElementById('entropyVal').innerText = this.value" style="flex: 1;">
+              <span id="entropyVal" style="font-weight: 700; color: var(--cyan); width: 35px;">4.0</span>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <label style="font-size: 0.82rem; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="includeRawToggle" onchange="toggleRawRecoveryMode(this.checked)">
+              <span>Allow Unredacted (Raw) Recovery <span style="font-size: 0.75rem; color: var(--amber);">(Caution: downloads raw secrets)</span></span>
+            </label>
+            <label style="font-size: 0.82rem; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="strictMode">
+              <span>Strict CI Mode (Fail if score &lt; 70 or critical leaks found)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeSettingsModal()">Apply & Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast" class="toast">
-    <span id="toastIcon">ℹ️</span>
+    <span id="toastIcon" style="display: inline-flex; align-items: center;"></span>
     <span id="toastMessage">Notification message</span>
   </div>
 
@@ -1038,6 +1204,125 @@ HTML_PAGE = r"""<!DOCTYPE html>
   <script>
     let currentAuditData = null;
     let allFindings = [];
+    let savedAiKey = '';
+    let savedGhToken = '';
+
+    function getSvg(name, size = 16) {
+      const icons = {
+        'folder': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`,
+        'globe': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`,
+        'package': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`,
+        'file': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`,
+        'commit': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>`,
+        'key': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg>`,
+        'lock': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
+        'shield': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`,
+        'search': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`,
+        'check': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+        'alert': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+        'zap': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`,
+        'copy': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
+        'download': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`,
+        'trash': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
+        'cpu': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>`,
+        'close': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+        'info': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`
+      };
+      return icons[name] || icons['info'];
+    }
+
+    function openSettingsModal() {
+      document.getElementById('settingsModal').style.display = 'flex';
+      updateAISettingsUI();
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').style.display = 'none';
+    }
+
+    function updateAISettingsUI() {
+      const p = document.getElementById('aiProviderSelect').value;
+      const keyRow = document.getElementById('aiKeyInputRow');
+      const cfgRow = document.getElementById('aiKeyConfiguredRow');
+      const pill = document.getElementById('aiStatusText');
+      if (p === 'heuristic' || p === 'none' || p === 'ollama') {
+        keyRow.style.display = 'none';
+        cfgRow.style.display = 'none';
+        pill.innerText = 'AI: ' + (p.charAt(0).toUpperCase() + p.slice(1));
+      } else {
+        if (savedAiKey) {
+          keyRow.style.display = 'none';
+          cfgRow.style.display = 'flex';
+          pill.innerText = 'AI: ' + p.toUpperCase() + ' (Key Active)';
+        } else {
+          keyRow.style.display = 'block';
+          cfgRow.style.display = 'none';
+          pill.innerText = 'AI: ' + p.toUpperCase() + ' (Key Needed)';
+        }
+      }
+    }
+
+    function saveAIKey() {
+      const input = document.getElementById('aiApiKeyInput');
+      if (input && input.value.trim()) {
+        savedAiKey = input.value.trim();
+        input.value = '';
+        updateAISettingsUI();
+        showToast('AI API Key saved (in-memory only)', 'check');
+      }
+    }
+
+    function replaceAIKey() {
+      savedAiKey = '';
+      updateAISettingsUI();
+    }
+
+    function clearAIKey() {
+      savedAiKey = '';
+      const input = document.getElementById('aiApiKeyInput');
+      if (input) input.value = '';
+      updateAISettingsUI();
+      showToast('AI API Key cleared', 'trash');
+    }
+
+    function saveGHToken() {
+      const input = document.getElementById('githubTokenInput');
+      if (input && input.value.trim()) {
+        savedGhToken = input.value.trim();
+        document.getElementById('ghTokenInputRow').style.display = 'none';
+        document.getElementById('ghTokenConfiguredRow').style.display = 'flex';
+        document.getElementById('ghStatusText').innerText = 'GitHub: Token Active';
+        document.getElementById('ghStatusDot').className = 'status-dot status-dot-green';
+        showToast('GitHub Token saved (in-memory only)', 'check');
+      }
+    }
+
+    function replaceGHToken() {
+      savedGhToken = '';
+      document.getElementById('ghTokenInputRow').style.display = 'flex';
+      document.getElementById('ghTokenConfiguredRow').style.display = 'none';
+      document.getElementById('ghStatusText').innerText = 'GitHub: Public';
+      document.getElementById('ghStatusDot').className = 'status-dot status-dot-neutral';
+    }
+
+    function clearGHToken() {
+      savedGhToken = '';
+      const input = document.getElementById('githubTokenInput');
+      if (input) input.value = '';
+      document.getElementById('ghTokenInputRow').style.display = 'flex';
+      document.getElementById('ghTokenConfiguredRow').style.display = 'none';
+      document.getElementById('ghStatusText').innerText = 'GitHub: Public';
+      document.getElementById('ghStatusDot').className = 'status-dot status-dot-neutral';
+      showToast('GitHub Token cleared', 'trash');
+    }
+
+    function toggleRawRecoveryMode(checked) {
+      if (checked) {
+        showToast('Raw Recovery Enabled: Unmasked secrets will be downloadable.', 'alert');
+      } else {
+        showToast('Strict Redaction Active.', 'shield');
+      }
+    }
 
     function updateTargetTypeBadge() {
       const val = (document.getElementById('repoPathInput').value || '').trim();
@@ -1047,10 +1332,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
                    /^git@github\.com:[^/]+\/[^/]+/i.test(val) ||
                    /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(val);
       if (isGh) {
-        badge.innerText = '🌐 Remote GitHub';
-        badge.style.color = 'var(--magenta)';
+        badge.innerHTML = getSvg('globe', 14) + ' Remote GitHub';
+        badge.style.color = 'var(--purple)';
       } else {
-        badge.innerText = '📁 Local Repo';
+        badge.innerHTML = getSvg('folder', 14) + ' Local Repo';
         badge.style.color = 'var(--cyan)';
       }
     }
@@ -1063,16 +1348,11 @@ HTML_PAGE = r"""<!DOCTYPE html>
         if (data && data.folder) {
           document.getElementById('repoPathInput').value = data.folder;
           updateTargetTypeBadge();
-          showToast('Folder selected: ' + data.folder, '📁');
+          showToast('Folder selected: ' + data.folder, 'folder');
         }
       } catch (err) {
         console.error('Browse folder error:', err);
       }
-    }
-
-    function toggleSettings() {
-      const panel = document.getElementById('scanOptions');
-      panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
     }
 
     function switchTab(tabName) {
@@ -1121,8 +1401,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
         const payload = {
           repo_path: repoPath,
           ai_provider: aiProvider,
+          ai_api_key: savedAiKey || null,
           entropy_threshold: entropyThreshold,
-          github_token: githubToken || null,
+          github_token: savedGhToken || githubToken || null,
           strict: strict
         };
 
@@ -1176,7 +1457,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
             currentAuditData = job.result;
             renderDashboard(job.result);
-            showToast('Forensics scan completed successfully!', '✅');
+            showToast('Forensics scan completed successfully!', 'check');
             break;
           }
         }
@@ -1252,7 +1533,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
       if (!findings || findings.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--emerald); padding: 2.5rem 1rem;">
-          ✨ No credentials or secret patterns detected in unreachable objects.
+          [OK] No credentials or secret patterns detected in unreachable objects.
         </td></tr>`;
         return;
       }
@@ -1271,11 +1552,11 @@ HTML_PAGE = r"""<!DOCTYPE html>
           <td><span class="code-badge">${f.file_path}:${f.line_number}</span></td>
           <td style="font-weight: 700; color: var(--cyan);">${f.entropy.toFixed(2)}</td>
           <td>
-            <div style="font-size: 0.8rem; font-weight: 600;">${f.is_false_positive ? '🟢 False Positive' : '🔴 True Leak (Risk: ' + (f.triage_risk_score || 'N/A') + ')'}</div>
+            <div style="font-size: 0.8rem; font-weight: 600;">${f.is_false_positive ? '<span class="badge badge-low">FALSE POSITIVE</span>' : '<span class="badge badge-critical">TRUE LEAK (Risk: ' + (f.triage_risk_score || 'N/A') + ')</span>'}</div>
             <div style="font-size: 0.7rem; color: var(--text-muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.triage_explanation || ''}</div>
           </td>
           <td>
-            <button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick='openDetailModal(${JSON.stringify(f)})'>Inspect</button>
+            <button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick='openDetailModal(${JSON.stringify(f)})'>${getSvg('search', 12)} Inspect</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -1343,10 +1624,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
           item.style.borderRadius = '8px';
           item.style.padding = '0.75rem 1rem';
           const fileButtonsHtml = (c.changed_files || []).slice(0, 6).map(fp => `
-            <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;"
+            <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; display: inline-flex; align-items: center; gap: 0.3rem;"
               onclick='recoverArtifact(${JSON.stringify({object_type: "file", commit_hash: c.commit_hash, file_path: fp})})'
               title="Recover & download ${escapeHtml(fp)}">
-              📄 ${escapeHtml(fp)}
+              ${getSvg('file', 12)} ${escapeHtml(fp)}
             </button>
           `).join('');
           item.innerHTML = `
@@ -1360,11 +1641,11 @@ HTML_PAGE = r"""<!DOCTYPE html>
               <span>${c.changed_files ? c.changed_files.length : 0} file(s) changed</span>
             </div>
             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
-              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; border-color: rgba(236, 72, 153, 0.4); color: #f9a8d4;" onclick="openCommitDiffModal(${idx})">
-                🔍 Inspect Diff
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; border-color: rgba(236, 72, 153, 0.4); color: #f9a8d4; display: inline-flex; align-items: center; gap: 0.3rem;" onclick="openCommitDiffModal(${idx})">
+                ${getSvg('search', 12)} Inspect Diff
               </button>
-              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem;" onclick='recoverArtifact(${JSON.stringify({object_type: "diff", commit_hash: c.commit_hash})})'>
-                ⬇️ Patch (.patch)
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.3rem;" onclick='recoverArtifact(${JSON.stringify({object_type: "diff", commit_hash: c.commit_hash})})'>
+                ${getSvg('download', 12)} Patch (.patch)
               </button>
               ${fileButtonsHtml}
             </div>
@@ -1395,11 +1676,11 @@ HTML_PAGE = r"""<!DOCTYPE html>
               Path: ${escapeHtml(b.associated_path || 'Detached Unlinked Blob')}
             </div>
             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem;" onclick="openBlobModal(${idx})">
-                🔍 Inspect Content
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.3rem;" onclick="openBlobModal(${idx})">
+                ${getSvg('search', 12)} Inspect Content
               </button>
-              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem;" onclick='recoverArtifact(${JSON.stringify({object_type: "blob", blob_hash: b.blob_hash})})'>
-                ⬇️ Recover Blob
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.3rem;" onclick='recoverArtifact(${JSON.stringify({object_type: "blob", blob_hash: b.blob_hash})})'>
+                ${getSvg('download', 12)} Recover Blob
               </button>
             </div>
           `;
@@ -1413,7 +1694,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       list.innerHTML = '';
 
       if (!deductions || deductions.length === 0) {
-        list.innerHTML = '<div style="color: var(--emerald); font-size: 0.875rem;">✨ No deductions. Repository is in pristine health!</div>';
+        list.innerHTML = '<div style="color: var(--emerald); font-size: 0.875rem;">[OK] No deductions. Repository is in pristine health!</div>';
         return;
       }
 
@@ -1492,12 +1773,12 @@ HTML_PAGE = r"""<!DOCTYPE html>
         ? document.getElementById('remediationBashScript').innerText
         : document.getElementById('remediationPSScript').innerText;
       navigator.clipboard.writeText(text);
-      showToast(`${type === 'bash' ? 'Bash' : 'PowerShell'} script copied to clipboard!`, '📋');
+      showToast(`${type === 'bash' ? 'Bash' : 'PowerShell'} script copied to clipboard!`, 'copy');
     }
 
     function copyCommand(cmd) {
       navigator.clipboard.writeText(cmd);
-      showToast('Command copied to clipboard!', '📋');
+      showToast('Command copied to clipboard!', 'copy');
     }
 
     let activeModalRecoveryTarget = null;
@@ -1616,7 +1897,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       const includeRaw = rawToggle ? rawToggle.checked : false;
 
       if (includeRaw) {
-        const proceed = confirm('⚠️ Unredacted (Raw) Recovery Mode is enabled.\nThe downloaded file will contain unmasked secrets if present.\n\nProceed with raw recovery?');
+        const proceed = confirm('[SECURITY WARNING] Unredacted (Raw) Recovery Mode is enabled.\nThe downloaded file will contain unmasked secrets if present.\n\nProceed with raw recovery?');
         if (!proceed) return;
       }
 
@@ -1647,7 +1928,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        showToast(`Recovered ${data.filename} (${data.is_redacted ? 'Redacted' : 'Raw'})`, '⬇️');
+        showToast(`Recovered ${data.filename} (${data.is_redacted ? 'Redacted' : 'Raw'})`, 'download');
       } catch (err) {
         alert('Error recovering artifact: ' + err.message);
       }
@@ -1664,7 +1945,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         });
         const data = await res.json();
         if (data.success) {
-          showToast('Pre-push hook installed successfully!', '🛡️');
+          showToast('Pre-push hook installed successfully!', 'shield');
         } else {
           alert('Failed to install hook: ' + data.error);
         }
@@ -1686,7 +1967,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       document.body.appendChild(a);
       a.click();
       a.remove();
-      showToast(`Downloading ${fmt.toUpperCase()} report...`, '📄');
+      showToast(`Downloading ${fmt.toUpperCase()} report...`, 'file');
     }
 
     // Direct browser download for Full Recovery Bundle (.ZIP)
@@ -1700,7 +1981,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       const includeRaw = rawToggle ? rawToggle.checked : false;
 
       if (includeRaw) {
-        const proceed = confirm('⚠️ Unredacted (Raw) Recovery Mode is enabled.\nThe ZIP bundle will include unmasked recovered files and commit patches.\n\nProceed with raw bundle download?');
+        const proceed = confirm('[SECURITY WARNING] Unredacted (Raw) Recovery Mode is enabled.\nThe ZIP bundle will include unmasked recovered files and commit patches.\n\nProceed with raw bundle download?');
         if (!proceed) return;
       }
 
@@ -1710,7 +1991,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       document.body.appendChild(a);
       a.click();
       a.remove();
-      showToast(`Downloading Recovery Bundle (${includeRaw ? 'Raw' : 'Strictly Redacted'})...`, '📦');
+      showToast(`Downloading Recovery Bundle (${includeRaw ? 'Raw' : 'Strictly Redacted'})...`, 'package');
     }
 
     // Export SARIF report
@@ -1729,7 +2010,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         const data = await res.json();
         if (data.success) {
           downloadReport('sarif');
-          showToast('SARIF report exported to: ' + data.file_path, '📄');
+          showToast('SARIF report exported to: ' + data.file_path, 'file');
         } else {
           alert('Export error: ' + data.error);
         }
@@ -1752,7 +2033,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         });
         const data = await res.json();
         if (data.success) {
-          showToast('Unreferenced objects permanently excised!', '🧹');
+          showToast('Unreferenced objects permanently excised!', 'trash');
           // Re-scan repository
           startScan();
         } else {
@@ -1763,9 +2044,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
       }
     }
 
-    function showToast(message, icon = 'ℹ️') {
+    function showToast(message, icon = 'info') {
       const toast = document.getElementById('toast');
-      document.getElementById('toastIcon').innerText = icon;
+      document.getElementById('toastIcon').innerHTML = getSvg(icon, 18);
       document.getElementById('toastMessage').innerText = message;
       toast.classList.add('show');
       setTimeout(() => { toast.classList.remove('show'); }, 3500);
