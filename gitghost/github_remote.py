@@ -284,3 +284,66 @@ class GitHubAPIForensicsClient:
 
         return events, candidate_shas, warnings
 
+    def fetch_orphan_commit_via_api(
+        self,
+        target: ParsedGitHubTarget,
+        commit_sha: str,
+        max_text_bytes: int = 10 * 1024 * 1024,
+    ) -> Optional[DanglingCommit]:
+        """Fetches an overwritten or orphaned commit directly from GitHub Commits API (/commits/{sha})."""
+        sha = (commit_sha or "").strip()
+        if not sha:
+            return None
+
+        commit_url = f"{target.api_repo_url}/commits/{sha}"
+        try:
+            data = self._get_json(commit_url)
+            if not isinstance(data, dict):
+                return None
+
+            full_sha = str(data.get("sha") or sha)
+            commit_obj = data.get("commit") or {}
+            author_obj = commit_obj.get("author") or {}
+            author_name = author_obj.get("name") or "Unknown"
+            author_email = author_obj.get("email") or ""
+            author_str = f"{author_name} <{author_email}>" if author_email else author_name
+            date_str = str(author_obj.get("date") or "")
+            message = str(commit_obj.get("message") or "")
+            parents = [
+                str(p.get("sha"))
+                for p in (data.get("parents") or [])
+                if isinstance(p, dict) and p.get("sha")
+            ]
+
+            changed_files: List[str] = []
+            diff_chunks: List[str] = []
+            accumulated_bytes = 0
+
+            for f_item in data.get("files") or []:
+                if not isinstance(f_item, dict):
+                    continue
+                fname = str(f_item.get("filename") or "")
+                if fname:
+                    changed_files.append(fname)
+                patch = f_item.get("patch")
+                if isinstance(patch, str) and patch:
+                    patch_bytes = len(patch.encode("utf-8", errors="replace"))
+                    if accumulated_bytes + patch_bytes <= max_text_bytes:
+                        diff_chunks.append(
+                            f"diff --git a/{fname} b/{fname}\n--- a/{fname}\n+++ b/{fname}\n{patch}"
+                        )
+                        accumulated_bytes += patch_bytes
+
+            return DanglingCommit(
+                commit_hash=full_sha,
+                author=author_str,
+                date=date_str,
+                message=message,
+                parents=parents,
+                changed_files=changed_files,
+                diff_content="\n".join(diff_chunks),
+                is_dangling=True,
+            )
+        except Exception:
+            return None
+
