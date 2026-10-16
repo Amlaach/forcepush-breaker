@@ -76,3 +76,31 @@ class TestRemediationGenerator:
         # Scripts still valid
         assert "git reflog expire" in plan.bash_script
         assert "git gc --prune=now --aggressive" in plan.powershell_script
+
+    def test_github_support_ticket_generation(self):
+        orphaned_commits = [
+            "deadbeef11111111111111111111111111111111",
+            "cafebabe22222222222222222222222222222222",
+        ]
+        ticket = RemediationGenerator.generate_github_support_ticket(
+            repo_url="https://github.com/acme/vault",
+            orphaned_commit_shas=orphaned_commits,
+            findings_count=3,
+        )
+        assert "Subject: Request for Server-Side Cache Purge" in ticket
+        assert "https://github.com/acme/vault" in ticket
+        assert "- `deadbeef11111111111111111111111111111111`" in ticket
+        assert "- `cafebabe22222222222222222222222222222222`" in ticket
+        assert "2 orphaned/force-pushed commit(s) containing 3 exposed credential finding(s)" in ticket
+
+    def test_pre_push_hook_installation(self, tmp_path: Path):
+        from gitghost.exporters import ReportExporter
+        (tmp_path / ".git").mkdir()
+
+        success, hook_path, notice = ReportExporter.install_pre_push_hook(tmp_path)
+        assert success is True
+        assert Path(hook_path).exists()
+        content = Path(hook_path).read_text(encoding="utf-8")
+        assert "pre-push" in content.lower()
+        assert "gitghost" in content.lower() or "unforce" in content.lower()
+
