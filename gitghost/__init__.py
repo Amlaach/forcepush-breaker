@@ -9,8 +9,15 @@ and provides an interactive cyber-forensics UI dashboard.
 """
 
 __version__ = "0.1.0"
-__author__ = "GitGhost Security Team"
+__author__ = "ForcePush-Breaker Security Team"
 __license__ = "MIT"
+
+BRAND_NAME = "ForcePush-Breaker"
+BRAND_SHORT = "UnForce"
+BRAND_TAGLINE = (
+    "Think `git push --force` deleted your leaked API keys? Think again. "
+    "Audit and recover hidden secrets from overwritten GitHub history."
+)
 
 from gitghost.git_forensics import GitForensics, DanglingCommit, DanglingBlob, ForensicsScanResult
 from gitghost.github_remote import (
@@ -34,6 +41,9 @@ from gitghost.ui_server import ScanJob, ScanJobManager, start_ui_server
 
 __all__ = [
     "__version__",
+    "BRAND_NAME",
+    "BRAND_SHORT",
+    "BRAND_TAGLINE",
     "GitForensics",
     "DanglingCommit",
     "DanglingBlob",
