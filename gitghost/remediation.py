@@ -32,6 +32,8 @@ class RemediationPlan:
     bash_script: str = ""
     powershell_script: str = ""
     rotation_warning: str = ""
+    github_support_ticket: str = ""
+
 
 
 class RemediationGenerator:
@@ -49,10 +51,16 @@ class RemediationGenerator:
         findings: List[SecretFinding],
         dangling_commits_count: int = 0,
         dangling_blobs_count: int = 0,
+        orphaned_commit_shas: Optional[List[str]] = None,
     ) -> RemediationPlan:
         steps: List[RemediationStep] = []
-        clean_path = str(Path(repo_path).resolve())
-        backup_path = f"{clean_path}_safety_backup.git"
+        is_remote_target = "github.com" in repo_path or repo_path.startswith(("http://", "https://", "git@"))
+        if is_remote_target:
+            clean_path = repo_path
+            backup_path = f"{repo_path.rstrip('/')}_safety_backup.git"
+        else:
+            clean_path = str(Path(repo_path).resolve())
+            backup_path = f"{clean_path}_safety_backup.git"
 
         affected_files: Set[str] = set()
         for f in findings:
@@ -135,6 +143,11 @@ class RemediationGenerator:
 
         bash_script = cls._build_bash_script(clean_path, steps, sorted_files)
         ps_script = cls._build_powershell_script(clean_path, steps, sorted_files)
+        support_ticket = cls.generate_github_support_ticket(
+            repo_url=clean_path,
+            orphaned_commit_shas=orphaned_commit_shas or [],
+            findings_count=len(findings),
+        )
 
         return RemediationPlan(
             repo_path=clean_path,
@@ -143,7 +156,43 @@ class RemediationGenerator:
             bash_script=bash_script,
             powershell_script=ps_script,
             rotation_warning=cls.ROTATION_NOTICE,
+            github_support_ticket=support_ticket,
         )
+
+    @classmethod
+    def generate_github_support_ticket(
+        cls,
+        repo_url: str,
+        orphaned_commit_shas: List[str],
+        findings_count: int = 0,
+    ) -> str:
+        """Generates an official GitHub Support Ticket request for server-side cache and commit purging."""
+        clean_shas = [s.strip() for s in orphaned_commit_shas if s and len(s.strip()) >= 7]
+        sha_list_str = "\n".join([f"- `{sha}`" for sha in clean_shas]) if clean_shas else "- (See attached audit report)"
+        count_str = f"{len(clean_shas)} orphaned/force-pushed commit(s)"
+        leak_str = f" containing {findings_count} exposed credential finding(s)" if findings_count else ""
+
+        return (
+            "Subject: Request for Server-Side Cache Purge / Dangling Commit Removal\n\n"
+            "Hello GitHub Support Team,\n\n"
+            f"We have conducted a security audit of our repository ({repo_url}) using ForcePush-Breaker.\n"
+            f"During the audit, we identified {count_str}{leak_str} that were previously overwritten "
+            "or orphaned via git force-push, but remain accessible directly via GitHub's commit cache "
+            "URLs (https://github.com/<owner>/<repo>/commit/<sha>).\n\n"
+            "We have already rewritten our history locally and forced-pushed the cleansed branch tips. "
+            "In accordance with GitHub's documentation on removing sensitive data, we kindly request a "
+            "server-side cache purge and garbage collection (gc) to permanently remove the following commit SHAs:\n\n"
+            f"{sha_list_str}\n\n"
+            "Repository Verification Details:\n"
+            f"- Repository Target: {repo_url}\n"
+            f"- Identified Orphaned Commits: {len(clean_shas)}\n"
+            "- Local history rewritten: Yes\n"
+            "- Credentials rotated in production: Yes\n\n"
+            "Thank you for your assistance in securing our repository.\n\n"
+            "Best regards,\n"
+            "Repository Security Team"
+        )
+
 
     @classmethod
     def _build_bash_script(
