@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 from gitghost.ai_triage import AITriage, AITriageResult
-from gitghost.git_forensics import ForensicsScanResult, GitForensics
+from gitghost.git_forensics import ForensicsScanResult, GitForensics, detect_ai_agent
 from gitghost.github_remote import (
     HistoryOverwriteEvent,
     RemoteAcquisitionResult,
@@ -197,12 +197,24 @@ def run_scan_pipeline(
         scanned_counter = 0
 
         for commit in scan_result.dangling_commits:
+            if commit.ai_agent is None:
+                commit.ai_agent = detect_ai_agent(
+                    author=commit.author,
+                    message=commit.message,
+                    diff_content=commit.diff_content,
+                )
+
             msg_res: RedactionResult = redactor.scan_and_redact(
                 commit.message,
                 file_path="[Commit Message]",
                 commit_hash=commit.commit_hash,
             )
             commit.redacted_message = msg_res.redacted_text
+            for f in msg_res.findings:
+                if commit.ai_agent and commit.ai_agent.is_ai_agent:
+                    f.is_ai_agent = True
+                    f.ai_agent_name = commit.ai_agent.agent_name
+                    f.ai_agent_evidence = list(commit.ai_agent.evidence)
             findings.extend(msg_res.findings)
 
             primary_file = commit.changed_files[0] if commit.changed_files else "Diff"
@@ -213,6 +225,11 @@ def run_scan_pipeline(
                 commit_hash=commit.commit_hash,
             )
             commit.redacted_diff = diff_res.redacted_text
+            for f in diff_res.findings:
+                if commit.ai_agent and commit.ai_agent.is_ai_agent:
+                    f.is_ai_agent = True
+                    f.ai_agent_name = commit.ai_agent.agent_name
+                    f.ai_agent_evidence = list(commit.ai_agent.evidence)
             findings.extend(diff_res.findings)
 
             scanned_counter += 1
