@@ -27,7 +27,7 @@ def launch_ui(
     server, active_port = start_ui_server(start_port=port)
     url = f"http://127.0.0.1:{active_port}/"
 
-    console.print(f"\n[bold cyan]👻 GitGhost Dashboard launched![/bold cyan]")
+    console.print(f"\n[bold cyan][*] ForcePush-Breaker (UnForce) Dashboard launched![/bold cyan]")
     console.print(f"   Server URL: [link={url}]{url}[/link]")
     console.print(f"   Target Repo: {Path(repo_path).resolve()}\n")
 
@@ -38,7 +38,7 @@ def launch_ui(
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
-            console.print("\n[dim]Shutting down GitGhost UI server.[/dim]")
+            console.print("\n[dim]Shutting down UI server.[/dim]")
             server.shutdown()
         return
 
@@ -51,7 +51,7 @@ def launch_ui(
 
             app = QApplication.instance() or QApplication(sys.argv)
             view = QWebEngineView()
-            view.setWindowTitle("GitGhost - Git Forensics & Secret Recovery")
+            view.setWindowTitle("ForcePush-Breaker (UnForce) - Forensics & Secret Recovery")
             view.resize(1280, 850)
             view.load(QUrl(url))
             view.show()
@@ -64,7 +64,7 @@ def launch_ui(
         import webview
 
         webview.create_window(
-            title="GitGhost - Git Forensics & Secret Recovery",
+            title="ForcePush-Breaker (UnForce) - Forensics & Secret Recovery",
             url=url,
             width=1280,
             height=850,
