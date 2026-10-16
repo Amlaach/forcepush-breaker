@@ -130,6 +130,54 @@ class DanglingCommit:
 
 
 
+_SENSITIVE_CONFIG_PATTERNS = [
+    # .env files
+    (re.compile(r"(^|/)\.env(\..+)?$", re.IGNORECASE), "env"),
+    (re.compile(r".*\.env$", re.IGNORECASE), "env"),
+    # Keys and certificates
+    (re.compile(r".*\.(pem|key|pkcs12|pfx|p12|keystore|crt|cer|der)$", re.IGNORECASE), "key"),
+    (re.compile(r"(^|/)(id_rsa|id_ed25519|id_dsa|id_ecdsa)(_.*)?$", re.IGNORECASE), "key"),
+    # Credentials & secrets
+    (re.compile(r"(^|/)(credentials|secrets|service[-_]?account.*)\.(json|yaml|yml|toml|ini|xml)$", re.IGNORECASE), "credential"),
+    (re.compile(r"(^|/)htpasswd$", re.IGNORECASE), "credential"),
+    (re.compile(r".*\.kdbx$", re.IGNORECASE), "credential"),
+    # Infrastructure state & variables
+    (re.compile(r"(^|/)terraform\.tfstate(\.backup)?$", re.IGNORECASE), "terraform"),
+    (re.compile(r".*\.tfvars(\.json)?$", re.IGNORECASE), "terraform"),
+    # App configuration with potential secrets
+    (re.compile(r"(^|/)(local\.settings\.json|appsettings\..*\.json|config\.(json|yaml|yml))$", re.IGNORECASE), "config"),
+]
+
+
+def classify_sensitive_config_file(file_path: str) -> Optional[str]:
+    """Returns the config type category ('env', 'key', 'credential', 'terraform', 'config')
+
+    if file_path matches known sensitive configurations, otherwise None.
+    """
+    if not file_path:
+        return None
+    clean_p = file_path.replace("\\", "/").strip()
+    for pattern, cat in _SENSITIVE_CONFIG_PATTERNS:
+        if pattern.search(clean_p):
+            return cat
+    return None
+
+
+def is_sensitive_config_file(file_path: str) -> bool:
+    return classify_sensitive_config_file(file_path) is not None
+
+
+@dataclass
+class DeletedConfigFile:
+    file_path: str
+    file_type: str  # "env" | "key" | "credential" | "terraform" | "config"
+    commit_hash: Optional[str] = None
+    blob_hash: Optional[str] = None
+    size: int = 0
+    date: str = ""
+    author: str = ""
+
+
 @dataclass
 class DanglingBlob:
     blob_hash: str
@@ -146,6 +194,7 @@ class ForensicsScanResult:
     is_git_repo: bool
     dangling_commits: List[DanglingCommit] = field(default_factory=list)
     dangling_blobs: List[DanglingBlob] = field(default_factory=list)
+    deleted_config_files: List[DeletedConfigFile] = field(default_factory=list)
     unreachable_trees: List[str] = field(default_factory=list)
     unreachable_tags: List[str] = field(default_factory=list)
     total_objects_scanned: int = 0
@@ -264,6 +313,40 @@ class GitForensics:
             result.dangling_blobs = self._batch_extract_blobs(
                 blob_hashes, type_and_sizes, blob_path_map
             )
+
+        # Step 6: Index deleted sensitive configuration and environment files (Time-Machine)
+        config_files_map: Dict[Tuple[str, Optional[str], Optional[str]], DeletedConfigFile] = {}
+
+        for c in result.dangling_commits:
+            for fpath in c.changed_files:
+                cat = classify_sensitive_config_file(fpath)
+                if cat:
+                    key = (fpath, c.commit_hash, None)
+                    if key not in config_files_map:
+                        config_files_map[key] = DeletedConfigFile(
+                            file_path=fpath,
+                            file_type=cat,
+                            commit_hash=c.commit_hash,
+                            blob_hash=None,
+                            date=c.date,
+                            author=c.author,
+                        )
+
+        for b in result.dangling_blobs:
+            if b.associated_path:
+                cat = classify_sensitive_config_file(b.associated_path)
+                if cat:
+                    key = (b.associated_path, None, b.blob_hash)
+                    if key not in config_files_map:
+                        config_files_map[key] = DeletedConfigFile(
+                            file_path=b.associated_path,
+                            file_type=cat,
+                            commit_hash=None,
+                            blob_hash=b.blob_hash,
+                            size=b.size,
+                        )
+
+        result.deleted_config_files = list(config_files_map.values())
 
         result.total_objects_scanned = (
             len(result.dangling_commits)
