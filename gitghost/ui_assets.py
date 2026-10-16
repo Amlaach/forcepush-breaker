@@ -1142,6 +1142,12 @@ HTML_PAGE = r"""<!DOCTYPE html>
             <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Recommended Security Action</div>
             <div id="modalAction" style="font-size: 0.85rem; margin-top: 0.25rem; color: #a5f3fc;"></div>
           </div>
+
+          <div id="modalLivenessRow" style="display: none; margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card);">
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Passive Key Liveness Status</div>
+            <div id="modalLivenessBadge" style="margin-top: 0.35rem; font-weight: 600;"></div>
+            <div id="modalLivenessDetails" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;"></div>
+          </div>
         </div>
 
         <div>
@@ -1156,6 +1162,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
         </div>
       </div>
       <div class="modal-footer">
+        <button id="modalVerifyBtn" class="btn btn-secondary" style="display: none;" onclick="verifyActiveModalKey()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          Verify Key Status
+        </button>
         <button id="modalRecoverBtn" class="btn btn-primary" style="display: none;" onclick="recoverFromActiveModal()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           Recover & Download Artifact
@@ -1734,7 +1744,11 @@ HTML_PAGE = r"""<!DOCTYPE html>
             <div style="font-size: 0.7rem; color: var(--text-muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.triage_explanation || ''}</div>
           </td>
           <td>
-            <button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick='openDetailModal(${JSON.stringify(f)})'>${getSvg('search', 12)} Inspect</button>
+            <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center;">
+              <button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick='openDetailModal(${JSON.stringify(f)})'>${getSvg('search', 12)} Inspect</button>
+              <button class="btn btn-secondary" style="padding: 0.35rem 0.55rem; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.25rem;" onclick='verifyFindingKey("${f.finding_id}", "${escapeHtml(f.rule_name)}", this)'>${getSvg('shield', 11)} Verify</button>
+            </div>
+            <div id="livenessStatus_${f.finding_id}" style="margin-top: 0.3rem; display: none;"></div>
           </td>
         `;
         tbody.appendChild(tr);
@@ -2035,7 +2049,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
       }).join('');
     }
 
+    let activeModalFinding = null;
+
     function openDetailModal(f) {
+      activeModalFinding = f;
       document.getElementById('modalTitle').innerText = f.rule_name;
       document.getElementById('modalSubtitle').innerText = `ID: ${f.finding_id} | Path: ${f.file_path}:${f.line_number}${f.commit_hash ? ' | Commit: ' + f.commit_hash.substring(0, 10) : ''}`;
       document.getElementById('modalTriageMeta').style.display = 'block';
@@ -2046,6 +2063,12 @@ HTML_PAGE = r"""<!DOCTYPE html>
       document.getElementById('modalEntropyVal').innerText = (f.entropy || 0).toFixed(2);
       document.getElementById('modalExplanation').innerText = f.triage_explanation || 'No AI explanation available.';
       document.getElementById('modalAction').innerText = f.triage_action || 'Rotate credentials and prune repository.';
+
+      const livenessRow = document.getElementById('modalLivenessRow');
+      if (livenessRow) livenessRow.style.display = 'none';
+
+      const verifyBtn = document.getElementById('modalVerifyBtn');
+      if (verifyBtn) verifyBtn.style.display = 'inline-flex';
 
       const diffText = f.diff_hunk || f.context_line || f.masked_value;
       document.getElementById('modalCodeView').innerHTML = renderDiffViewHtml(diffText);
@@ -2067,8 +2090,92 @@ HTML_PAGE = r"""<!DOCTYPE html>
       document.getElementById('detailModal').style.display = 'flex';
     }
 
+    async function verifyFindingKey(findingId, ruleName, btnEl) {
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerText = 'Checking...';
+      }
+      try {
+        const repoPath = (document.getElementById('repoPathInput').value || '.').trim();
+        const res = await fetch('/api/verify/key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            finding_id: findingId,
+            rule_name: ruleName,
+            repo_path: repoPath
+          })
+        });
+        const data = await res.json();
+        const statusEl = document.getElementById(`livenessStatus_${findingId}`);
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          if (data.status === 'ACTIVE') {
+            statusEl.innerHTML = `<span class="badge badge-critical" style="font-size: 0.68rem;">[!] ACTIVE</span>`;
+          } else if (data.status === 'REVOKED') {
+            statusEl.innerHTML = `<span class="badge" style="background: rgba(16, 185, 129, 0.2); border: 1px solid var(--emerald); color: #6ee7b7; font-size: 0.68rem;">[OK] REVOKED</span>`;
+          } else {
+            statusEl.innerHTML = `<span class="badge badge-low" style="font-size: 0.68rem;">UNVERIFIABLE</span>`;
+          }
+        }
+        showToast(`Key probe (${data.provider}): ${data.status}`, data.status === 'ACTIVE' ? 'alert' : 'check');
+      } catch (err) {
+        showToast('Probe failed: ' + err.message, 'alert');
+      } finally {
+        if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.innerHTML = `${getSvg('shield', 11)} Verify`;
+        }
+      }
+    }
+
+    async function verifyActiveModalKey() {
+      if (!activeModalFinding) return;
+      const btn = document.getElementById('modalVerifyBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Probing vendor API...';
+      }
+      try {
+        const repoPath = (document.getElementById('repoPathInput').value || '.').trim();
+        const res = await fetch('/api/verify/key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            finding_id: activeModalFinding.finding_id,
+            rule_name: activeModalFinding.rule_name,
+            repo_path: repoPath
+          })
+        });
+        const data = await res.json();
+        const row = document.getElementById('modalLivenessRow');
+        const badge = document.getElementById('modalLivenessBadge');
+        const details = document.getElementById('modalLivenessDetails');
+        if (row && badge && details) {
+          row.style.display = 'block';
+          if (data.status === 'ACTIVE') {
+            badge.innerHTML = `<span class="badge badge-critical">[!] ACTIVE KEY (${data.provider})</span>`;
+          } else if (data.status === 'REVOKED') {
+            badge.innerHTML = `<span class="badge" style="background: rgba(16, 185, 129, 0.2); border: 1px solid var(--emerald); color: #6ee7b7;">[OK] REVOKED / INACTIVE (${data.provider})</span>`;
+          } else {
+            badge.innerHTML = `<span class="badge badge-low">UNVERIFIABLE (${data.provider})</span>`;
+          }
+          details.innerText = data.details || '';
+        }
+        showToast(`Liveness result: ${data.status}`, data.status === 'ACTIVE' ? 'alert' : 'check');
+      } catch (err) {
+        showToast('Key verification failed: ' + err.message, 'alert');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `${getSvg('shield', 14)} Verify Key Status`;
+        }
+      }
+    }
+
     function closeModal() {
       document.getElementById('detailModal').style.display = 'none';
+      activeModalFinding = null;
     }
 
     function openCommitDiffModal(commitIdx) {
