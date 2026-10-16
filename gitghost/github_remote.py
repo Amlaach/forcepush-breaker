@@ -7,10 +7,14 @@ for force-push/deleted branch discovery, and smart mirror cloning with resource 
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from gitghost.git_forensics import DanglingCommit
 
 _HTTPS_GITHUB_RE = re.compile(
@@ -58,7 +62,6 @@ class RemoteAcquisitionResult:
     discovered_orphan_shas: List[str] = field(default_factory=list)
     api_recovered_commits: List[DanglingCommit] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
-
 
 
 def sanitize_token_in_text(text: str, token: Optional[str] = None) -> str:
@@ -132,3 +135,152 @@ def parse_github_url(target: str) -> Optional[ParsedGitHubTarget]:
 def is_github_target(target: str) -> bool:
     """Returns True if the target string represents a remote GitHub repository."""
     return parse_github_url(target) is not None
+
+
+class GitHubAPIForensicsClient:
+    """Queries GitHub REST API for history overwrite events, force-pushes, and orphaned commits.
+
+    Token is held strictly in memory and never emitted in logs, exceptions, or reports.
+    """
+
+    DEFAULT_TIMEOUT_SECONDS = 12
+
+    def __init__(self, github_token: Optional[str] = None, timeout: int = DEFAULT_TIMEOUT_SECONDS):
+        resolved_token = (github_token or os.getenv("GITHUB_TOKEN") or "").strip()
+        self._token: Optional[str] = resolved_token if resolved_token else None
+        self.timeout = timeout
+
+    def __repr__(self) -> str:
+        return f"GitHubAPIForensicsClient(authenticated={bool(self._token)}, timeout={self.timeout})"
+
+    def _build_headers(self, accept: str = "application/vnd.github+json") -> Dict[str, str]:
+        headers = {
+            "Accept": accept,
+            "User-Agent": "GitGhost-Security-Forensics/0.1.0",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
+        return headers
+
+    def _get_json(self, url: str) -> Any:
+        req = urllib.request.Request(url, headers=self._build_headers(), method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                return json.loads(resp.read().decode("utf-8", errors="replace"))
+        except Exception as exc:
+            safe_msg = sanitize_token_in_text(str(exc), self._token)
+            raise RuntimeError(f"GitHub API request failed ({url}): {safe_msg}") from None
+
+    def discover_history_overwrite_events(
+        self, target: ParsedGitHubTarget
+    ) -> Tuple[List[HistoryOverwriteEvent], List[str], List[str]]:
+        """Inspects repository activity events and closed PRs for force-push/overwritten SHAs.
+
+        Returns (events, candidate_orphan_shas, warnings).
+        """
+        events: List[HistoryOverwriteEvent] = []
+        candidate_shas: List[str] = []
+        seen_shas: Set[str] = set()
+        warnings: List[str] = []
+        zero_sha = "0" * 40
+
+        # 1. Query /repos/{owner}/{repo}/events
+        events_url = f"{target.api_repo_url}/events?per_page=100"
+        try:
+            raw_events = self._get_json(events_url)
+            if isinstance(raw_events, list):
+                for ev in raw_events:
+                    if not isinstance(ev, dict):
+                        continue
+                    ev_type = ev.get("type", "")
+                    ev_id = str(ev.get("id", ""))
+                    actor = (ev.get("actor") or {}).get("login", "unknown")
+                    created_at = ev.get("created_at", "")
+                    payload = ev.get("payload") or {}
+
+                    if ev_type == "PushEvent":
+                        before_sha = str(payload.get("before") or "").strip()
+                        after_sha = str(payload.get("head") or "").strip()
+                        ref = str(payload.get("ref") or "refs/heads/main")
+                        forced = bool(payload.get("forced", False))
+                        size = payload.get("size", 1)
+
+                        if before_sha and before_sha != zero_sha and before_sha != after_sha:
+                            is_force_candidate = forced or size == 0
+                            kind = "force_push" if is_force_candidate else "push_before"
+                            desc = (
+                                f"Force-push / history rewrite on {ref} (previous tip {before_sha[:10]} replaced by {after_sha[:10]})"
+                                if is_force_candidate
+                                else f"Push event on {ref} (previous tip {before_sha[:10]} -> {after_sha[:10]})"
+                            )
+                            events.append(
+                                HistoryOverwriteEvent(
+                                    event_id=ev_id,
+                                    event_type=kind,
+                                    ref=ref,
+                                    before_sha=before_sha,
+                                    after_sha=after_sha,
+                                    actor=actor,
+                                    created_at=created_at,
+                                    description=desc,
+                                )
+                            )
+                            if before_sha not in seen_shas:
+                                seen_shas.add(before_sha)
+                                candidate_shas.append(before_sha)
+
+                    elif ev_type == "DeleteEvent":
+                        ref_type = str(payload.get("ref_type") or "")
+                        ref = str(payload.get("ref") or "")
+                        if ref_type in ("branch", "tag") and ref:
+                            events.append(
+                                HistoryOverwriteEvent(
+                                    event_id=ev_id,
+                                    event_type="branch_delete",
+                                    ref=f"refs/heads/{ref}" if ref_type == "branch" else f"refs/tags/{ref}",
+                                    before_sha="",
+                                    after_sha=None,
+                                    actor=actor,
+                                    created_at=created_at,
+                                    description=f"Deleted {ref_type} '{ref}' by {actor}",
+                                )
+                            )
+        except Exception as exc:
+            warnings.append(sanitize_token_in_text(str(exc), self._token))
+
+        # 2. Query closed unmerged PRs for orphaned head SHAs
+        pulls_url = f"{target.api_repo_url}/pulls?state=closed&per_page=30"
+        try:
+            raw_pulls = self._get_json(pulls_url)
+            if isinstance(raw_pulls, list):
+                for pr in raw_pulls:
+                    if not isinstance(pr, dict) or pr.get("merged_at"):
+                        continue
+                    head = pr.get("head") or {}
+                    head_sha = str(head.get("sha") or "").strip()
+                    head_ref = str(head.get("ref") or "pr-branch")
+                    pr_num = pr.get("number", "?")
+                    user_login = (pr.get("user") or {}).get("login", "unknown")
+                    closed_at = str(pr.get("closed_at") or "")
+                    if head_sha and head_sha != zero_sha:
+                        events.append(
+                            HistoryOverwriteEvent(
+                                event_id=f"PR-{pr_num}",
+                                event_type="closed_pr_orphan",
+                                ref=f"refs/pull/{pr_num}/head ({head_ref})",
+                                before_sha=head_sha,
+                                after_sha=None,
+                                actor=user_login,
+                                created_at=closed_at,
+                                description=f"Closed unmerged PR #{pr_num} ('{pr.get('title', '')}') head commit {head_sha[:10]}",
+                            )
+                        )
+                        if head_sha not in seen_shas:
+                            seen_shas.add(head_sha)
+                            candidate_shas.append(head_sha)
+        except Exception as exc:
+            warnings.append(sanitize_token_in_text(str(exc), self._token))
+
+        return events, candidate_shas, warnings
+
