@@ -646,8 +646,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
     <div class="control-row">
       <div class="repo-input-wrapper">
         <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-        <input type="text" id="repoPathInput" class="repo-input" placeholder="/path/to/target/git/repository" value=".">
+        <input type="text" id="repoPathInput" class="repo-input" placeholder="https://github.com/owner/repo, owner/repo, or /local/path/to/repo" value="." oninput="updateTargetTypeBadge()">
       </div>
+      <span id="repoTargetBadge" class="code-badge" style="padding: 0.45rem 0.65rem; font-size: 0.75rem; color: var(--cyan);">📁 Local Repo</span>
       <button class="btn btn-secondary" onclick="browseFolder()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 8 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
         Browse
@@ -656,13 +657,17 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <svg id="scanIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <span id="scanBtnText">Scan Repository</span>
       </button>
-      <button class="settings-dropdown-toggle" onclick="toggleSettings()" title="Scan Configuration">
+      <button class="settings-dropdown-toggle" onclick="toggleSettings()" title="Scan Configuration & GitHub Token">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
       </button>
     </div>
 
     <!-- Scan Options Bar (Collapsible) -->
     <div id="scanOptions" class="scan-options-row" style="display: none;">
+      <div class="option-group">
+        <label for="githubTokenInput">GitHub Token (In-Memory):</label>
+        <input type="password" id="githubTokenInput" class="select-input" style="width: 210px;" placeholder="ghp_... (optional for API/private)" autocomplete="off">
+      </div>
       <div class="option-group">
         <label for="aiProviderSelect">AI Triage Provider:</label>
         <select id="aiProviderSelect" class="select-input">
@@ -679,6 +684,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <label for="entropyThreshold">Shannon Entropy Sensitivity:</label>
         <input type="range" id="entropyThreshold" min="3.0" max="5.5" step="0.1" value="4.0" oninput="document.getElementById('entropyVal').innerText = this.value">
         <span id="entropyVal" style="font-weight: 700; color: var(--cyan);">4.0</span>
+      </div>
+      <div class="option-group">
+        <label title="Default is Strictly Redacted. Check only if you need to recover original unmasked files."><input type="checkbox" id="includeRawToggle"> Allow Unredacted (Raw) Recovery</label>
       </div>
       <div class="option-group">
         <label><input type="checkbox" id="strictMode"> Strict CI Gatekeeper</label>
@@ -965,6 +973,22 @@ HTML_PAGE = r"""<!DOCTYPE html>
     let currentAuditData = null;
     let allFindings = [];
 
+    function updateTargetTypeBadge() {
+      const val = (document.getElementById('repoPathInput').value || '').trim();
+      const badge = document.getElementById('repoTargetBadge');
+      if (!badge) return;
+      const isGh = /^https?:\/\/(www\.)?github\.com\/[^/]+\/[^/]+/i.test(val) ||
+                   /^git@github\.com:[^/]+\/[^/]+/i.test(val) ||
+                   /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(val);
+      if (isGh) {
+        badge.innerText = '🌐 Remote GitHub';
+        badge.style.color = 'var(--magenta)';
+      } else {
+        badge.innerText = '📁 Local Repo';
+        badge.style.color = 'var(--cyan)';
+      }
+    }
+
     // Folder selection
     async function browseFolder() {
       try {
@@ -972,6 +996,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         const data = await res.json();
         if (data && data.folder) {
           document.getElementById('repoPathInput').value = data.folder;
+          updateTargetTypeBadge();
           showToast('Folder selected: ' + data.folder, '📁');
         }
       } catch (err) {
