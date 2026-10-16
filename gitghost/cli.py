@@ -93,7 +93,8 @@ def scan_cmd(
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Path to export report file."),
     export_format: Optional[str] = typer.Option(None, "--format", "-f", help="Format: markdown, json, sarif."),
     recover_zip: Optional[str] = typer.Option(None, "--recover-zip", help="Path to export full recovery ZIP bundle (reports, patches, recovered files)."),
-    include_raw: bool = typer.Option(False, "--include-raw", help="Export unredacted (raw) files/patches in recovery ZIP bundle (default is redacted)."),
+    include_raw: bool = typer.Option(False, "--include-raw", "--raw", "--unredacted", help="Export unredacted (raw) files/patches in recovery ZIP bundle (default is redacted)."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompts."),
     strict: bool = typer.Option(False, "--strict", help="CI/CD mode: Exit with code 1 if score < 70 or critical leaks exist."),
     no_ai: bool = typer.Option(False, "--no-ai", help="Disable AI triage."),
 ) -> None:
@@ -176,6 +177,10 @@ def scan_cmd(
         )
 
     if recover_zip:
+        if include_raw and not yes:
+            if not typer.confirm("[!] SECURITY WARNING: Raw recovery bundle will contain unmasked secrets. Proceed?"):
+                console.print("[dim]Aborted raw bundle export.[/dim]")
+                raise typer.Abort()
         zip_path = Path(recover_zip).resolve()
         zip_path.parent.mkdir(parents=True, exist_ok=True)
         zip_bytes = ObjectRecoveryEngine.build_recovery_zip_bundle(
@@ -183,7 +188,7 @@ def scan_cmd(
         )
         zip_path.write_bytes(zip_bytes)
         mode_str = "UNREDACTED (RAW)" if include_raw else "STRICTLY REDACTED"
-        console.print(f"[bold green]Recovery ZIP bundle exported ({mode_str}):[/bold green] {zip_path}")
+        console.print(f"[bold green][OK] Recovery ZIP bundle exported ({mode_str}):[/bold green] {zip_path}")
 
     if strict and (pipeline_res.hygiene.score < 70 or pipeline_res.hygiene.critical_findings_count > 0):
         console.print(f"\n[bold red]Strict Check Failed:[/bold red] Hygiene score {pipeline_res.hygiene.score}/100.")
@@ -335,6 +340,71 @@ def clean_cmd(
         except Exception as e:
             console.print(f"[bold red]Excision Failed:[/bold red] {e}")
             raise typer.Exit(1)
+
+
+@app.command(name="recover")
+def recover_cmd(
+    path: str = typer.Argument(".", help="Target repository path or remote GitHub URL."),
+    commit: Optional[str] = typer.Option(None, "--commit", "-c", help="Dangling commit hash to recover."),
+    blob: Optional[str] = typer.Option(None, "--blob", "-b", help="Dangling blob hash to recover."),
+    file_path: Optional[str] = typer.Option(None, "--file", "-f", help="Specific file path to recover from commit."),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="File path to save the recovered content."),
+    raw: bool = typer.Option(False, "--raw", "--unredacted", help="Extract unmasked (raw) original content containing secrets."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip security confirmation prompt for raw recovery."),
+    github_token: Optional[str] = typer.Option(None, "--github-token", envvar="GITHUB_TOKEN", help="GitHub token for remote scanning."),
+) -> None:
+    """Recover files, patches, or detached blobs from overwritten Git history."""
+    print_banner()
+
+    if not commit and not blob:
+        console.print("[bold red]Error:[/bold red] Must specify either --commit <hash> or --blob <hash> to recover.")
+        raise typer.Exit(1)
+
+    if raw and not yes:
+        if not typer.confirm("[!] SECURITY WARNING: Raw recovery extracts unmasked credentials from history. Proceed?"):
+            console.print("[dim]Recovery aborted by user.[/dim]")
+            raise typer.Abort()
+
+    try:
+        pipeline_res = run_scan_pipeline(
+            repo_path=path,
+            ai_provider="none",
+            github_token=github_token,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Forensics Scan Failed:[/bold red] {exc}")
+        raise typer.Exit(1)
+
+    try:
+        if blob:
+            artifact = ObjectRecoveryEngine.recover_blob(pipeline_res, blob, include_raw=raw)
+        elif commit and file_path:
+            artifact = ObjectRecoveryEngine.recover_commit_file(
+                pipeline_res, commit, file_path=file_path, include_raw=raw
+            )
+        elif commit:
+            artifact = ObjectRecoveryEngine.recover_commit_diff(
+                pipeline_res, commit, include_raw=raw
+            )
+        else:
+            console.print("[bold red]Error:[/bold red] Invalid recovery targets.")
+            raise typer.Exit(1)
+    except ValueError as ve:
+        console.print(f"[bold red]Not Found:[/bold red] {ve}")
+        raise typer.Exit(1)
+    except Exception as exc:
+        console.print(f"[bold red]Recovery Failed:[/bold red] {exc}")
+        raise typer.Exit(1)
+
+    mode_label = "UNREDACTED (RAW)" if raw else "STRICTLY REDACTED"
+    if output:
+        out_p = Path(output).resolve()
+        out_p.parent.mkdir(parents=True, exist_ok=True)
+        out_p.write_text(artifact.content, encoding="utf-8")
+        console.print(f"[bold green][OK] Recovered {artifact.filename} ({mode_label}) to:[/bold green] {out_p}")
+    else:
+        console.print(f"[bold cyan][*] Recovered Artifact: {artifact.filename} ({mode_label})[/bold cyan]\n")
+        console.print(artifact.content)
 
 
 def _render_ghost_tree(scan_result: ForensicsScanResult):
