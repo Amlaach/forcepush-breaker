@@ -81,12 +81,11 @@ def test_full_end_to_end_remote_github_forensics_and_recovery(
     orig_acquire = SmartGitCloner.acquire
 
     @classmethod
-    def acquire_with_mock_events(cls, target, github_token=None, clone_source_override=None, on_phase=None):
+    def acquire_with_mock_events(cls, target, *args, **kwargs):
         acq = orig_acquire(
             target=target,
-            github_token=github_token,
-            clone_source_override=clone_source_override,
-            on_phase=on_phase,
+            *args,
+            **kwargs,
         )
         acq.history_events.append(
             HistoryOverwriteEvent(
@@ -155,6 +154,38 @@ def test_full_end_to_end_remote_github_forensics_and_recovery(
     assert finding["line_number"] == 2
     assert "diff_hunk" in finding and "\n" in finding["diff_hunk"]
     assert raw_aws_secret not in finding["diff_hunk"]
+
+    # Verify .env & Sensitive Config Time-Machine detection
+    assert "deleted_config_files" in result
+    env_configs = [c for c in result["deleted_config_files"] if c["file_path"] == "config/prod.env"]
+    assert len(env_configs) >= 1
+    assert env_configs[0]["commit_hash"] == orphaned_sha
+    assert env_configs[0]["file_type"] in ("env", "config")
+
+    # Verify Remediation & GitHub Support Ticket Generator
+    assert "remediation" in result
+    assert "github_support_ticket" in result["remediation"]
+    ticket = result["remediation"]["github_support_ticket"]
+    assert remote_url in ticket
+    assert orphaned_sha in ticket
+    assert "Cache Purge" in ticket or "Purge Request" in ticket or "GitGhost" in ticket
+
+    # Verify Safe Passive Key Liveness probe endpoint
+    verify_req = urllib.request.Request(
+        f"{e2e_server}/api/verify/key",
+        data=json.dumps({
+            "finding_id": finding["finding_id"],
+            "repo_path": remote_url,
+            "rule_name": finding["rule_name"],
+        }).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(verify_req, timeout=10) as resp:
+        assert resp.status == 200
+        liveness_data = json.loads(resp.read().decode("utf-8"))
+        assert "status" in liveness_data
+        assert liveness_data["status"] in ("ACTIVE", "UNKNOWN", "FORMAT_VALID", "UNVERIFIABLE")
+        assert liveness_data.get("provider") == "AWS"
 
     # 4. Recover single file: Redacted (default include_raw=False) vs Raw (include_raw=True)
     rec_redacted_req = urllib.request.Request(
