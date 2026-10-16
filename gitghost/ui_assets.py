@@ -967,6 +967,20 @@ HTML_PAGE = r"""<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- Public Forks Forensics Card -->
+      <div id="forksAuditCard" class="card" style="margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h3 style="font-size: 1rem; font-weight: 700; color: #c084fc; display: flex; align-items: center; gap: 0.4rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><path d="M13 6h3a2 2 0 0 1 2 2v7"></path><line x1="6" y1="9" x2="6" y2="21"></line></svg>
+            Public Forks & Divergent Branch Audit
+          </h3>
+          <span id="graveyardForksCount" class="tab-pill">0 forks</span>
+        </div>
+        <div id="forksAuditList" style="display: flex; flex-direction: column; gap: 0.65rem; max-height: 260px; overflow-y: auto;">
+          <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1.25rem;">No public forks audited (local scan or no forks found).</div>
+        </div>
+      </div>
+
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
         <!-- Dangling Commits Panel -->
         <div class="card">
@@ -1272,6 +1286,8 @@ HTML_PAGE = r"""<!DOCTYPE html>
         'close': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
         'clock': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
         'terminal': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>`,
+        'git-fork': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><path d="M18 9v1a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9"></path><path d="M12 12v3"></path></svg>`,
+        'external': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`,
         'info': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`
       };
       return icons[name] || icons['info'];
@@ -1566,8 +1582,8 @@ HTML_PAGE = r"""<!DOCTYPE html>
       // 3. Render Findings Table
       renderFindingsTable(allFindings);
 
-      // 4. Render Graveyard (including GitHub History Overwrite Events)
-      renderGraveyard(data.dangling_commits, data.dangling_blobs, historyEvents);
+      // 4. Render Graveyard (including GitHub History Overwrite Events and Forks)
+      renderGraveyard(data.dangling_commits, data.dangling_blobs, historyEvents, data.discovered_forks || []);
 
       // 5. Render Deductions
       renderDeductions(data.hygiene_score.deductions || []);
@@ -1742,7 +1758,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       renderFindingsTable(filtered);
     }
 
-    function renderGraveyard(commits, blobs, historyEvents = []) {
+    function renderGraveyard(commits, blobs, historyEvents = [], discoveredForks = []) {
       const eventsList = document.getElementById('historyEventsList');
       if (eventsList) {
         eventsList.innerHTML = '';
@@ -1756,10 +1772,14 @@ HTML_PAGE = r"""<!DOCTYPE html>
             evItem.style.border = '1px solid var(--border)';
             evItem.style.borderRadius = '8px';
             evItem.style.padding = '0.65rem 1rem';
+            const isForkDiv = ev.event_type === 'fork_divergence';
+            const badgeHtml = isForkDiv
+              ? `<span class="badge" style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #d8b4fe; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.25rem;">${getSvg('git-fork', 11)} FORK-DIVERGENCE</span>`
+              : `<span class="badge badge-high">${escapeHtml(ev.event_type || 'history_overwrite')}</span>`;
             evItem.innerHTML = `
               <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                  <span class="badge badge-high">${escapeHtml(ev.event_type || 'history_overwrite')}</span>
+                  ${badgeHtml}
                   <span class="code-badge">${escapeHtml(ev.ref || 'refs/heads/*')}</span>
                   ${ev.before_sha ? `<span class="code-badge" style="color: var(--rose);">orphaned: ${escapeHtml(ev.before_sha.substring(0, 10))}</span>` : ''}
                 </div>
@@ -1768,6 +1788,41 @@ HTML_PAGE = r"""<!DOCTYPE html>
               <div style="font-size: 0.8rem; color: var(--text-main); margin-top: 0.35rem;">${escapeHtml(ev.description || '')}</div>
             `;
             eventsList.appendChild(evItem);
+          });
+        }
+      }
+
+      const forksList = document.getElementById('forksAuditList');
+      if (forksList) {
+        forksList.innerHTML = '';
+        const forksCountEl = document.getElementById('graveyardForksCount');
+        if (forksCountEl) forksCountEl.innerText = (discoveredForks ? discoveredForks.length : 0) + ' forks';
+
+        if (!discoveredForks || discoveredForks.length === 0) {
+          forksList.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1.25rem;">No public forks audited (local repository scan or no public forks found).</div>';
+        } else {
+          discoveredForks.forEach(f => {
+            const fItem = document.createElement('div');
+            fItem.style.background = 'var(--bg-card)';
+            fItem.style.border = '1px solid var(--border)';
+            fItem.style.borderRadius = '8px';
+            fItem.style.padding = '0.65rem 1rem';
+            fItem.innerHTML = `
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="badge" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.25rem;">${getSvg('git-fork', 12)} ${escapeHtml(f.full_name)}</span>
+                  <span class="code-badge">branch: ${escapeHtml(f.default_branch || 'main')}</span>
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">${f.stargazers_count || 0} stars | ${f.forks_count || 0} sub-forks</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">Pushed: ${escapeHtml((f.pushed_at || '').substring(0, 10))}</span>
+                  <a href="${escapeHtml(f.html_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; display: inline-flex; align-items: center; gap: 0.25rem;">
+                    ${getSvg('external', 11)} View Fork
+                  </a>
+                </div>
+              </div>
+            `;
+            forksList.appendChild(fItem);
           });
         }
       }

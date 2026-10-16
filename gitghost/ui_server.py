@@ -447,6 +447,21 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             for cf in getattr(pipeline_res.scan_result, "deleted_config_files", [])
         ]
 
+        forks_payload = [
+            {
+                "owner": f.owner,
+                "repo": f.repo,
+                "full_name": f.full_name,
+                "clone_url": f.clone_url,
+                "html_url": f.html_url,
+                "default_branch": f.default_branch,
+                "pushed_at": f.pushed_at,
+                "stargazers_count": f.stargazers_count,
+                "forks_count": f.forks_count,
+            }
+            for f in getattr(pipeline_res, "discovered_forks", [])
+        ]
+
         return {
             "repo_path": pipeline_res.repo_path,
             "is_remote": pipeline_res.is_remote,
@@ -456,6 +471,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             "dangling_blobs": blobs_payload,
             "deleted_config_files": config_files_payload,
             "history_events": history_events_payload,
+            "discovered_forks": forks_payload,
             "findings": findings_payload,
             "hygiene_score": hygiene_payload,
             "remediation": remediation_payload,
