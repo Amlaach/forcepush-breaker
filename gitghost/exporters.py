@@ -92,11 +92,11 @@ class ReportExporter:
         remediation: RemediationPlan,
     ) -> str:
         md: List[str] = [
-            "# 👻 GitGhost Security & Forensics Audit Report",
+            "# ForcePush-Breaker (UnForce) - GitGhost Security & Forensics Audit Report",
             "",
             f"**Repository:** `{scan_result.repo_path}`  ",
             f"**Scan Date:** `{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}`  ",
-            f"**Audit Engine:** `GitGhost v0.1.0`",
+            f"**Audit Engine:** `ForcePush-Breaker (UnForce) / GitGhost v0.1.0`",
             "",
             "---",
             "",
@@ -107,11 +107,11 @@ class ReportExporter:
             "",
             "| Metric | Count | Status |",
             "| :--- | :--- | :--- |",
-            f"| Dangling Commits | `{len(scan_result.dangling_commits)}` | {'⚠️ Warning' if len(scan_result.dangling_commits) > 0 else '✅ Clean'} |",
-            f"| Dangling Blobs | `{len(scan_result.dangling_blobs)}` | {'⚠️ Warning' if len(scan_result.dangling_blobs) > 0 else '✅ Clean'} |",
-            f"| Critical Secret Leaks | `{hygiene.critical_findings_count}` | {'🚨 CRITICAL' if hygiene.critical_findings_count > 0 else '✅ None'} |",
-            f"| High Risk Secrets | `{hygiene.high_findings_count}` | {'⚠️ HIGH' if hygiene.high_findings_count > 0 else '✅ None'} |",
-            f"| Filtered False Positives | `{hygiene.false_positives_count}` | ℹ️ Triaged |",
+            f"| Dangling Commits | `{len(scan_result.dangling_commits)}` | {'[WARN] Warning' if len(scan_result.dangling_commits) > 0 else '[OK] Clean'} |",
+            f"| Dangling Blobs | `{len(scan_result.dangling_blobs)}` | {'[WARN] Warning' if len(scan_result.dangling_blobs) > 0 else '[OK] Clean'} |",
+            f"| Critical Secret Leaks | `{hygiene.critical_findings_count}` | {'[CRITICAL]' if hygiene.critical_findings_count > 0 else '[OK] None'} |",
+            f"| High Risk Secrets | `{hygiene.high_findings_count}` | {'[HIGH]' if hygiene.high_findings_count > 0 else '[OK] None'} |",
+            f"| Filtered False Positives | `{hygiene.false_positives_count}` | [INFO] Triaged |",
             "",
         ]
 
@@ -139,18 +139,14 @@ class ReportExporter:
 
         md.extend(["---", "", "## 3. Discovered Credential Findings & AI Triage", ""])
         if not findings:
-            md.append("✅ **No credentials or high-entropy secrets were found in unreachable objects.**\n")
+            md.append("[OK] **No credentials or high-entropy secrets were found in unreachable objects.**\n")
         else:
             for idx, f in enumerate(findings, start=1):
                 triage = triage_map.get(f.finding_id)
-                status_icon = (
-                    "🚨"
-                    if f.severity_estimate == "Critical"
-                    else ("⚠️" if f.severity_estimate == "High" else "ℹ️")
-                )
+                sev_tag = f"[{f.severity_estimate.upper()}]"
                 if triage and triage.is_false_positive:
-                    status_icon = "🟢 (False Positive)"
-                md.append(f"### {idx}. [{f.finding_id}] {status_icon} {f.rule_name}")
+                    sev_tag = "[FALSE POSITIVE]"
+                md.append(f"### {idx}. [{f.finding_id}] {sev_tag} {f.rule_name}")
                 md.append(f"- **File:** `{f.file_path or 'Unattached Object'}` (Line {f.line_number})")
                 md.append(f"- **Associated Commit / Blob:** `{f.commit_hash or f.blob_hash or 'N/A'}`")
                 md.append(f"- **Shannon Entropy:** `{f.entropy}`")
@@ -169,7 +165,7 @@ class ReportExporter:
             "",
             "## 4. Remediation Action Plan",
             "",
-            f"> ⚠️ **{remediation.rotation_warning}**",
+            f"> [!] **{remediation.rotation_warning}**",
             "",
         ])
         for step in remediation.steps:
