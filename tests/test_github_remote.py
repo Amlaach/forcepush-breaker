@@ -158,3 +158,48 @@ class TestGitHubAPIForensicsClient:
         assert "diff --git a/.env.prod b/.env.prod" in commit.diff_content
         assert "+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE" in commit.diff_content
 
+
+class TestSmartGitCloner:
+    def test_mirror_clone_and_guaranteed_cleanup(self, tmp_path: Path):
+        import subprocess
+        from gitghost.github_remote import SmartGitCloner
+
+        upstream = tmp_path / "upstream_repo"
+        upstream.mkdir()
+        subprocess.run(["git", "init"], cwd=str(upstream), check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Tester"], cwd=str(upstream), check=True)
+        subprocess.run(["git", "config", "user.email", "tester@acme.io"], cwd=str(upstream), check=True)
+        subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=str(upstream), check=True)
+        (upstream / "app.py").write_text("print('ok')\n", encoding="utf-8")
+        subprocess.run(["git", "add", "app.py"], cwd=str(upstream), check=True)
+        subprocess.run(["git", "commit", "-m", "initial commit"], cwd=str(upstream), check=True)
+
+        target = parse_github_url("https://github.com/acme/upstream_repo")
+        assert target is not None
+
+        acq = SmartGitCloner.acquire(
+            target=target,
+            clone_source_override=str(upstream),
+        )
+        try:
+            assert acq.local_clone_path.exists()
+            assert (acq.local_clone_path / "HEAD").exists()
+        finally:
+            SmartGitCloner.cleanup_workspace(acq.local_clone_path)
+            assert not acq.local_clone_path.exists()
+
+    def test_failed_clone_cleans_up_and_scrubs_token(self, tmp_path: Path):
+        from gitghost.github_remote import SmartGitCloner
+
+        target = parse_github_url("https://github.com/acme/nonexistent")
+        assert target is not None
+        fake_token = "ghp_VerySensitiveToken9876543210ABCDEFG"
+
+        with pytest.raises(RuntimeError) as exc_info:
+            SmartGitCloner.acquire(
+                target=target,
+                github_token=fake_token,
+                clone_source_override=str(tmp_path / "does_not_exist_repo.git"),
+            )
+        assert fake_token not in str(exc_info.value)
+
