@@ -195,9 +195,12 @@ class GitHubAPIForensicsClient:
             raise RuntimeError(f"GitHub API request failed ({url}): {safe_msg}") from None
 
     def discover_history_overwrite_events(
-        self, target: ParsedGitHubTarget
+        self,
+        target: ParsedGitHubTarget,
+        scan_forks: bool = True,
+        max_forks: int = 5,
     ) -> Tuple[List[HistoryOverwriteEvent], List[str], List[str]]:
-        """Inspects repository activity events and closed PRs for force-push/overwritten SHAs.
+        """Inspects repository activity events, closed PRs, and public forks for force-push/overwritten SHAs.
 
         Returns (events, candidate_orphan_shas, warnings).
         """
@@ -304,6 +307,32 @@ class GitHubAPIForensicsClient:
         except Exception as exc:
             warnings.append(sanitize_token_in_text(str(exc), self._token))
 
+        # 3. Query public forks and compare branches for divergent / overwritten commits
+        if scan_forks:
+            try:
+                public_forks = self.query_public_forks(target, limit=max_forks)
+                for f in public_forks:
+                    div_commits = self.compare_fork_with_parent(target, f)
+                    for c_sha, c_actor, c_msg in div_commits:
+                        short_msg = c_msg.splitlines()[0] if c_msg else "Commit in fork"
+                        events.append(
+                            HistoryOverwriteEvent(
+                                event_id=f"fork-{f.owner}-{c_sha[:7]}",
+                                event_type="fork_divergence",
+                                ref=f"fork:{f.full_name}:{f.default_branch}",
+                                before_sha=c_sha,
+                                after_sha=None,
+                                actor=c_actor or f.owner,
+                                created_at=f.pushed_at,
+                                description=f"Fork '{f.full_name}' holds commit {c_sha[:10]} not in parent ('{short_msg}')",
+                            )
+                        )
+                        if c_sha not in seen_shas:
+                            seen_shas.add(c_sha)
+                            candidate_shas.append(c_sha)
+            except Exception as exc:
+                warnings.append(sanitize_token_in_text(str(exc), self._token))
+
         return events, candidate_shas, warnings
 
     def query_public_forks(
@@ -349,6 +378,43 @@ class GitHubAPIForensicsClient:
         except Exception:
             pass
         return forks
+
+    def compare_fork_with_parent(
+        self,
+        target: ParsedGitHubTarget,
+        fork: ForkForensicsTarget,
+    ) -> List[Tuple[str, str, str]]:
+        """Compares a fork with the parent repository to identify divergent commits.
+
+        Calls /repos/{owner}/{repo}/compare/{parent_branch}...{fork_owner}:{fork_branch}.
+        Returns a list of (commit_sha, author_login, commit_message) present in fork but not parent.
+        """
+        divergent_commits: List[Tuple[str, str, str]] = []
+        compare_urls = [
+            f"{target.api_repo_url}/compare/{target.repo}:{fork.default_branch}...{fork.owner}:{fork.default_branch}",
+            f"{target.api_repo_url}/compare/{fork.default_branch}...{fork.owner}:{fork.default_branch}",
+        ]
+        for c_url in compare_urls:
+            try:
+                data = self._get_json(c_url)
+                if isinstance(data, dict):
+                    commits = data.get("commits") or []
+                    for c in commits:
+                        if not isinstance(c, dict):
+                            continue
+                        sha = str(c.get("sha") or "").strip()
+                        author_obj = c.get("author") or {}
+                        author_login = (author_obj.get("login") if isinstance(author_obj, dict) else "") or fork.owner
+                        commit_inner = c.get("commit") or {}
+                        msg = str(commit_inner.get("message") or "")
+                        if sha:
+                            divergent_commits.append((sha, author_login, msg))
+                    if divergent_commits:
+                        break
+            except Exception:
+                continue
+        return divergent_commits
+
 
     def fetch_orphan_commit_via_api(
 
