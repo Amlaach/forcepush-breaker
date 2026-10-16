@@ -63,39 +63,39 @@ flowchart TD
 
 ## ✨ Core Features
 
-- **🔍 Live Object-Store Forensics (`git_forensics.py`)**:
-  - Traverses `.git/objects` using `git fsck --full --no-reflogs --unreachable --lost-found`.
-  - Exhumes unreachable commits, trees, and blobs that are disconnected from active refs (`HEAD`, branches, tags).
-  - Reconstructs complete metadata: author, timestamp, commit subject, changed files, and unified diffs.
+- **🌐 Remote GitHub Forensics & Smart Mirror Cloner (`github_remote.py`)**:
+  - Accepts remote GitHub URLs (`https://github.com/owner/repo`, `git@github.com:owner/repo.git`, or `owner/repo`) directly in the UI and CLI.
+  - Queries the GitHub REST API (`/events`, `/pulls?state=closed`, `/commits/{sha}`) to detect **Force-Push overwrites**, deleted branch refs, and unmerged PR commits (`before` SHAs).
+  - Performs a smart `--mirror` clone (`+refs/pull/*:refs/pull/*`), explicitly fetches orphaned commit SHAs from GitHub's object store, and guarantees automatic temporary workspace cleanup.
 
-- **🛡️ Strict Secret Redaction (`redactor.py`)**:
-  - Computes Shannon entropy on orphaned diffs to detect high-entropy keys, passwords, and random tokens.
-  - Multi-pattern detection for AWS credentials, GitHub/GitLab tokens, Slack webhooks, Private Keys, Database URIs, and `.env` configs.
-  - **Zero Leak Guarantee**: All discovered credentials are cryptographically masked (`AKIA************MPLE`, `[REDACTED_DB_PASSWORD]`) before terminal rendering, report export, or AI prompt dispatch.
+- **🔍 Live Object-Store Forensics (`git_forensics.py`)**:
+  - Supports both standard working-tree `.git` repositories and bare/mirror repositories.
+  - Traverses the object database using `git fsck --full --no-reflogs --unreachable --lost-found`.
+  - Exhumes unreachable commits, trees, and blobs disconnected from active refs (`HEAD`, branches, tags) while enforcing strict resource bounds (`MAX_TEXT_SCAN_BYTES = 10MB`) and command timeouts.
+
+- **🛡️ Multi-Line Diff Attribution & Strict Secret Redaction (`redactor.py`, `pipeline.py`)**:
+  - Parses unified `diff --git` and `@@ -a,b +c,d @@` hunk headers per file for exact file path and line number attribution across multi-file commits.
+  - Computes Shannon entropy and evaluates 14+ regex rules for AWS keys, GitHub/GitLab tokens, Slack webhooks, Private Keys, Database URIs, and `.env` secrets.
+  - Generates multi-line **Redacted Diff Hunks** (`diff_hunk`) and stores strictly redacted commit diffs (`redacted_diff`) and blob contents (`redacted_content`).
+
+- **📦 Safe File & Commit Recovery Engine (`recovery.py`)**:
+  - Recovers deleted files (`recover_commit_file`), unified commit patches (`recover_commit_diff`), and detached blobs (`recover_blob`).
+  - Generates a self-contained **Recovery ZIP Bundle** (`gitghost_recovery_bundle.zip`) containing Markdown/JSON/SARIF reports, commit `.patch` files, and recovered files.
+  - **Redacted by Default, Raw on Explicit Request**: Defaults to strict secret redaction (`include_raw=False`), with an explicit opt-in (`include_raw=True` / `--include-raw`) when full unredacted file recovery is required.
 
 - **🤖 AI-Powered Context Triage (`ai_triage.py`)**:
-  - Analyzes commit messages, author intent, surrounding code syntax, and file paths.
-  - Distinguishes real active leaks from false positives (e.g., test fixtures, documentation samples, mock keys).
+  - Distinguishes real active leaks from false positives (test fixtures, documentation samples, mock keys).
   - Multi-provider support: Google Gemini, OpenAI GPT-4o, Anthropic Claude, local Ollama, or built-in offline Heuristics.
 
-- **📈 Repo Hygiene Scorecard (`scoring.py`)**:
-  - Computes a comprehensive 0–100 repository hygiene grade.
-  - Itemized deduction breakdown penalizing critical credentials, dangling object accumulation, and active threat recency.
-
-- **🛠️ Automated Excision Recipes (`remediation.py`)**:
-  - Customized `git filter-repo` commands to rewrite offending tree paths.
-  - Physical disk excision scripts: `git reflog expire --expire=now --all` and `git gc --prune=now --aggressive`.
-
-- **📋 CI/CD Gatekeeper & Exporters (`exporters.py`)**:
-  - Exports standard **SARIF 2.1.0** reports for direct ingestion into GitHub Security Code Scanning and SonarQube.
-  - Exports structured JSON and formatted Markdown audit reports.
-  - `gitghost install-hook`: Installs a `pre-push` protection hook into `.git/hooks/`.
+- **📈 Repo Hygiene Scorecard (`scoring.py`) & Remediation Playbook (`remediation.py`)**:
+  - Computes a 0–100 repository hygiene grade with itemized deductions.
+  - Generates customized `git filter-repo` and `git gc --prune=now --aggressive` excision scripts.
 
 ---
 
 ## 🖥️ Interactive Desktop & Web UI/UX
 
-GitGhost comes equipped with a modern, dark-mode cybersecurity dashboard:
+GitGhost includes a self-contained dark-mode cybersecurity dashboard powered by an asynchronous background job manager:
 
 ```bash
 # Launch native desktop application (Edge WebView2 / PySide6)
@@ -109,11 +109,11 @@ gitghost ui /path/to/repo --port 8765
 ```
 
 ### Dashboard Highlights:
-- **Circular Hygiene Gauge**: Real-time animated SVG gauge showing grade (A+, A, B, C, D, F) and score.
-- **Secrets Inspector**: Interactive table with severity filters, Shannon entropy values, and AI triage verdicts. Clicking any finding displays the redacted context line and commit metadata.
-- **Graveyard Explorer**: Visual explorer of all dangling commits, author details, dates, and unreachable blobs.
-- **One-Click Remediation**: Copy customized `git filter-repo` and `git gc` commands, or safely execute cleanup directly from the UI.
-- **One-Click Exports**: Instant export to SARIF 2.1.0, Markdown, JSON, and pre-push hook installation.
+- **Remote & Local Target Bar**: Paste any GitHub repository URL (`https://github.com/owner/repo`) or local path, with optional in-memory GitHub token support.
+- **Real-Time Asynchronous Progress Polling**: Background scan worker (`POST /api/scan/start` + `GET /api/scan/status`) streams live cloning, object exhumation, and secret scanning progress without browser timeouts.
+- **Syntax-Highlighted Redacted Diff Viewer**: Inspect multi-line unified diffs with highlighted additions (`+`), deletions (`-`), hunk headers (`@@`), and masked credential badges.
+- **Graveyard & Force-Push Explorer**: Browse GitHub force-push/branch-deletion events, inspect full commit diffs, and recover individual deleted files or `.patch` diffs in one click.
+- **One-Click Download Center**: Directly download the full **Recovery Bundle (.ZIP)**, **JSON**, **Markdown**, or **SARIF 2.1.0** reports from the browser.
 
 ---
 
@@ -127,49 +127,33 @@ Test GitGhost in 5 seconds without touching any real repositories:
 gitghost demo
 ```
 
-> **What it does:** Automatically creates an isolated temporary Git sandbox, simulates a developer accidentally committing a `.env` file with live credentials and running `git reset --hard HEAD~1`, runs the full forensics pipeline to unearth the ghost commit, and cleanly disposes of the sandbox.
-
-### Installation
+### Live Forensics Scan (Local & Remote GitHub)
 
 ```bash
-# Clone repository
-git clone https://github.com/your-username/gitghost.git
-cd gitghost
-
-# Install dependencies and package
-pip install -e .
-
-# Or with desktop UI support:
-pip install -e ".[desktop]"
-```
-
-### Live Forensics Scan
-
-```bash
-# Audit current repository with offline heuristic triage
+# Audit local repository with offline heuristic triage
 gitghost scan .
 
-# Audit with Google Gemini or OpenAI AI triage
-export GEMINI_API_KEY="your-gemini-key"
-gitghost scan /path/to/repo -p gemini
+# Audit a remote GitHub repository (smart mirror clone + force-push event analysis)
+gitghost scan https://github.com/owner/repo --github-token ghp_your_token
+
+# Export full Recovery ZIP Bundle (strictly redacted by default)
+gitghost scan https://github.com/owner/repo --recover-zip recovery_bundle.zip
+
+# Export unredacted (raw) files in the Recovery ZIP Bundle when full recovery is needed
+gitghost scan . --recover-zip raw_recovery_bundle.zip --include-raw
 
 # CI/CD mode: fail pipeline if hygiene score < 70 or critical leaks exist
 gitghost scan . --strict --format sarif --output audit_report.sarif
 ```
 
-### Install Pre-Push Protection Hook
+### Install Pre-Push Protection Hook & Safe Cleanup
 
 ```bash
+# Install pre-push hook
 gitghost install-hook .
-```
 
-### Safe History Excision (Purge Unreferenced Objects)
-
-```bash
-# Preview cleanup commands
+# Preview and execute physical purge of unreferenced local objects
 gitghost clean --dry-run
-
-# Execute physical purge
 gitghost clean
 ```
 
@@ -177,12 +161,13 @@ gitghost clean
 
 ## 🔒 Security & Privacy Guarantee
 
-1. **Authorized Local Scans Only**: GitGhost operates strictly on local repository paths provided by the user.
-2. **Never Sends Raw Secrets to AI**: The redaction engine operates **prior** to AI prompt construction. LLMs only ever observe masked placeholders (e.g. `AKIA************MPLE`), guaranteeing zero credentials leak outside your machine.
-3. **Offline by Default**: Works 100% offline using the built-in Heuristic Rule-Engine without requiring any external network access or cloud API keys.
+1. **In-Memory Ephemeral GitHub Token**: Tokens supplied in the UI or CLI are held strictly in memory for API/clone headers, never written to `.git/config`, and automatically scrubbed from all logs and error messages.
+2. **Never Sends Raw Secrets to AI**: The redaction engine runs **prior** to AI prompt construction. LLMs only ever observe masked placeholders (e.g. `AKIA************MPLE`).
+3. **Resource Limits & Guaranteed Cleanup**: Enforces execution timeouts, skips binary or oversized blobs (`>10MB`), and cleans up temporary mirror clones inside `try/finally` blocks.
 
 ---
 
 ## 📄 License
 
 MIT License. See [LICENSE](LICENSE) for full details.
+
