@@ -434,6 +434,19 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             ],
         }
 
+        config_files_payload = [
+            {
+                "file_path": cf.file_path,
+                "file_type": cf.file_type,
+                "commit_hash": cf.commit_hash,
+                "blob_hash": cf.blob_hash,
+                "size": cf.size,
+                "date": cf.date,
+                "author": cf.author,
+            }
+            for cf in getattr(pipeline_res.scan_result, "deleted_config_files", [])
+        ]
+
         return {
             "repo_path": pipeline_res.repo_path,
             "is_remote": pipeline_res.is_remote,
@@ -441,6 +454,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             "total_objects_scanned": pipeline_res.scan_result.total_objects_scanned,
             "dangling_commits": commits_payload,
             "dangling_blobs": blobs_payload,
+            "deleted_config_files": config_files_payload,
             "history_events": history_events_payload,
             "findings": findings_payload,
             "hygiene_score": hygiene_payload,

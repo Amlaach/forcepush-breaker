@@ -900,6 +900,12 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
         Remediation Playbook
       </button>
+
+      <button class="tab-btn" onclick="switchTab('timemachine')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        .env Time-Machine
+        <span id="tabCountTimeMachine" class="tab-pill">0</span>
+      </button>
     </div>
 
     <!-- TAB 1: Findings Table -->
@@ -1046,6 +1052,44 @@ HTML_PAGE = r"""<!DOCTYPE html>
             Execute Cleanup (Purge Unreachable)
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: .env & Config Time-Machine -->
+    <div id="tabTimeMachine" class="tab-content" style="display: none;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 0.85rem; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <input type="text" id="timeMachineFilter" placeholder="Filter config files..." class="select-input" style="width: 220px;" oninput="filterTimeMachine()">
+          <select id="timeMachineTypeFilter" class="select-input" onchange="filterTimeMachine()">
+            <option value="ALL">All File Types</option>
+            <option value="env">.env files</option>
+            <option value="key">Private Keys (*.pem, *.key)</option>
+            <option value="credential">Credentials & Secrets</option>
+            <option value="terraform">Terraform State (*.tfstate)</option>
+            <option value="config">App Config (*.json, *.yml)</option>
+          </select>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          Historical snapshot indexing of unreferenced and deleted environment assets.
+        </div>
+      </div>
+
+      <div class="card" style="padding: 0; overflow-x: auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>File Name</th>
+              <th>Category</th>
+              <th>Origin Object</th>
+              <th>Author / Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="timeMachineTableBody">
+            <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">Run a scan to exhume deleted configuration files.</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </main>
@@ -1226,6 +1270,8 @@ HTML_PAGE = r"""<!DOCTYPE html>
         'trash': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
         'cpu': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>`,
         'close': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+        'clock': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+        'terminal': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>`,
         'info': `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`
       };
       return icons[name] || icons['info'];
@@ -1370,7 +1416,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
         event.currentTarget.classList.add('active');
       } else if (tabName === 'remediation') {
         document.getElementById('tabRemediation').style.display = 'block';
-        event.currentTarget.classList.add('active');
+        if (event && event.currentTarget) event.currentTarget.classList.add('active');
+      } else if (tabName === 'timemachine') {
+        document.getElementById('tabTimeMachine').style.display = 'block';
+        if (event && event.currentTarget) event.currentTarget.classList.add('active');
       }
     }
 
@@ -1525,6 +1574,115 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
       // 6. Render Remediation
       renderRemediation(data.remediation);
+
+      // 7. Render Config & .env Time-Machine
+      renderTimeMachine(data.deleted_config_files || []);
+    }
+
+    let allConfigFiles = [];
+
+    function renderTimeMachine(configFiles) {
+      allConfigFiles = configFiles || [];
+      const countEl = document.getElementById('tabCountTimeMachine');
+      if (countEl) countEl.innerText = allConfigFiles.length;
+
+      const tbody = document.getElementById('timeMachineTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (!allConfigFiles || allConfigFiles.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--emerald); padding: 2.5rem 1rem;">
+          [OK] No deleted sensitive configuration or environment files detected in unreachable objects.
+        </td></tr>`;
+        return;
+      }
+
+      allConfigFiles.forEach(cf => {
+        const tr = document.createElement('tr');
+        const badgeClass = (cf.file_type === 'env' || cf.file_type === 'key') ? 'badge-critical' :
+                           (cf.file_type === 'credential' ? 'badge-high' : 'badge-medium');
+
+        const originLabel = cf.commit_hash
+          ? `<span class="code-badge" style="color: var(--magenta);">commit ${cf.commit_hash.substring(0, 10)}</span>`
+          : (cf.blob_hash ? `<span class="code-badge" style="color: var(--amber);">blob ${cf.blob_hash.substring(0, 10)}</span>` : '<span class="code-badge">unreachable</span>');
+
+        const authorDate = cf.author
+          ? `<span style="font-size: 0.8rem; color: var(--text-main);">${escapeHtml(cf.author)}</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(cf.date ? cf.date.substring(0, 10) : '')}</span>`
+          : (cf.size ? `<span style="font-size: 0.8rem; color: var(--text-muted);">${cf.size} bytes</span>` : '—');
+
+        const recoverTarget = cf.commit_hash
+          ? { object_type: 'file', commit_hash: cf.commit_hash, file_path: cf.file_path }
+          : { object_type: 'blob', blob_hash: cf.blob_hash };
+
+        tr.innerHTML = `
+          <td style="font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
+            ${getSvg('file', 14)} ${escapeHtml(cf.file_path)}
+          </td>
+          <td><span class="badge ${badgeClass}">${escapeHtml((cf.file_type || 'config').toUpperCase())}</span></td>
+          <td>${originLabel}</td>
+          <td>${authorDate}</td>
+          <td>
+            <button class="btn btn-primary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.3rem;"
+              onclick='recoverArtifact(${JSON.stringify(recoverTarget)})'>
+              ${getSvg('download', 12)} Recover File
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterTimeMachine() {
+      const q = (document.getElementById('timeMachineFilter').value || '').toLowerCase();
+      const typeFilter = document.getElementById('timeMachineTypeFilter').value;
+
+      const filtered = allConfigFiles.filter(cf => {
+        const matchesQuery = cf.file_path.toLowerCase().includes(q) ||
+                             (cf.commit_hash && cf.commit_hash.toLowerCase().includes(q)) ||
+                             (cf.blob_hash && cf.blob_hash.toLowerCase().includes(q));
+        const matchesType = (typeFilter === 'ALL') || (cf.file_type.toLowerCase() === typeFilter.toLowerCase());
+        return matchesQuery && matchesType;
+      });
+
+      const tbody = document.getElementById('timeMachineTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No matching config files found.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(cf => {
+        const tr = document.createElement('tr');
+        const badgeClass = (cf.file_type === 'env' || cf.file_type === 'key') ? 'badge-critical' :
+                           (cf.file_type === 'credential' ? 'badge-high' : 'badge-medium');
+        const originLabel = cf.commit_hash
+          ? `<span class="code-badge" style="color: var(--magenta);">commit ${cf.commit_hash.substring(0, 10)}</span>`
+          : (cf.blob_hash ? `<span class="code-badge" style="color: var(--amber);">blob ${cf.blob_hash.substring(0, 10)}</span>` : '<span class="code-badge">unreachable</span>');
+        const authorDate = cf.author
+          ? `<span style="font-size: 0.8rem; color: var(--text-main);">${escapeHtml(cf.author)}</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(cf.date ? cf.date.substring(0, 10) : '')}</span>`
+          : (cf.size ? `<span style="font-size: 0.8rem; color: var(--text-muted);">${cf.size} bytes</span>` : '—');
+        const recoverTarget = cf.commit_hash
+          ? { object_type: 'file', commit_hash: cf.commit_hash, file_path: cf.file_path }
+          : { object_type: 'blob', blob_hash: cf.blob_hash };
+
+        tr.innerHTML = `
+          <td style="font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
+            ${getSvg('file', 14)} ${escapeHtml(cf.file_path)}
+          </td>
+          <td><span class="badge ${badgeClass}">${escapeHtml((cf.file_type || 'config').toUpperCase())}</span></td>
+          <td>${originLabel}</td>
+          <td>${authorDate}</td>
+          <td>
+            <button class="btn btn-primary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.3rem;"
+              onclick='recoverArtifact(${JSON.stringify(recoverTarget)})'>
+              ${getSvg('download', 12)} Recover File
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
     }
 
     function renderFindingsTable(findings) {
