@@ -328,6 +328,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 "masked_value": f.masked_value,
                 "line_number": f.line_number,
                 "context_line": f.context_line,
+                "diff_hunk": f.diff_hunk or f.context_line,
                 "entropy": round(f.entropy, 2),
                 "file_path": f.file_path,
                 "commit_hash": f.commit_hash,
@@ -344,8 +345,9 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 "commit_hash": c.commit_hash,
                 "author": c.author,
                 "date": c.date,
-                "message": c.message,
+                "message": c.redacted_message or c.message,
                 "changed_files": c.changed_files,
+                "redacted_diff": c.redacted_diff,
             }
             for c in pipeline_res.scan_result.dangling_commits
         ]
@@ -356,8 +358,23 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 "size": b.size,
                 "is_binary": b.is_binary,
                 "associated_path": b.associated_path,
+                "redacted_content": b.redacted_content if not b.is_binary else "[Binary blob data]",
             }
             for b in pipeline_res.scan_result.dangling_blobs
+        ]
+
+        history_events_payload = [
+            {
+                "event_id": ev.event_id,
+                "event_type": ev.event_type,
+                "ref": ev.ref,
+                "before_sha": ev.before_sha,
+                "after_sha": ev.after_sha,
+                "actor": ev.actor,
+                "created_at": ev.created_at,
+                "description": ev.description,
+            }
+            for ev in pipeline_res.history_events
         ]
 
         hygiene_payload = {
@@ -398,6 +415,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             "total_objects_scanned": pipeline_res.scan_result.total_objects_scanned,
             "dangling_commits": commits_payload,
             "dangling_blobs": blobs_payload,
+            "history_events": history_events_payload,
             "findings": findings_payload,
             "hygiene_score": hygiene_payload,
             "remediation": remediation_payload,
