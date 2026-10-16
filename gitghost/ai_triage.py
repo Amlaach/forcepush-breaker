@@ -27,9 +27,16 @@ class AITriageResult:
 
 
 class AITriage:
-    def __init__(self, provider: str = "auto", model: Optional[str] = None, timeout_seconds: int = 15):
+    def __init__(
+        self,
+        provider: str = "auto",
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        timeout_seconds: int = 15,
+    ):
         self.provider = provider.lower()
         self.model = model
+        self.api_key = (api_key or "").strip() or None
         self.timeout = timeout_seconds
 
     def triage_finding(
@@ -47,14 +54,21 @@ class AITriage:
             elif active_provider == "anthropic": return self._call_anthropic(prompt)
             elif active_provider == "ollama": return self._call_ollama(prompt)
         except Exception as e:
+            raw_err = str(e)
+            if self.api_key:
+                raw_err = raw_err.replace(self.api_key, "[REDACTED_API_KEY]")
             heuristic = self._heuristic_triage(finding_rule, masked_snippet, context_line, commit_message, file_path)
-            heuristic.technical_explanation += f" (Note: {active_provider} fallback: {str(e)[:50]})"
+            heuristic.technical_explanation += f" (Note: {active_provider} fallback: {raw_err[:50]})"
             return heuristic
 
         return self._heuristic_triage(finding_rule, masked_snippet, context_line, commit_message, file_path)
 
     def _resolve_provider(self) -> str:
         if self.provider != "auto": return self.provider
+        if self.api_key:
+            if self.api_key.startswith("sk-ant-"): return "anthropic"
+            if self.api_key.startswith("AIzaSy"): return "gemini"
+            if self.api_key.startswith("sk-"): return "openai"
         if os.getenv("GEMINI_API_KEY"): return "gemini"
         if os.getenv("OPENAI_API_KEY"): return "openai"
         if os.getenv("ANTHROPIC_API_KEY"): return "anthropic"
@@ -89,7 +103,7 @@ Return ONLY a valid JSON object matching this schema:
 }}"""
 
     def _call_openai(self, prompt: str) -> AITriageResult:
-        api_key = os.getenv("OPENAI_API_KEY", "")
+        api_key = self.api_key or os.getenv("OPENAI_API_KEY", "")
         model = self.model or "gpt-4o-mini"
         url = "https://api.openai.com/v1/chat/completions"
         payload = {
@@ -110,7 +124,7 @@ Return ONLY a valid JSON object matching this schema:
             return self._build_result_from_dict(parsed, f"OpenAI ({model})")
 
     def _call_anthropic(self, prompt: str) -> AITriageResult:
-        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        api_key = self.api_key or os.getenv("ANTHROPIC_API_KEY", "")
         model = self.model or "claude-3-5-sonnet-20241022"
         url = "https://api.anthropic.com/v1/messages"
         payload = {"model": model, "max_tokens": 512, "temperature": 0.1, "messages": [{"role": "user", "content": prompt}]}
@@ -122,7 +136,7 @@ Return ONLY a valid JSON object matching this schema:
             return self._build_result_from_dict(parsed, f"Anthropic ({model})")
 
     def _call_gemini(self, prompt: str) -> AITriageResult:
-        api_key = os.getenv("GEMINI_API_KEY", "")
+        api_key = self.api_key or os.getenv("GEMINI_API_KEY", "")
         model = self.model or "gemini-1.5-flash"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"responseMimeType": "application/json"}}

@@ -122,6 +122,7 @@ class PipelineResult:
 def run_scan_pipeline(
     repo_path: str | Path = ".",
     ai_provider: str = "none",
+    ai_api_key: Optional[str] = None,
     model: Optional[str] = None,
     entropy_threshold: float = SecretRedactor.ENTROPY_THRESHOLD,
     github_token: Optional[str] = None,
@@ -264,11 +265,13 @@ def run_scan_pipeline(
 
         triage_map: Dict[str, AITriageResult] = {}
         effective_provider = (ai_provider or "none").lower()
+        if effective_provider == "none" and ai_api_key:
+            effective_provider = "auto"
 
         if effective_provider != "none" and findings:
             if on_phase:
                 on_phase("Performing AI context triage on redacted findings...", 85)
-            triage_engine = AITriage(provider=effective_provider, model=model)
+            triage_engine = AITriage(provider=effective_provider, model=model, api_key=ai_api_key)
             for f in findings:
                 matched_commit = next(
                     (c for c in scan_result.dangling_commits if c.commit_hash == f.commit_hash),
