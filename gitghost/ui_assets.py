@@ -1287,21 +1287,37 @@ HTML_PAGE = r"""<!DOCTYPE html>
       if (!commits || commits.length === 0) {
         commitList.innerHTML = '<div style="color: var(--emerald); font-size: 0.85rem; text-align: center; padding: 2rem;">No dangling commits!</div>';
       } else {
-        commits.forEach(c => {
+        commits.forEach((c, idx) => {
           const item = document.createElement('div');
           item.style.background = 'var(--bg-card)';
           item.style.border = '1px solid var(--border)';
           item.style.borderRadius = '8px';
           item.style.padding = '0.75rem 1rem';
+          const fileButtonsHtml = (c.changed_files || []).slice(0, 6).map(fp => `
+            <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;"
+              onclick='recoverArtifact(${JSON.stringify({object_type: "file", commit_hash: c.commit_hash, file_path: fp})})'
+              title="Recover & download ${escapeHtml(fp)}">
+              📄 ${escapeHtml(fp)}
+            </button>
+          `).join('');
           item.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <span class="code-badge" style="color: var(--magenta);">commit ${c.commit_hash.substring(0, 10)}</span>
               <span style="font-size: 0.75rem; color: var(--text-muted);">${c.date ? c.date.substring(0, 10) : ''}</span>
             </div>
-            <div style="font-size: 0.85rem; font-weight: 600; margin: 0.35rem 0;">"${c.message ? c.message.split('\n')[0] : 'No message'}"</div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted);">
-              <span>Author: ${c.author || 'Unknown'}</span>
+            <div style="font-size: 0.85rem; font-weight: 600; margin: 0.35rem 0;">"${escapeHtml(c.message ? c.message.split('\n')[0] : 'No message')}"</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+              <span>Author: ${escapeHtml(c.author || 'Unknown')}</span>
               <span>${c.changed_files ? c.changed_files.length : 0} file(s) changed</span>
+            </div>
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; border-color: rgba(236, 72, 153, 0.4); color: #f9a8d4;" onclick="openCommitDiffModal(${idx})">
+                🔍 Inspect Diff
+              </button>
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem;" onclick='recoverArtifact(${JSON.stringify({object_type: "diff", commit_hash: c.commit_hash})})'>
+                ⬇️ Patch (.patch)
+              </button>
+              ${fileButtonsHtml}
             </div>
           `;
           commitList.appendChild(item);
@@ -1315,7 +1331,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       if (!blobs || blobs.length === 0) {
         blobList.innerHTML = '<div style="color: var(--emerald); font-size: 0.85rem; text-align: center; padding: 2rem;">No dangling blobs!</div>';
       } else {
-        blobs.forEach(b => {
+        blobs.forEach((b, idx) => {
           const item = document.createElement('div');
           item.style.background = 'var(--bg-card)';
           item.style.border = '1px solid var(--border)';
@@ -1326,8 +1342,16 @@ HTML_PAGE = r"""<!DOCTYPE html>
               <span class="code-badge" style="color: var(--amber);">${b.blob_hash.substring(0, 10)}</span>
               <span style="font-size: 0.75rem; color: var(--text-muted);">${b.size} bytes</span>
             </div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.35rem;">
-              Path: ${b.associated_path || 'Detached Unlinked Blob'}
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin: 0.35rem 0 0.5rem;">
+              Path: ${escapeHtml(b.associated_path || 'Detached Unlinked Blob')}
+            </div>
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem;" onclick="openBlobModal(${idx})">
+                🔍 Inspect Content
+              </button>
+              <button class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.72rem;" onclick='recoverArtifact(${JSON.stringify({object_type: "blob", blob_hash: b.blob_hash})})'>
+                ⬇️ Recover Blob
+              </button>
             </div>
           `;
           blobList.appendChild(item);
@@ -1495,6 +1519,89 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
     function closeModal() {
       document.getElementById('detailModal').style.display = 'none';
+    }
+
+    function openCommitDiffModal(commitIdx) {
+      if (!currentAuditData || !currentAuditData.dangling_commits) return;
+      const c = currentAuditData.dangling_commits[commitIdx];
+      if (!c) return;
+      document.getElementById('modalTitle').innerText = `Dangling Commit ${c.commit_hash.substring(0, 10)}`;
+      document.getElementById('modalSubtitle').innerText = `Author: ${c.author || 'Unknown'} | Date: ${c.date || ''}`;
+      document.getElementById('modalTriageMeta').style.display = 'none';
+      document.getElementById('modalCodeView').innerHTML = renderDiffViewHtml(c.redacted_diff || c.message || 'No diff content.');
+
+      activeModalRecoveryTarget = {
+        object_type: 'diff',
+        commit_hash: c.commit_hash
+      };
+      document.getElementById('modalRecoverBtn').style.display = 'inline-flex';
+      document.getElementById('detailModal').style.display = 'flex';
+    }
+
+    function openBlobModal(blobIdx) {
+      if (!currentAuditData || !currentAuditData.dangling_blobs) return;
+      const b = currentAuditData.dangling_blobs[blobIdx];
+      if (!b) return;
+      document.getElementById('modalTitle').innerText = `Dangling Blob ${b.blob_hash.substring(0, 10)}`;
+      document.getElementById('modalSubtitle').innerText = `Path: ${b.associated_path || 'Detached Blob'} | Size: ${b.size} bytes`;
+      document.getElementById('modalTriageMeta').style.display = 'none';
+      document.getElementById('modalCodeView').innerHTML = renderDiffViewHtml(b.redacted_content || '[Empty blob]');
+
+      activeModalRecoveryTarget = {
+        object_type: 'blob',
+        blob_hash: b.blob_hash
+      };
+      document.getElementById('modalRecoverBtn').style.display = 'inline-flex';
+      document.getElementById('detailModal').style.display = 'flex';
+    }
+
+    function recoverFromActiveModal() {
+      if (activeModalRecoveryTarget) {
+        recoverArtifact(activeModalRecoveryTarget);
+      }
+    }
+
+    async function recoverArtifact(opts) {
+      const repoPath = document.getElementById('repoPathInput').value.trim() || '.';
+      const rawToggle = document.getElementById('includeRawToggle');
+      const includeRaw = rawToggle ? rawToggle.checked : false;
+
+      if (includeRaw) {
+        const proceed = confirm('⚠️ Unredacted (Raw) Recovery Mode is enabled.\nThe downloaded file will contain unmasked secrets if present.\n\nProceed with raw recovery?');
+        if (!proceed) return;
+      }
+
+      try {
+        const res = await fetch('/api/recover/file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            repo_path: repoPath,
+            object_type: opts.object_type || 'commit',
+            commit_hash: opts.commit_hash || '',
+            blob_hash: opts.blob_hash || '',
+            file_path: opts.file_path || '',
+            include_raw: includeRaw
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          alert('Recovery Error: ' + (data.error || res.statusText));
+          return;
+        }
+        const blob = new Blob([data.content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = data.filename || 'recovered_artifact.txt';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast(`Recovered ${data.filename} (${data.is_redacted ? 'Redacted' : 'Raw'})`, '⬇️');
+      } catch (err) {
+        alert('Error recovering artifact: ' + err.message);
+      }
     }
 
     // Pre-push hook installer
