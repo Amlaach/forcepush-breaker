@@ -138,6 +138,8 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._send_html(HTML_PAGE)
         elif self.path == "/api/status":
             self._send_json({"status": "ok", "version": __version__, "app": "GitGhost"})
+        elif self.path.startswith("/api/scan/status"):
+            self._handle_scan_status()
         else:
             self._send_error(404, "Not Found")
 
@@ -152,6 +154,8 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
 
         if self.path == "/api/browse":
             self._handle_browse()
+        elif self.path == "/api/scan/start":
+            self._handle_scan_start(data)
         elif self.path == "/api/scan":
             self._handle_scan(data)
         elif self.path == "/api/cleanup":
@@ -214,36 +218,105 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
 
         self._send_json({"folder": folder or ""})
 
-    def _handle_scan(self, data: dict):
+    def _validate_target_or_error(self, repo_path_str: str) -> Optional[str]:
         if not shutil.which("git"):
             self._send_error(500, "Git executable not found in system PATH. Git is required to perform forensics.")
-            return
-
-        repo_path_str = data.get("repo_path", ".").strip() or "."
+            return None
+        if is_github_target(repo_path_str):
+            return repo_path_str
         repo_path = Path(repo_path_str).resolve()
-
         if not repo_path.exists():
             self._send_error(400, f"Path does not exist: {repo_path}")
-            return
-
+            return None
         forensics = GitForensics(repo_path)
         if not forensics.is_valid_repo():
             self._send_error(400, f"'{repo_path}' is not a valid Git repository (.git directory missing).")
+            return None
+        return str(repo_path)
+
+    def _handle_scan_start(self, data: dict):
+        repo_path_str = (data.get("repo_path") or ".").strip() or "."
+        validated = self._validate_target_or_error(repo_path_str)
+        if validated is None:
             return
 
         ai_provider = data.get("ai_provider", "heuristic")
         entropy_thresh = float(data.get("entropy_threshold", 4.0))
+        github_token = data.get("github_token")
+        clone_override = data.get("clone_source_override")
 
-        # Run unified full scan pipeline
-        pipeline_res = run_scan_pipeline(
-            repo_path=repo_path,
+        job = ScanJobManager.start_job(
+            repo_target=validated,
             ai_provider=ai_provider,
             entropy_threshold=entropy_thresh,
+            github_token=github_token,
+            clone_source_override=clone_override,
         )
+        self._send_json({
+            "job_id": job.job_id,
+            "status": job.status,
+            "progress_pct": job.progress_pct,
+            "phase_message": job.phase_message,
+        })
 
-        # Cache result in memory for seamless export
-        _SCAN_CACHE[str(repo_path)] = pipeline_res
+    def _handle_scan_status(self):
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        job_id = (params.get("job_id") or [""])[0].strip()
+        if not job_id:
+            self._send_error(400, "Missing required query parameter: job_id")
+            return
 
+        job = ScanJobManager.get_job(job_id)
+        if job is None:
+            self._send_error(404, f"Scan job not found: {job_id}")
+            return
+
+        resp: Dict[str, Any] = {
+            "job_id": job.job_id,
+            "repo_target": job.repo_target,
+            "status": job.status,
+            "progress_pct": job.progress_pct,
+            "phase_message": job.phase_message,
+            "scanned_objects": job.scanned_objects,
+            "total_objects": job.total_objects,
+            "error": job.error,
+        }
+        if job.status == "completed" and job.result is not None:
+            resp["result"] = self._serialize_pipeline_result(job.result)
+        self._send_json(resp)
+
+    def _handle_scan(self, data: dict):
+        repo_path_str = (data.get("repo_path") or ".").strip() or "."
+        validated = self._validate_target_or_error(repo_path_str)
+        if validated is None:
+            return
+
+        ai_provider = data.get("ai_provider", "heuristic")
+        entropy_thresh = float(data.get("entropy_threshold", 4.0))
+        github_token = data.get("github_token")
+        clone_override = data.get("clone_source_override")
+
+        try:
+            pipeline_res = run_scan_pipeline(
+                repo_path=validated,
+                ai_provider=ai_provider,
+                entropy_threshold=entropy_thresh,
+                github_token=github_token,
+                clone_source_override=clone_override,
+            )
+        except Exception as exc:
+            self._send_error(500, sanitize_token_in_text(str(exc), github_token))
+            return
+
+        with _CACHE_LOCK:
+            _SCAN_CACHE[pipeline_res.repo_path] = pipeline_res
+            _SCAN_CACHE[validated] = pipeline_res
+            _SCAN_CACHE["__latest__"] = pipeline_res
+
+        self._send_json(self._serialize_pipeline_result(pipeline_res))
+
+    def _serialize_pipeline_result(self, pipeline_res: PipelineResult) -> dict:
         # Format response payload
         findings_payload = []
         for f in pipeline_res.findings:
@@ -318,15 +391,17 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             ],
         }
 
-        self._send_json({
-            "repo_path": str(repo_path),
+        return {
+            "repo_path": pipeline_res.repo_path,
+            "is_remote": pipeline_res.is_remote,
+            "remote_url": pipeline_res.remote_url,
             "total_objects_scanned": pipeline_res.scan_result.total_objects_scanned,
             "dangling_commits": commits_payload,
             "dangling_blobs": blobs_payload,
             "findings": findings_payload,
             "hygiene_score": hygiene_payload,
             "remediation": remediation_payload,
-        })
+        }
 
     def _handle_cleanup(self, data: dict):
         repo_path_str = data.get("repo_path", ".").strip() or "."
