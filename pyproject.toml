@@ -30,6 +30,8 @@ all = [
 ]
 
 [project.scripts]
+unforce = "gitghost.cli:app"
+forcepush-breaker = "gitghost.cli:app"
 gitghost = "gitghost.cli:app"
 
 [tool.setuptools.packages.find]
