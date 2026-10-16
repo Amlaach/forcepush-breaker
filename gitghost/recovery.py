@@ -8,12 +8,15 @@ while allowing explicit unredacted recovery (include_raw=True) when authorized b
 
 from __future__ import annotations
 
+import io
 import re
 import subprocess
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
+from gitghost.exporters import ReportExporter
 from gitghost.git_forensics import DanglingBlob, DanglingCommit, GitForensics
 from gitghost.pipeline import PipelineResult
 from gitghost.redactor import SecretRedactor
@@ -217,3 +220,68 @@ class ObjectRecoveryEngine:
         if extracted:
             return "\n".join(extracted) + "\n"
         return diff_content
+
+    @classmethod
+    def build_recovery_zip_bundle(
+        cls,
+        pipeline_res: PipelineResult,
+        include_raw: bool = False,
+    ) -> bytes:
+        """Generates an in-memory ZIP archive with reports, commit patches, and recovered files."""
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            # 1. Reports (always strictly redacted)
+            md_report = ReportExporter.to_markdown(
+                pipeline_res.scan_result,
+                pipeline_res.findings,
+                pipeline_res.triage_map,
+                pipeline_res.hygiene,
+                pipeline_res.remediation,
+            )
+            json_report = ReportExporter.to_json(
+                pipeline_res.scan_result,
+                pipeline_res.findings,
+                pipeline_res.triage_map,
+                pipeline_res.hygiene,
+                pipeline_res.remediation,
+            )
+            sarif_report = ReportExporter.to_sarif(
+                pipeline_res.scan_result,
+                pipeline_res.findings,
+                pipeline_res.triage_map,
+            )
+            zf.writestr("reports/gitghost_audit_report.md", md_report)
+            zf.writestr("reports/gitghost_audit_report.json", json_report)
+            zf.writestr("reports/gitghost_audit_report.sarif", sarif_report)
+
+            # 2. Dangling commit patches & recovered files
+            for commit in pipeline_res.scan_result.dangling_commits:
+                diff_art = cls.recover_commit_diff(
+                    pipeline_res, commit.commit_hash, include_raw=include_raw
+                )
+                zf.writestr(f"commits/{diff_art.filename}", diff_art.content)
+
+                for fpath in commit.changed_files[:25]:
+                    try:
+                        file_art = cls.recover_commit_file(
+                            pipeline_res,
+                            commit.commit_hash,
+                            file_path=fpath,
+                            include_raw=include_raw,
+                        )
+                        zf.writestr(f"recovered_files/{file_art.filename}", file_art.content)
+                    except Exception:
+                        pass
+
+            # 3. Detached non-binary blobs
+            for blob in pipeline_res.scan_result.dangling_blobs[:50]:
+                if not blob.is_binary:
+                    try:
+                        blob_art = cls.recover_blob(
+                            pipeline_res, blob.blob_hash, include_raw=include_raw
+                        )
+                        zf.writestr(f"recovered_blobs/{blob_art.filename}", blob_art.content)
+                    except Exception:
+                        pass
+
+        return buf.getvalue()
