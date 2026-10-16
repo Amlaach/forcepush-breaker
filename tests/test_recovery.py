@@ -110,7 +110,7 @@ class TestObjectRecoveryEngine:
         assert raw_blob.is_redacted is False
         assert "1234567890123-abcdef" in raw_blob.content
 
-    def test_build_recovery_zip_bundle(self, sample_pipeline_result: PipelineResult):
+    def test_build_recovery_zip_bundle_redacted(self, sample_pipeline_result: PipelineResult):
         zip_bytes = ObjectRecoveryEngine.build_recovery_zip_bundle(
             sample_pipeline_result, include_raw=False
         )
@@ -119,6 +119,8 @@ class TestObjectRecoveryEngine:
             assert "reports/gitghost_audit_report.md" in names
             assert "reports/gitghost_audit_report.json" in names
             assert "reports/gitghost_audit_report.sarif" in names
+            assert "reports/forcepush_breaker_audit_report.json" in names
+            assert "UNREDACTED_SECURITY_WARNING.txt" not in names
             assert any(n.startswith("commits/") for n in names)
             assert any(n.startswith("recovered_files/") for n in names)
             assert any(n.startswith("recovered_blobs/") for n in names)
@@ -126,3 +128,24 @@ class TestObjectRecoveryEngine:
             for name in names:
                 text = zf.read(name).decode("utf-8")
                 assert "AKIAIOSFODNN7EXAMPLE" not in text
+
+    def test_build_recovery_zip_bundle_raw_mode(self, sample_pipeline_result: PipelineResult):
+        zip_bytes = ObjectRecoveryEngine.build_recovery_zip_bundle(
+            sample_pipeline_result, include_raw=True
+        )
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            names = zf.namelist()
+            assert "UNREDACTED_SECURITY_WARNING.txt" in names
+            warning_text = zf.read("UNREDACTED_SECURITY_WARNING.txt").decode("utf-8")
+            assert "SECURITY WARNING: UNREDACTED (RAW) RECOVERY BUNDLE" in warning_text
+
+            # Reports remain redacted, but recovered files and patches contain raw secrets
+            assert "reports/gitghost_audit_report.json" in names
+            report_text = zf.read("reports/gitghost_audit_report.json").decode("utf-8")
+            assert "AKIAIOSFODNN7EXAMPLE" not in report_text
+
+            # At least one recovered file or patch contains the raw unredacted secret
+            raw_file = next(n for n in names if n.startswith("recovered_files/") and "raw" in n)
+            content = zf.read(raw_file).decode("utf-8")
+            assert "AKIAIOSFODNN7EXAMPLE" in content
+

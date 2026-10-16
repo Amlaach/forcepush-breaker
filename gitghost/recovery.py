@@ -253,6 +253,25 @@ class ObjectRecoveryEngine:
             zf.writestr("reports/gitghost_audit_report.md", md_report)
             zf.writestr("reports/gitghost_audit_report.json", json_report)
             zf.writestr("reports/gitghost_audit_report.sarif", sarif_report)
+            zf.writestr("reports/forcepush_breaker_audit_report.md", md_report)
+            zf.writestr("reports/forcepush_breaker_audit_report.json", json_report)
+            zf.writestr("reports/forcepush_breaker_audit_report.sarif", sarif_report)
+
+            if include_raw:
+                warning_notice = (
+                    "====================================================================\n"
+                    "SECURITY WARNING: UNREDACTED (RAW) RECOVERY BUNDLE\n"
+                    "====================================================================\n\n"
+                    "This recovery bundle was generated with include_raw=True.\n"
+                    "The recovered files, patches, and detached blobs in this archive\n"
+                    "contain UNMASKED secrets and credentials recovered from overwritten Git history.\n\n"
+                    "OPERATIONAL SAFETY GUIDELINES:\n"
+                    "1. Store this archive in a secure, encrypted location.\n"
+                    "2. Rotate all exposed credentials immediately.\n"
+                    "3. Do NOT commit or push recovered files to public repositories.\n"
+                    "4. Permanently delete this bundle once secret rotation is complete.\n"
+                )
+                zf.writestr("UNREDACTED_SECURITY_WARNING.txt", warning_notice)
 
             # 2. Dangling commit patches & recovered files
             for commit in pipeline_res.scan_result.dangling_commits:
