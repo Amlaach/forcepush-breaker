@@ -19,7 +19,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
-from gitghost.git_forensics import DanglingCommit
+from gitghost.git_forensics import DanglingCommit, detect_ai_agent
 
 _HTTPS_GITHUB_RE = re.compile(
     r"^https?://(?:www\.)?github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$"
@@ -338,6 +338,13 @@ class GitHubAPIForensicsClient:
                         )
                         accumulated_bytes += patch_bytes
 
+            diff_text = "\n".join(diff_chunks)
+            ai_attribution = detect_ai_agent(
+                author=author_str,
+                message=message,
+                diff_content=diff_text,
+            )
+
             return DanglingCommit(
                 commit_hash=full_sha,
                 author=author_str,
@@ -345,8 +352,9 @@ class GitHubAPIForensicsClient:
                 message=message,
                 parents=parents,
                 changed_files=changed_files,
-                diff_content="\n".join(diff_chunks),
+                diff_content=diff_text,
                 is_dangling=True,
+                ai_agent=ai_attribution,
             )
         except Exception:
             return None
