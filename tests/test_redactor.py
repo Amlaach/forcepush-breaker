@@ -131,3 +131,23 @@ class TestSecretRedactor:
         # Entropy should be calculated accurately from data, not hardcoded to fixed 5.0
         assert pk_finding.entropy != 5.0
         assert pk_finding.entropy > 4.5
+
+    def test_multiline_redacted_diff_hunk_generation(self, redactor):
+        raw_secret = "ghp_AbCdEf1234567890AbCdEf1234567890AbCd"
+        diff_text = (
+            "@@ -10,4 +10,5 @@\n"
+            " import os\n"
+            "-TOKEN = None\n"
+            f"+TOKEN = '{raw_secret}'\n"
+            " def connect():\n"
+            "     return True\n"
+        )
+        result = redactor.scan_and_redact(diff_text, file_path="client.py")
+        assert len(result.findings) >= 1
+        f = result.findings[0]
+        assert f.diff_hunk != ""
+        assert "@@ -10,4 +10,5 @@" in f.diff_hunk
+        assert "-TOKEN = None" in f.diff_hunk
+        assert "def connect():" in f.diff_hunk
+        assert raw_secret not in f.diff_hunk
+
