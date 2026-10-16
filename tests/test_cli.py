@@ -48,3 +48,38 @@ class TestCliCommands:
         result = runner.invoke(app, ["scan", "/non/existent/path/123456"])
         assert result.exit_code == 1
         assert "Target path does not exist" in result.output
+
+    def test_scan_with_recover_zip_bundle(self, tmp_path: Path):
+        import zipfile
+
+        info = DemoBuilder.create_demo_repository()
+        zip_out = tmp_path / "recovery_bundle.zip"
+        try:
+            result = runner.invoke(
+                app,
+                ["scan", str(info.repo_path), "--no-ai", "--recover-zip", str(zip_out)],
+            )
+            assert result.exit_code == 0
+            assert zip_out.exists()
+            with zipfile.ZipFile(zip_out, "r") as zf:
+                names = zf.namelist()
+                assert "reports/gitghost_audit_report.json" in names
+                assert any(n.startswith("commits/") for n in names)
+        finally:
+            DemoBuilder.cleanup(info.repo_path)
+
+    def test_scan_remote_url_token_sanitized_on_error(self, monkeypatch):
+        fake_token = "ghp_SuperSecretTokenValue999999"
+
+        def _failing_pipeline(**kwargs):
+            raise RuntimeError(f"Clone failed for https://{fake_token}@github.com/octocat/Hello-World.git")
+
+        monkeypatch.setattr("gitghost.cli.run_scan_pipeline", _failing_pipeline)
+        result = runner.invoke(
+            app,
+            ["scan", "https://github.com/octocat/Hello-World", "--github-token", fake_token],
+        )
+        assert result.exit_code == 1
+        assert fake_token not in result.output
+        assert "[REDACTED_GITHUB_TOKEN]" in result.output
+
