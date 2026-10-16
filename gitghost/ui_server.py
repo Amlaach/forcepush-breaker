@@ -142,6 +142,8 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._handle_scan_status()
         elif self.path.startswith("/api/download/report"):
             self._handle_download_report_get()
+        elif self.path.startswith("/api/download/bundle"):
+            self._handle_download_bundle_get()
         else:
             self._send_error(404, "Not Found")
 
@@ -166,6 +168,10 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._handle_export(data)
         elif self.path == "/api/download/report":
             self._handle_download_report(data)
+        elif self.path == "/api/download/bundle":
+            self._handle_download_bundle(data)
+        elif self.path == "/api/recover/file":
+            self._handle_recover_file(data)
         elif self.path == "/api/hook":
             self._handle_hook(data)
         else:
@@ -529,6 +535,89 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             return
         content, filename, content_type = self._build_report_payload(pipeline_res, fmt)
         self._send_download(content.encode("utf-8"), filename, content_type)
+
+    def _handle_download_bundle_get(self):
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        repo_path_str = (params.get("repo_path") or [""])[0]
+        raw_param = (params.get("include_raw") or ["false"])[0].lower()
+        include_raw = raw_param in ("1", "true", "yes")
+        self._handle_download_bundle({"repo_path": repo_path_str, "include_raw": include_raw})
+
+    def _handle_download_bundle(self, data: dict):
+        repo_path_str = (data.get("repo_path") or "").strip()
+        include_raw = bool(data.get("include_raw", False))
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+        try:
+            zip_bytes = ObjectRecoveryEngine.build_recovery_zip_bundle(
+                pipeline_res, include_raw=include_raw
+            )
+            filename = (
+                "gitghost_recovery_bundle_raw.zip"
+                if include_raw
+                else "gitghost_recovery_bundle.zip"
+            )
+            self._send_download(zip_bytes, filename, "application/zip")
+        except Exception as exc:
+            self._send_error(500, f"Failed to build recovery bundle: {exc}")
+
+    def _handle_recover_file(self, data: dict):
+        repo_path_str = (data.get("repo_path") or "").strip()
+        include_raw = bool(data.get("include_raw", False))
+        object_type = (data.get("object_type") or "").strip().lower()
+        commit_hash = (data.get("commit_hash") or "").strip()
+        blob_hash = (data.get("blob_hash") or "").strip()
+        file_path = (data.get("file_path") or "").strip()
+
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+
+        try:
+            if object_type == "blob" or (blob_hash and not commit_hash):
+                artifact = ObjectRecoveryEngine.recover_blob(
+                    pipeline_res, blob_hash, include_raw=include_raw
+                )
+            elif object_type == "diff" or (commit_hash and not file_path and object_type != "file"):
+                artifact = ObjectRecoveryEngine.recover_commit_diff(
+                    pipeline_res, commit_hash, include_raw=include_raw
+                )
+            elif commit_hash:
+                artifact = ObjectRecoveryEngine.recover_commit_file(
+                    pipeline_res,
+                    commit_hash,
+                    file_path=file_path or None,
+                    include_raw=include_raw,
+                )
+            else:
+                self._send_error(400, "Must provide commit_hash or blob_hash for recovery.")
+                return
+        except ValueError as ve:
+            self._send_error(404, str(ve))
+            return
+        except Exception as exc:
+            self._send_error(500, f"Recovery failed: {exc}")
+            return
+
+        if data.get("download"):
+            self._send_download(
+                artifact.content.encode("utf-8"),
+                artifact.filename,
+                "text/plain; charset=utf-8",
+            )
+            return
+
+        self._send_json({
+            "success": True,
+            "filename": artifact.filename,
+            "content": artifact.content,
+            "is_redacted": artifact.is_redacted,
+            "source_type": artifact.source_type,
+            "object_hash": artifact.object_hash,
+            "file_path": artifact.file_path,
+        })
 
     def _handle_export(self, data: dict):
         repo_path_str = (data.get("repo_path") or ".").strip() or "."
