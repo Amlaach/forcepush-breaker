@@ -141,6 +141,7 @@ def run_scan_pipeline(
             file_path="[Commit Message]",
             commit_hash=commit.commit_hash,
         )
+        commit.redacted_message = msg_res.redacted_text
         findings.extend(msg_res.findings)
 
         primary_file = commit.changed_files[0] if commit.changed_files else "Diff"
@@ -150,6 +151,7 @@ def run_scan_pipeline(
             fallback_file=primary_file,
             commit_hash=commit.commit_hash,
         )
+        commit.redacted_diff = diff_res.redacted_text
         findings.extend(diff_res.findings)
 
         scanned_counter += 1
@@ -157,14 +159,17 @@ def run_scan_pipeline(
             on_item_scanned(scanned_counter, total_items)
 
     for blob in scan_result.dangling_blobs:
-        if not blob.is_binary:
+        if not blob.is_binary and blob.size <= GitForensics.MAX_TEXT_SCAN_BYTES:
             blob_path = blob.associated_path or "Detached Blob"
             blob_res: RedactionResult = redactor.scan_and_redact(
                 blob.content,
                 file_path=blob_path,
                 blob_hash=blob.blob_hash,
             )
+            blob.redacted_content = blob_res.redacted_text
             findings.extend(blob_res.findings)
+        else:
+            blob.redacted_content = blob.content
 
         scanned_counter += 1
         if on_item_scanned:

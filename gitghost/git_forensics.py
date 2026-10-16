@@ -27,6 +27,8 @@ class DanglingCommit:
     parents: List[str] = field(default_factory=list)
     changed_files: List[str] = field(default_factory=list)
     diff_content: str = ""
+    redacted_diff: str = ""
+    redacted_message: str = ""
     is_dangling: bool = True
 
 
@@ -35,6 +37,7 @@ class DanglingBlob:
     blob_hash: str
     size: int
     content: str
+    redacted_content: str = ""
     is_binary: bool = False
     associated_path: Optional[str] = None
 
