@@ -202,3 +202,50 @@ class TestAIAgentDetection:
         assert len(att.evidence) == 0
 
 
+class TestSensitiveConfigTimeMachine:
+    def test_classify_sensitive_config_file(self):
+        from gitghost.git_forensics import classify_sensitive_config_file, is_sensitive_config_file
+
+        assert classify_sensitive_config_file(".env") == "env"
+        assert classify_sensitive_config_file(".env.production") == "env"
+        assert classify_sensitive_config_file("staging.env") == "env"
+        assert classify_sensitive_config_file("nested/path/.env.local") == "env"
+
+        assert classify_sensitive_config_file("server.key") == "key"
+        assert classify_sensitive_config_file("cert.pem") == "key"
+        assert classify_sensitive_config_file(".ssh/id_rsa") == "key"
+        assert classify_sensitive_config_file("id_ed25519") == "key"
+
+        assert classify_sensitive_config_file("credentials.json") == "credential"
+        assert classify_sensitive_config_file("secrets.yaml") == "credential"
+        assert classify_sensitive_config_file("service_account.json") == "credential"
+        assert classify_sensitive_config_file("htpasswd") == "credential"
+
+        assert classify_sensitive_config_file("terraform.tfstate") == "terraform"
+        assert classify_sensitive_config_file("prod.tfvars") == "terraform"
+
+        assert classify_sensitive_config_file("config.json") == "config"
+        assert classify_sensitive_config_file("local.settings.json") == "config"
+
+        assert classify_sensitive_config_file("main.py") is None
+        assert classify_sensitive_config_file("index.html") is None
+        assert is_sensitive_config_file(".env") is True
+        assert is_sensitive_config_file("main.py") is False
+
+    def test_live_time_machine_indexing(self, tmp_path: Path):
+        from gitghost.demo_builder import DemoBuilder
+
+        info = DemoBuilder.create_demo_repository()
+        try:
+            forensics = GitForensics(info.repo_path)
+            scan_res = forensics.scan()
+            assert len(scan_res.deleted_config_files) >= 1
+            env_item = next((cf for cf in scan_res.deleted_config_files if cf.file_path == ".env"), None)
+            assert env_item is not None
+            assert env_item.file_type == "env"
+            assert env_item.commit_hash is not None
+        finally:
+            DemoBuilder.cleanup(info.repo_path)
+
+
+

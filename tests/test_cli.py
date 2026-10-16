@@ -132,4 +132,15 @@ class TestCliCommands:
         finally:
             DemoBuilder.cleanup(info.repo_path)
 
+    def test_scan_configs_only(self):
+        info = DemoBuilder.create_demo_repository()
+        try:
+            res = runner.invoke(app, ["scan", str(info.repo_path), "--configs-only", "--no-ai"])
+            assert res.exit_code == 0
+            assert "[TIME-MACHINE]" in res.output
+            assert ".env" in res.output
+        finally:
+            DemoBuilder.cleanup(info.repo_path)
+
+
 
