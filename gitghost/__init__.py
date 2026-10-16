@@ -14,9 +14,10 @@ __license__ = "MIT"
 
 from gitghost.git_forensics import GitForensics, DanglingCommit, DanglingBlob, ForensicsScanResult
 from gitghost.github_remote import (
-    GitHubForensicsClient,
-    GitHubHistoryOverwriteEvent,
-    GitHubRepoRef,
+    GitHubAPIForensicsClient,
+    HistoryOverwriteEvent,
+    ParsedGitHubTarget,
+    RemoteAcquisitionResult,
     SmartGitCloner,
     is_github_target,
     parse_github_url,
@@ -37,9 +38,10 @@ __all__ = [
     "DanglingCommit",
     "DanglingBlob",
     "ForensicsScanResult",
-    "GitHubRepoRef",
-    "GitHubHistoryOverwriteEvent",
-    "GitHubForensicsClient",
+    "ParsedGitHubTarget",
+    "HistoryOverwriteEvent",
+    "RemoteAcquisitionResult",
+    "GitHubAPIForensicsClient",
     "SmartGitCloner",
     "parse_github_url",
     "is_github_target",
@@ -63,3 +65,4 @@ __all__ = [
     "launch_ui",
     "start_ui_server",
 ]
+
