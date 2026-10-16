@@ -69,6 +69,9 @@ class ReportExporter:
                     "date": c.date,
                     "message": c.message,
                     "changed_files": c.changed_files,
+                    "is_ai_agent": c.ai_agent.is_ai_agent if c.ai_agent else False,
+                    "ai_agent_name": c.ai_agent.agent_name if c.ai_agent else None,
+                    "ai_agent_evidence": c.ai_agent.evidence if c.ai_agent else [],
                 }
                 for c in scan_result.dangling_commits
             ],
@@ -125,15 +128,16 @@ class ReportExporter:
         if not scan_result.dangling_commits:
             md.append("_No dangling or unreachable commits detected in the object store._\n")
         else:
-            md.append("| Commit Hash | Author | Date | Subject | Files Touched |")
-            md.append("| :--- | :--- | :--- | :--- | :--- |")
+            md.append("| Commit Hash | Author | Date | Subject | Files Touched | Agent Attribution |")
+            md.append("| :--- | :--- | :--- | :--- | :--- | :--- |")
             for c in scan_result.dangling_commits:
                 short_hash = f"`{c.commit_hash[:10]}`"
                 files_str = ", ".join([f"`{f}`" for f in c.changed_files[:3]]) or "_None_"
                 if len(c.changed_files) > 3:
                     files_str += f" (+{len(c.changed_files) - 3} more)"
+                agent_str = f"[AI-Agent: {c.ai_agent.agent_name}]" if (c.ai_agent and c.ai_agent.is_ai_agent) else "Human / Standard"
                 md.append(
-                    f"| {short_hash} | {c.author} | {c.date[:10]} | {c.message.splitlines()[0] if c.message else 'N/A'} | {files_str} |"
+                    f"| {short_hash} | {c.author} | {c.date[:10]} | {c.message.splitlines()[0] if c.message else 'N/A'} | {files_str} | {agent_str} |"
                 )
             md.append("")
 
@@ -146,7 +150,8 @@ class ReportExporter:
                 sev_tag = f"[{f.severity_estimate.upper()}]"
                 if triage and triage.is_false_positive:
                     sev_tag = "[FALSE POSITIVE]"
-                md.append(f"### {idx}. [{f.finding_id}] {sev_tag} {f.rule_name}")
+                agent_tag = f" [AI-Agent Leak: {f.ai_agent_name}]" if getattr(f, "is_ai_agent", False) else ""
+                md.append(f"### {idx}. [{f.finding_id}] {sev_tag}{agent_tag} {f.rule_name}")
                 md.append(f"- **File:** `{f.file_path or 'Unattached Object'}` (Line {f.line_number})")
                 md.append(f"- **Associated Commit / Blob:** `{f.commit_hash or f.blob_hash or 'N/A'}`")
                 md.append(f"- **Shannon Entropy:** `{f.entropy}`")
@@ -251,6 +256,8 @@ class ReportExporter:
                     "commit_hash": f.commit_hash or "N/A",
                     "blob_hash": f.blob_hash or "N/A",
                     "entropy": f.entropy,
+                    "is_ai_agent": getattr(f, "is_ai_agent", False),
+                    "ai_agent_name": getattr(f, "ai_agent_name", None),
                 },
             })
 
