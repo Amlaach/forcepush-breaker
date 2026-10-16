@@ -27,7 +27,7 @@ from gitghost import __version__
 from gitghost.ai_triage import AITriageResult
 from gitghost.demo_builder import DemoBuilder
 from gitghost.exporters import ReportExporter
-from gitghost.git_forensics import ForensicsScanResult, GitForensics
+from gitghost.git_forensics import DeletedConfigFile, ForensicsScanResult, GitForensics
 from gitghost.github_remote import is_github_target, sanitize_token_in_text
 from gitghost.pipeline import run_scan_pipeline
 from gitghost.recovery import ObjectRecoveryEngine
@@ -95,6 +95,7 @@ def scan_cmd(
     recover_zip: Optional[str] = typer.Option(None, "--recover-zip", help="Path to export full recovery ZIP bundle (reports, patches, recovered files)."),
     include_raw: bool = typer.Option(False, "--include-raw", "--raw", "--unredacted", help="Export unredacted (raw) files/patches in recovery ZIP bundle (default is redacted)."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompts."),
+    configs_only: bool = typer.Option(False, "--configs-only", help="Filter and display only deleted sensitive configuration files (.env, keys, credentials)."),
     strict: bool = typer.Option(False, "--strict", help="CI/CD mode: Exit with code 1 if score < 70 or critical leaks exist."),
     no_ai: bool = typer.Option(False, "--no-ai", help="Disable AI triage."),
 ) -> None:
@@ -160,8 +161,14 @@ def scan_cmd(
         console.print(f"[bold red]Error:[/bold red] {safe_err}")
         raise typer.Exit(1)
 
+    if configs_only:
+        _render_config_time_machine(pipeline_res.scan_result.deleted_config_files)
+        return
+
     _render_ghost_tree(pipeline_res.scan_result)
     _render_findings_table(pipeline_res.findings, pipeline_res.triage_map)
+    if pipeline_res.scan_result.deleted_config_files:
+        _render_config_time_machine(pipeline_res.scan_result.deleted_config_files)
     _render_score_panel(pipeline_res.hygiene)
     _render_remediation_panel(pipeline_res.remediation)
 
@@ -430,7 +437,52 @@ def _render_ghost_tree(scan_result: ForensicsScanResult):
     if len(scan_result.dangling_blobs) > 4:
         blobs_branch.add(f"[dim italic]... and {len(scan_result.dangling_blobs) - 4} more dangling blobs[/dim italic]")
 
+    deleted_configs = getattr(scan_result, "deleted_config_files", [])
+    if deleted_configs:
+        configs_branch = tree.add(f"[bold red][CONFIGS] Deleted Sensitive Files ({len(deleted_configs)})[/bold red]")
+        for cf in deleted_configs[:6]:
+            origin = f"commit {cf.commit_hash[:10]}" if cf.commit_hash else f"blob {cf.blob_hash[:10]}"
+            configs_branch.add(f"[bold red]{cf.file_path}[/bold red] [dim]({cf.file_type.upper()} in {origin})[/dim]")
+        if len(deleted_configs) > 6:
+            configs_branch.add(f"[dim italic]... and {len(deleted_configs) - 6} more config files[/dim italic]")
+
     console.print(tree)
+    console.print("")
+
+
+def _render_config_time_machine(configs: list[DeletedConfigFile]):
+    table = Table(
+        title="[TIME-MACHINE] Deleted Sensitive Configuration & Environment Files",
+        title_style="bold red",
+        box=box.ROUNDED,
+        header_style="bold magenta",
+        show_lines=True,
+    )
+    table.add_column("File Path", style="bold red", width=28)
+    table.add_column("Category", width=12)
+    table.add_column("Origin", width=22)
+    table.add_column("Author / Date", width=24)
+    table.add_column("Recovery Command", style="cyan", width=36)
+
+    if not configs:
+        table.add_row("—", "CLEAN", "No deleted configs", "—", "—")
+    else:
+        for cf in configs:
+            origin_str = f"commit {cf.commit_hash[:10]}" if cf.commit_hash else f"blob {cf.blob_hash[:10]}"
+            author_date = f"{cf.author} ({cf.date[:10]})" if cf.author else (f"{cf.size} bytes" if cf.size else "—")
+            rec_cmd = (
+                f"unforce recover --commit {cf.commit_hash[:10]} --file {cf.file_path}"
+                if cf.commit_hash
+                else f"unforce recover --blob {cf.blob_hash[:10]}"
+            )
+            table.add_row(
+                cf.file_path,
+                cf.file_type.upper(),
+                origin_str,
+                author_date,
+                rec_cmd,
+            )
+    console.print(table)
     console.print("")
 
 
