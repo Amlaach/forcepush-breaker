@@ -1028,12 +1028,14 @@ HTML_PAGE = r"""<!DOCTYPE html>
       }
     }
 
-    // Trigger Scan
+    // Trigger Asynchronous Scan with Real-Time Polling
     async function startScan() {
       const repoPath = document.getElementById('repoPathInput').value.trim() || '.';
       const aiProvider = document.getElementById('aiProviderSelect').value;
       const entropyThreshold = parseFloat(document.getElementById('entropyThreshold').value);
       const strict = document.getElementById('strictMode').checked;
+      const githubTokenEl = document.getElementById('githubTokenInput');
+      const githubToken = githubTokenEl ? githubTokenEl.value.trim() : '';
 
       const scanBtn = document.getElementById('scanBtn');
       const scanBtnText = document.getElementById('scanBtnText');
@@ -1045,58 +1047,76 @@ HTML_PAGE = r"""<!DOCTYPE html>
       scanBtn.disabled = true;
       scanBtnText.innerText = 'Scanning...';
       progressContainer.style.display = 'block';
-      progressFill.style.width = '20%';
-      progressStatus.innerText = 'Exhuming object graveyard (.git/objects)...';
-      progressPct.innerText = '20%';
+      progressFill.style.width = '5%';
+      progressStatus.innerText = 'Initializing forensics scan job...';
+      progressPct.innerText = '5%';
 
       try {
         const payload = {
           repo_path: repoPath,
           ai_provider: aiProvider,
           entropy_threshold: entropyThreshold,
+          github_token: githubToken || null,
           strict: strict
         };
 
-        // Animate fake progress steps while backend runs live forensics
-        const pInterval = setInterval(() => {
-          let curr = parseInt(progressFill.style.width);
-          if (curr < 85) {
-            curr += 15;
-            progressFill.style.width = curr + '%';
-            progressPct.innerText = curr + '%';
-            if (curr === 50) progressStatus.innerText = 'Scanning with Shannon entropy & redacting secrets...';
-            if (curr === 75) progressStatus.innerText = 'Running AI triage & calculating hygiene score...';
-          }
-        }, 300);
-
-        const response = await fetch('/api/scan', {
+        const startRes = await fetch('/api/scan/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
 
-        clearInterval(pInterval);
-        progressFill.style.width = '100%';
-        progressPct.innerText = '100%';
-        progressStatus.innerText = 'Forensics audit complete.';
-
-        setTimeout(() => {
+        if (!startRes.ok) {
+          const errData = await startRes.json();
+          alert('Scan Error: ' + (errData.error || startRes.statusText));
           progressContainer.style.display = 'none';
-        }, 800);
-
-        if (!response.ok) {
-          const errData = await response.json();
-          alert('Scan Error: ' + (errData.error || response.statusText));
           return;
         }
 
-        const data = await response.json();
-        currentAuditData = data;
-        renderDashboard(data);
-        showToast('Forensics scan completed successfully!', '✅');
+        const startData = await startRes.json();
+        const jobId = startData.job_id;
 
+        while (true) {
+          await new Promise(r => setTimeout(r, 300));
+          const pollRes = await fetch('/api/scan/status?job_id=' + encodeURIComponent(jobId));
+          if (!pollRes.ok) {
+            const errData = await pollRes.json();
+            throw new Error(errData.error || pollRes.statusText);
+          }
+          const job = await pollRes.json();
+          const pct = job.progress_pct || 0;
+          progressFill.style.width = pct + '%';
+          progressPct.innerText = pct + '%';
+
+          let statusMsg = job.phase_message || 'Scanning repository...';
+          if (job.total_objects > 0 && job.scanned_objects > 0) {
+            statusMsg += ` (${job.scanned_objects}/${job.total_objects} objects)`;
+          }
+          progressStatus.innerText = statusMsg;
+
+          if (job.status === 'failed') {
+            alert('Scan Error: ' + (job.error || 'Unknown forensics error'));
+            progressContainer.style.display = 'none';
+            return;
+          }
+
+          if (job.status === 'completed' && job.result) {
+            progressFill.style.width = '100%';
+            progressPct.innerText = '100%';
+            progressStatus.innerText = 'Forensics audit complete.';
+            setTimeout(() => {
+              progressContainer.style.display = 'none';
+            }, 900);
+
+            currentAuditData = job.result;
+            renderDashboard(job.result);
+            showToast('Forensics scan completed successfully!', '✅');
+            break;
+          }
+        }
       } catch (err) {
         alert('Network/Server Error: ' + err.message);
+        progressContainer.style.display = 'none';
       } finally {
         scanBtn.disabled = false;
         scanBtnText.innerText = 'Scan Repository';
