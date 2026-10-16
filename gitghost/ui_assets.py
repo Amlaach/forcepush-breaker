@@ -1544,10 +1544,14 @@ HTML_PAGE = r"""<!DOCTYPE html>
                          (f.triage_severity === 'High' ? 'badge-high' :
                          (f.triage_severity === 'Medium' ? 'badge-medium' : 'badge-low'));
 
+        const aiBadge = f.is_ai_agent
+          ? `<br><span class="badge" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 0.68rem; display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 0.3rem;">${getSvg('cpu', 11)} AI-Agent Leak (${escapeHtml(f.ai_agent_name || 'AI')})</span>`
+          : '';
+
         tr.innerHTML = `
           <td><span class="code-badge">${f.finding_id}</span></td>
           <td><span class="badge ${sevClass}">${f.triage_severity || f.severity_estimate}</span></td>
-          <td style="font-weight: 600;">${f.rule_name}</td>
+          <td style="font-weight: 600;">${escapeHtml(f.rule_name)}${aiBadge}</td>
           <td><span class="secret-masked" title="${f.masked_value}">${f.masked_value}</span></td>
           <td><span class="code-badge">${f.file_path}:${f.line_number}</span></td>
           <td style="font-weight: 700; color: var(--cyan);">${f.entropy.toFixed(2)}</td>
@@ -1631,8 +1635,11 @@ HTML_PAGE = r"""<!DOCTYPE html>
             </button>
           `).join('');
           item.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span class="code-badge" style="color: var(--magenta);">commit ${c.commit_hash.substring(0, 10)}</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="code-badge" style="color: var(--magenta);">commit ${c.commit_hash.substring(0, 10)}</span>
+                ${c.is_ai_agent ? `<span class="badge" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 0.7rem; display: inline-flex; align-items: center; gap: 0.25rem;">${getSvg('cpu', 11)} AI-Agent (${escapeHtml(c.ai_agent_name || 'AI')})</span>` : ''}
+              </div>
               <span style="font-size: 0.75rem; color: var(--text-muted);">${c.date ? c.date.substring(0, 10) : ''}</span>
             </div>
             <div style="font-size: 0.85rem; font-weight: 600; margin: 0.35rem 0;">"${escapeHtml(c.message ? c.message.split('\n')[0] : 'No message')}"</div>

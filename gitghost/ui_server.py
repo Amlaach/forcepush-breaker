@@ -358,6 +358,9 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 "triage_risk_score": t.risk_score if t else None,
                 "triage_explanation": t.technical_explanation if t else None,
                 "triage_action": t.recommended_action if t else None,
+                "is_ai_agent": getattr(f, "is_ai_agent", False),
+                "ai_agent_name": getattr(f, "ai_agent_name", None),
+                "ai_agent_evidence": getattr(f, "ai_agent_evidence", []),
             })
 
         commits_payload = [
@@ -368,6 +371,9 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 "message": c.redacted_message or c.message,
                 "changed_files": c.changed_files,
                 "redacted_diff": c.redacted_diff,
+                "is_ai_agent": c.ai_agent.is_ai_agent if c.ai_agent else False,
+                "ai_agent_name": c.ai_agent.agent_name if c.ai_agent else None,
+                "ai_agent_evidence": c.ai_agent.evidence if c.ai_agent else [],
             }
             for c in pipeline_res.scan_result.dangling_commits
         ]
