@@ -316,7 +316,33 @@ if (!gotLock) {
     }
   });
 
+function ensureOfficialShortcut() {
+  if (process.platform !== "win32") return;
+  try {
+    const currentExe = process.execPath;
+    if (!currentExe || !currentExe.toLowerCase().endsWith(".exe")) return;
+    if (currentExe.toLowerCase().includes("node_modules\\electron")) return;
+
+    const currentDir = path.dirname(currentExe);
+    const parentDir = path.dirname(currentDir);
+    const shortcutName = "UnForce Studio.lnk";
+    const scPath = path.join(parentDir, shortcutName);
+
+    const psScript = `
+      $WshShell = New-Object -ComObject WScript.Shell;
+      $Shortcut = $WshShell.CreateShortcut('${scPath.replace(/'/g, "''")}');
+      $Shortcut.TargetPath = '${currentExe.replace(/'/g, "''")}';
+      $Shortcut.WorkingDirectory = '${currentDir.replace(/'/g, "''")}';
+      $Shortcut.Description = 'UnForce Security & Git Forensics Studio';
+      $Shortcut.IconLocation = '${currentExe.replace(/'/g, "''")},0';
+      $Shortcut.Save();
+    `;
+    execFile("powershell", ["-NoProfile", "-NonInteractive", "-Command", psScript], { windowsHide: true }, () => {});
+  } catch (_) {}
+}
+
   app.whenReady().then(async () => {
+    ensureOfficialShortcut();
     const win = createMainWindow();
     const initialRepo = extractInitialGitHubUrlArg(process.argv);
     const localBundle = path.join(__dirname, "ui_bundle.html");

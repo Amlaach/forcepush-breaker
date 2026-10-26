@@ -283,6 +283,58 @@ class GitHubAPIForensicsClient:
         warnings: List[str] = []
         zero_sha = "0" * 40
 
+        # 0. Query /repos/{owner}/{repo}/activity (Modern GitHub Activity API for force_push / branch events)
+        activity_url = f"{target.api_repo_url}/activity?per_page=100"
+        try:
+            raw_activity = self._get_json(activity_url)
+            if isinstance(raw_activity, list):
+                for act in raw_activity:
+                    if not isinstance(act, dict):
+                        continue
+                    act_type = str(act.get("activity_type") or "").strip()
+                    act_id = str(act.get("id", ""))
+                    actor = (act.get("actor") or {}).get("login", "unknown")
+                    timestamp = str(act.get("timestamp") or "")
+                    before_sha = str(act.get("before") or "").strip()
+                    after_sha = str(act.get("after") or "").strip()
+                    ref = str(act.get("ref") or "refs/heads/main")
+
+                    if act_type == "force_push" and before_sha and before_sha != zero_sha:
+                        desc = f"Force-push / history rewrite on {ref} (previous tip {before_sha[:10]} overwritten by {after_sha[:10]})"
+                        events.append(
+                            HistoryOverwriteEvent(
+                                event_id=f"act-{act_id}",
+                                event_type="force_push",
+                                ref=ref,
+                                before_sha=before_sha,
+                                after_sha=after_sha,
+                                actor=actor,
+                                created_at=timestamp,
+                                description=desc,
+                            )
+                        )
+                        if before_sha not in seen_shas:
+                            seen_shas.add(before_sha)
+                            candidate_shas.append(before_sha)
+                    elif "branch_delete" in act_type:
+                        events.append(
+                            HistoryOverwriteEvent(
+                                event_id=f"act-{act_id}",
+                                event_type="branch_delete",
+                                ref=ref,
+                                before_sha=before_sha if before_sha != zero_sha else "",
+                                after_sha=None,
+                                actor=actor,
+                                created_at=timestamp,
+                                description=f"Deleted branch '{ref}' by {actor}",
+                            )
+                        )
+                        if before_sha and before_sha != zero_sha and before_sha not in seen_shas:
+                            seen_shas.add(before_sha)
+                            candidate_shas.append(before_sha)
+        except Exception:
+            pass
+
         # 1. Query /repos/{owner}/{repo}/events
         events_url = f"{target.api_repo_url}/events?per_page=100"
         try:
