@@ -15,7 +15,7 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 @dataclass
@@ -127,6 +127,31 @@ class DanglingCommit:
     redacted_message: str = ""
     is_dangling: bool = True
     ai_agent: Optional[AIAgentAttribution] = None
+    file_snapshots: Dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class ReflogEntry:
+    index: int
+    selector: str
+    commit_hash: str
+    action: str
+    message: str
+    date: str
+    author: str
+    is_unreachable: bool = False
+
+
+@dataclass
+class RepoMetadata:
+    current_branch: str = ""
+    head_sha: str = ""
+    head_subject: str = ""
+    remote_url: str = ""
+    is_bare: bool = False
+    is_clean: bool = True
+    local_branches: List[str] = field(default_factory=list)
+    tags_count: int = 0
 
 
 
@@ -193,10 +218,13 @@ class ForensicsScanResult:
     repo_path: str
     is_git_repo: bool
     dangling_commits: List[DanglingCommit] = field(default_factory=list)
+    branch_commits: List[DanglingCommit] = field(default_factory=list)
     dangling_blobs: List[DanglingBlob] = field(default_factory=list)
     deleted_config_files: List[DeletedConfigFile] = field(default_factory=list)
     unreachable_trees: List[str] = field(default_factory=list)
     unreachable_tags: List[str] = field(default_factory=list)
+    reflog_entries: List[ReflogEntry] = field(default_factory=list)
+    repo_metadata: Optional[RepoMetadata] = None
     total_objects_scanned: int = 0
     scan_timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     errors: List[str] = field(default_factory=list)
@@ -204,6 +232,8 @@ class ForensicsScanResult:
 
 class GitForensics:
     MAX_BLOB_SIZE_BYTES = 512 * 1024
+    MAX_SNAPSHOT_BYTES = 256 * 1024
+    MAX_SNAPSHOT_FILES_PER_COMMIT = 25
     MAX_TEXT_SCAN_BYTES = 10 * 1024 * 1024
     GIT_CMD_TIMEOUT_SECONDS = 60
 
@@ -241,6 +271,7 @@ class GitForensics:
             )
 
         result = ForensicsScanResult(repo_path=str(self.repo_path), is_git_repo=True)
+        result.repo_metadata = self.collect_repo_metadata()
         unreachable_objects: Dict[str, Set[str]] = {
             "commit": set(),
             "blob": set(),
@@ -286,7 +317,12 @@ class GitForensics:
                         if len(f.name) in (40, 64):
                             candidate_hashes.add(f.name)
 
+        result.branch_commits = self.collect_branch_commits(max_commits=60)
+        hist_deleted_configs = self.collect_historical_deleted_configs(max_commits=120)
+
         if not candidate_hashes:
+            result.deleted_config_files = hist_deleted_configs
+            result.reflog_entries = self.collect_reflog(set())
             return result
 
         # Step 2: Batch check all candidate objects to identify exact types & sizes in ONE call
@@ -346,7 +382,15 @@ class GitForensics:
                             size=b.size,
                         )
 
+        for hcf in hist_deleted_configs:
+            key = (hcf.file_path, hcf.commit_hash, hcf.blob_hash)
+            if key not in config_files_map:
+                config_files_map[key] = hcf
+
         result.deleted_config_files = list(config_files_map.values())
+        result.reflog_entries = self.collect_reflog(
+            {c.commit_hash for c in result.dangling_commits}
+        )
 
         result.total_objects_scanned = (
             len(result.dangling_commits)
@@ -475,223 +519,3 @@ class GitForensics:
         if current_commit:
             commit_diffs[current_commit] = "\n".join(cur_lines)
             commit_files[current_commit] = list(dict.fromkeys(cur_files))
-
-        reconstructed: List[DanglingCommit] = []
-        for ch in commit_hashes:
-            meta = commit_meta.get(
-                ch,
-                {
-                    "author": "Unknown",
-                    "date": datetime.now(timezone.utc).isoformat(),
-                    "parents": [],
-                    "message": "",
-                },
-            )
-            meta_author = meta.get("author", "Unknown")
-            meta_message = meta.get("message", "")
-            diff_text = commit_diffs.get(ch, "")
-            ai_attribution = detect_ai_agent(
-                author=meta_author,
-                message=meta_message,
-                diff_content=diff_text,
-            )
-
-            reconstructed.append(
-                DanglingCommit(
-                    commit_hash=ch,
-                    author=meta_author,
-                    date=meta["date"],
-                    message=meta_message,
-                    parents=meta["parents"],
-                    changed_files=commit_files.get(ch, []),
-                    diff_content=diff_text,
-                    is_dangling=True,
-                    ai_agent=ai_attribution,
-                )
-            )
-
-        return reconstructed
-
-    def _map_tree_blobs_batch(
-        self, commit_hashes: List[str], unreachable_trees: Set[str]
-    ) -> Dict[str, str]:
-        """Maps blob hashes to their file paths in batch from commit trees and standalone trees."""
-        import binascii
-        blob_path_map: Dict[str, str] = {}
-
-        if commit_hashes:
-            p = subprocess.Popen(
-                ["git", "diff-tree", "-r", "--root", "--stdin"],
-                cwd=str(self.repo_path),
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-            tree_out, _ = p.communicate("\n".join(commit_hashes) + "\n")
-            for line in tree_out.splitlines():
-                if "\t" in line:
-                    left, path = line.split("\t", 1)
-                    parts = left.split()
-                    if len(parts) >= 4:
-                        b_hash = parts[3]
-                        if len(b_hash) in (40, 64) and b_hash != "0" * len(b_hash):
-                            blob_path_map[b_hash] = path.strip()
-
-        trees_to_read = [t for t in unreachable_trees if t]
-        if trees_to_read:
-            p = subprocess.Popen(
-                ["git", "cat-file", "--batch"],
-                cwd=str(self.repo_path),
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            )
-            raw_input = "\n".join(trees_to_read).encode("ascii") + b"\n"
-            raw_output, _ = p.communicate(raw_input)
-            stream = io.BytesIO(raw_output)
-            while True:
-                header_line = stream.readline()
-                if not header_line:
-                    break
-                header_parts = header_line.decode("utf-8", errors="replace").strip().split()
-                if len(header_parts) >= 3:
-                    try:
-                        size = int(header_parts[2])
-                    except ValueError:
-                        break
-                    tree_bytes = stream.read(size)
-                    stream.read(1)
-                    idx = 0
-                    while idx < len(tree_bytes):
-                        space_idx = tree_bytes.find(b" ", idx)
-                        null_idx = tree_bytes.find(b"\x00", space_idx)
-                        if space_idx == -1 or null_idx == -1 or null_idx + 21 > len(tree_bytes):
-                            break
-                        mode = tree_bytes[idx:space_idx].decode(errors="replace")
-                        name = tree_bytes[space_idx + 1:null_idx].decode(errors="replace")
-                        sha = binascii.hexlify(tree_bytes[null_idx + 1:null_idx + 21]).decode("ascii")
-                        if not mode.startswith("40000"):
-                            blob_path_map[sha] = name
-                        idx = null_idx + 21
-                elif len(header_parts) == 2 and header_parts[1] == "missing":
-                    continue
-                else:
-                    break
-
-        return blob_path_map
-
-    def _batch_extract_blobs(
-        self,
-        blob_hashes: List[str],
-        type_and_sizes: Dict[str, Tuple[str, int]],
-        blob_path_map: Dict[str, str],
-    ) -> List[DanglingBlob]:
-        """Extracts blob contents using a single streamed 'git cat-file --batch' process."""
-        blobs: List[DanglingBlob] = []
-        readable_hashes: List[str] = []
-
-        for b_hash in blob_hashes:
-            size = type_and_sizes.get(b_hash, ("blob", 0))[1]
-            path = blob_path_map.get(b_hash)
-            if size > self.MAX_BLOB_SIZE_BYTES:
-                blobs.append(
-                    DanglingBlob(
-                        blob_hash=b_hash,
-                        size=size,
-                        content="[Binary or oversized file content omitted - size: %d bytes]" % size,
-                        is_binary=True,
-                        associated_path=path,
-                    )
-                )
-            else:
-                readable_hashes.append(b_hash)
-
-        if readable_hashes:
-            p = subprocess.Popen(
-                ["git", "cat-file", "--batch"],
-                cwd=str(self.repo_path),
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            )
-            raw_input = b"\n".join(h.encode("ascii") for h in readable_hashes) + b"\n"
-            raw_output, _ = p.communicate(raw_input)
-
-            stream = io.BytesIO(raw_output)
-            while True:
-                header_line = stream.readline()
-                if not header_line:
-                    break
-                header_parts = header_line.decode("utf-8", errors="replace").strip().split()
-                if len(header_parts) >= 3:
-                    obj_hash, _, size_str = header_parts[0], header_parts[1], header_parts[2]
-                    try:
-                        size = int(size_str)
-                    except ValueError:
-                        break
-                    raw_data = stream.read(size)
-                    stream.read(1)  # trailing newline from git cat-file
-                    is_binary = b"\x00" in raw_data[:8000]
-                    content = (
-                        "[Binary blob data (%d bytes)]" % size
-                        if is_binary
-                        else raw_data.decode("utf-8", errors="replace")
-                    )
-                    blobs.append(
-                        DanglingBlob(
-                            blob_hash=obj_hash,
-                            size=size,
-                            content=content,
-                            is_binary=is_binary,
-                            associated_path=blob_path_map.get(obj_hash),
-                        )
-                    )
-                elif len(header_parts) == 2 and header_parts[1] == "missing":
-                    continue
-                else:
-                    break
-
-        return blobs
-
-    def _run_git(self, args: List[str], check: bool = True) -> subprocess.CompletedProcess[str]:
-        full_cmd = ["git"] + args
-        try:
-            return subprocess.run(
-                full_cmd,
-                cwd=str(self.repo_path),
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=self.GIT_CMD_TIMEOUT_SECONDS,
-                check=check,
-            )
-        except subprocess.TimeoutExpired:
-            if check:
-                raise RuntimeError(f"Git command timed out after {self.GIT_CMD_TIMEOUT_SECONDS}s: {' '.join(args)}")
-            return subprocess.CompletedProcess(
-                args=full_cmd,
-                returncode=124,
-                stdout="",
-                stderr="git command timed out",
-            )
-        except subprocess.CalledProcessError as e:
-            if check:
-                raise
-            return subprocess.CompletedProcess(
-                args=full_cmd,
-                returncode=e.returncode,
-                stdout=e.stdout or "",
-                stderr=e.stderr or "",
-            )
-        except FileNotFoundError:
-            return subprocess.CompletedProcess(
-                args=full_cmd,
-                returncode=127,
-                stdout="",
-                stderr="git not found",
-            )
-
