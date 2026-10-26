@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Set
+from typing import List, Optional, Set
 
 from gitghost.redactor import SecretFinding
 
@@ -195,11 +195,18 @@ class RemediationGenerator:
 
 
     @classmethod
+    def _normalize_target_path(cls, repo_path: str) -> str:
+        is_remote_target = "github.com" in repo_path or repo_path.startswith(("http://", "https://", "git@"))
+        if is_remote_target:
+            return repo_path
+        return str(Path(repo_path).resolve())
+
+    @classmethod
     def _build_bash_script(
         cls, repo_path: str, steps: List[RemediationStep], affected_files: List[str]
     ) -> str:
-        clean_path = str(Path(repo_path).resolve())
-        backup_path = f"{clean_path}_safety_backup.git"
+        clean_path = cls._normalize_target_path(repo_path)
+        backup_path = f"{clean_path.rstrip('/')}_safety_backup.git"
         lines = [
             "#!/usr/bin/env bash",
             "# ForcePush-Breaker (UnForce) Automated History Remediation Script (Bash)",
@@ -254,8 +261,8 @@ class RemediationGenerator:
     def _build_powershell_script(
         cls, repo_path: str, steps: List[RemediationStep], affected_files: List[str]
     ) -> str:
-        clean_path = str(Path(repo_path).resolve())
-        backup_path = f"{clean_path}_safety_backup.git"
+        clean_path = cls._normalize_target_path(repo_path)
+        backup_path = f"{clean_path.rstrip('/')}_safety_backup.git"
         lines = [
             "# ForcePush-Breaker (UnForce) Automated History Remediation Script (PowerShell)",
             f"# Generated for: {clean_path}",
