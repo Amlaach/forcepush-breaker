@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import io
 import re
+import shutil
 import subprocess
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from gitghost.exporters import ReportExporter
 from gitghost.git_forensics import DanglingBlob, DanglingCommit, GitForensics
@@ -140,10 +141,14 @@ class ObjectRecoveryEngine:
         if not target_file:
             return cls.recover_commit_diff(pipeline_res, commit.commit_hash, include_raw=include_raw)
 
-        # 1. Try extracting full file snapshot from local Git repository if available on disk
+        # 0. Check pre-extracted full file snapshot on DanglingCommit (works for both local & remote clones!)
         raw_file_content: Optional[str] = None
+        if getattr(commit, "file_snapshots", None) and target_file in commit.file_snapshots:
+            raw_file_content = commit.file_snapshots[target_file]
+
+        # 1. Try extracting full file snapshot from local Git repository if available on disk
         local_repo = Path(pipeline_res.repo_path)
-        if not pipeline_res.is_remote and local_repo.exists():
+        if raw_file_content is None and not pipeline_res.is_remote and local_repo.exists():
             try:
                 res = subprocess.run(
                     ["git", "show", f"{commit.commit_hash}:{target_file}"],
@@ -304,3 +309,189 @@ class ObjectRecoveryEngine:
                         pass
 
         return buf.getvalue()
+
+    @classmethod
+    def restore_commit_as_branch(
+        cls,
+        repo_path: str | Path,
+        commit_hash: str,
+        branch_name: str,
+        checkout: bool = False,
+    ) -> Dict[str, object]:
+        """Safely restores an orphaned/dangling commit to a new local Git branch."""
+        repo_dir = Path(repo_path).resolve()
+        if not GitForensics(repo_dir).is_valid_repo():
+            raise ValueError(f"Not a valid local Git repository: {repo_dir}")
+
+        clean_sha = (commit_hash or "").strip()
+        if not re.match(r"^[0-9a-fA-F]{7,64}$", clean_sha):
+            raise ValueError("Invalid commit SHA format.")
+
+        clean_branch = (branch_name or "").strip()
+        if not clean_branch or not re.match(r"^[A-Za-z0-9._/\-]+$", clean_branch) or ".." in clean_branch:
+            raise ValueError("Invalid branch name. Use letters, numbers, '-', '_', '.', or '/'.")
+
+        # Verify commit object exists in repo
+        verify_res = subprocess.run(
+            ["git", "cat-file", "-t", clean_sha],
+            cwd=str(repo_dir),
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        if verify_res.returncode != 0 or verify_res.stdout.strip() != "commit":
+            raise ValueError(f"Commit object '{clean_sha}' does not exist in local repository.")
+
+        # Ensure branch does not already exist
+        exists_res = subprocess.run(
+            ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{clean_branch}"],
+            cwd=str(repo_dir),
+            check=False,
+        )
+        if exists_res.returncode == 0:
+            raise ValueError(f"Branch '{clean_branch}' already exists. Choose a unique branch name.")
+
+        # Create the branch pointing at the dangling commit
+        create_res = subprocess.run(
+            ["git", "branch", clean_branch, clean_sha],
+            cwd=str(repo_dir),
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        if create_res.returncode != 0:
+            raise RuntimeError(f"Failed to create branch: {(create_res.stderr or create_res.stdout).strip()}")
+
+        checked_out = False
+        notice = f"Branch '{clean_branch}' created pointing to {clean_sha[:10]}."
+        if checkout:
+            co_res = subprocess.run(
+                ["git", "checkout", clean_branch],
+                cwd=str(repo_dir),
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+            if co_res.returncode == 0:
+                checked_out = True
+                notice = f"Branch '{clean_branch}' created and checked out!"
+            else:
+                notice += f" (Created safely, but checkout skipped due to uncommitted changes: {(co_res.stderr or '').strip()})"
+
+        return {
+            "success": True,
+            "branch_name": clean_branch,
+            "commit_hash": clean_sha,
+            "checked_out": checked_out,
+            "message": notice,
+        }
+
+    @classmethod
+    def cherry_pick_commit(
+        cls,
+        repo_path: str | Path,
+        commit_hash: str,
+        no_commit: bool = False,
+    ) -> Dict[str, object]:
+        """Safely cherry-picks a dangling commit onto the active branch (aborts cleanly on conflict)."""
+        repo_dir = Path(repo_path).resolve()
+        if not GitForensics(repo_dir).is_valid_repo():
+            raise ValueError(f"Not a valid local Git repository: {repo_dir}")
+
+        clean_sha = (commit_hash or "").strip()
+        if not re.match(r"^[0-9a-fA-F]{7,64}$", clean_sha):
+            raise ValueError("Invalid commit SHA format.")
+
+        cmd = ["git", "cherry-pick"]
+        if no_commit:
+            cmd.append("--no-commit")
+        cmd.append(clean_sha)
+
+        res = subprocess.run(
+            cmd,
+            cwd=str(repo_dir),
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        if res.returncode != 0:
+            err_detail = (res.stderr or res.stdout or "").strip()
+            # Abort any partial cherry-pick so the user's repo stays clean
+            subprocess.run(
+                ["git", "cherry-pick", "--abort"],
+                cwd=str(repo_dir),
+                capture_output=True,
+                check=False,
+            )
+            raise RuntimeError(
+                f"Cherry-pick could not be applied cleanly (aborted safely to keep working tree intact): {err_detail}"
+            )
+
+        return {
+            "success": True,
+            "commit_hash": clean_sha,
+            "staged_only": no_commit,
+            "message": (
+                f"Changes from {clean_sha[:10]} staged into working tree (--no-commit)."
+                if no_commit
+                else f"Commit {clean_sha[:10]} cherry-picked onto current branch!"
+            ),
+        }
+
+    @classmethod
+    def restore_file_to_disk(
+        cls,
+        pipeline_res: PipelineResult,
+        object_type: str,
+        commit_hash: str = "",
+        blob_hash: str = "",
+        file_path: str = "",
+        destination_path: Optional[str] = None,
+        include_raw: bool = True,
+        create_backup: bool = True,
+    ) -> Dict[str, object]:
+        """Restores a recovered file directly into the repository working tree or an explicit destination path."""
+        if object_type == "blob" or (blob_hash and not commit_hash):
+            artifact = cls.recover_blob(pipeline_res, blob_hash, include_raw=include_raw)
+            rel_default = artifact.file_path or artifact.filename
+        else:
+            artifact = cls.recover_commit_file(
+                pipeline_res,
+                commit_hash,
+                file_path=file_path or None,
+                include_raw=include_raw,
+            )
+            rel_default = artifact.file_path or file_path or artifact.filename
+
+        if destination_path:
+            dest = Path(destination_path).resolve()
+        else:
+            if pipeline_res.is_remote:
+                raise ValueError("Remote repository has no local working tree; specify destination_path.")
+            repo_root = Path(pipeline_res.repo_path).resolve()
+            clean_rel = rel_default.lstrip("/\\")
+            dest = (repo_root / clean_rel).resolve()
+            # Guard against path traversal outside repo_root
+            if repo_root not in dest.parents and dest != repo_root:
+                raise ValueError(f"Unsafe relative file path blocked: {rel_default}")
+
+        backup_created: Optional[str] = None
+        if dest.exists() and create_backup:
+            bak_path = dest.with_name(dest.name + ".unforce.bak")
+            shutil.copy2(dest, bak_path)
+            backup_created = str(bak_path)
+
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(artifact.content, encoding="utf-8")
+
+        return {
+            "success": True,
+            "saved_path": str(dest),
+            "is_redacted": artifact.is_redacted,
+            "backup_path": backup_created,
+            "message": f"Restored file to {dest}",
+        }
