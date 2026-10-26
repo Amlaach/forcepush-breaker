@@ -5,9 +5,16 @@ __pycache__/
 
 # Distribution / packaging
 build/
+build_backend/
 dist/
+release/
 *.egg-info/
 .eggs/
+*.spec
+
+# Desktop Chromium / Electron build artifacts
+desktop/node_modules/
+desktop/dist/
 
 # Environments
 .venv
