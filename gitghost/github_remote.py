@@ -256,3 +256,261 @@ class GitHubAPIForensicsClient:
                 return json.loads(resp.read().decode("utf-8", errors="replace"))
         except urllib.error.URLError as url_exc:
             # Handle SSL-intercepting proxies (e.g. corporate firewalls / NetFree where NODE_TLS_REJECT_UNAUTHORIZED=0)
+            reason_str = str(getattr(url_exc, "reason", url_exc))
+            if "CERTIFICATE_VERIFY_FAILED" in reason_str or os.getenv("NODE_TLS_REJECT_UNAUTHORIZED") == "0":
+                try:
+                    ctx = ssl._create_unverified_context()
+                    with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as resp:
+                        return json.loads(resp.read().decode("utf-8", errors="replace"))
+                except Exception as retry_exc:
+                    safe_msg = sanitize_token_in_text(str(retry_exc), self._token)
+                    raise RuntimeError(f"GitHub API request failed ({url}): {safe_msg}") from None
+            safe_msg = sanitize_token_in_text(str(url_exc), self._token)
+            raise RuntimeError(f"GitHub API request failed ({url}): {safe_msg}") from None
+        except Exception as exc:
+            safe_msg = sanitize_token_in_text(str(exc), self._token)
+            raise RuntimeError(f"GitHub API request failed ({url}): {safe_msg}") from None
+
+    def discover_history_overwrite_events(
+        self,
+        target: ParsedGitHubTarget,
+        scan_forks: bool = True,
+        max_forks: int = 5,
+    ) -> Tuple[List[HistoryOverwriteEvent], List[str], List[str]]:
+        events: List[HistoryOverwriteEvent] = []
+        candidate_shas: List[str] = []
+        seen_shas: Set[str] = set()
+        warnings: List[str] = []
+        zero_sha = "0" * 40
+
+        # 1. Query /repos/{owner}/{repo}/events
+        events_url = f"{target.api_repo_url}/events?per_page=100"
+        try:
+            raw_events = self._get_json(events_url)
+            if isinstance(raw_events, list):
+                for ev in raw_events:
+                    if not isinstance(ev, dict):
+                        continue
+                    ev_type = ev.get("type", "")
+                    ev_id = str(ev.get("id", ""))
+                    actor = (ev.get("actor") or {}).get("login", "unknown")
+                    created_at = ev.get("created_at", "")
+                    payload = ev.get("payload") or {}
+
+                    if ev_type == "PushEvent":
+                        before_sha = str(payload.get("before") or "").strip()
+                        after_sha = str(payload.get("head") or "").strip()
+                        ref = str(payload.get("ref") or "refs/heads/main")
+                        forced = bool(payload.get("forced", False))
+                        size = payload.get("size", 1)
+
+                        if before_sha and before_sha != zero_sha and before_sha != after_sha:
+                            is_force_candidate = forced or size == 0
+                            kind = "force_push" if is_force_candidate else "push_before"
+                            desc = (
+                                f"Force-push / history rewrite on {ref} (previous tip {before_sha[:10]} replaced by {after_sha[:10]})"
+                                if is_force_candidate
+                                else f"Push event on {ref} (previous tip {before_sha[:10]} -> {after_sha[:10]})"
+                            )
+                            events.append(
+                                HistoryOverwriteEvent(
+                                    event_id=ev_id,
+                                    event_type=kind,
+                                    ref=ref,
+                                    before_sha=before_sha,
+                                    after_sha=after_sha,
+                                    actor=actor,
+                                    created_at=created_at,
+                                    description=desc,
+                                )
+                            )
+                            if before_sha not in seen_shas:
+                                seen_shas.add(before_sha)
+                                candidate_shas.append(before_sha)
+
+                    elif ev_type == "DeleteEvent":
+                        ref_type = str(payload.get("ref_type") or "")
+                        ref = str(payload.get("ref") or "")
+                        if ref_type in ("branch", "tag") and ref:
+                            events.append(
+                                HistoryOverwriteEvent(
+                                    event_id=ev_id,
+                                    event_type="branch_delete",
+                                    ref=f"refs/heads/{ref}" if ref_type == "branch" else f"refs/tags/{ref}",
+                                    before_sha="",
+                                    after_sha=None,
+                                    actor=actor,
+                                    created_at=created_at,
+                                    description=f"Deleted {ref_type} '{ref}' by {actor}",
+                                )
+                            )
+        except Exception as exc:
+            warnings.append(sanitize_token_in_text(str(exc), self._token))
+
+        # 2. Query closed unmerged PRs for orphaned head SHAs
+        pulls_url = f"{target.api_repo_url}/pulls?state=closed&per_page=30"
+        try:
+            raw_pulls = self._get_json(pulls_url)
+            if isinstance(raw_pulls, list):
+                for pr in raw_pulls:
+                    if not isinstance(pr, dict) or pr.get("merged_at"):
+                        continue
+                    head = pr.get("head") or {}
+                    head_sha = str(head.get("sha") or "").strip()
+                    head_ref = str(head.get("ref") or "pr-branch")
+                    pr_num = pr.get("number", "?")
+                    user_login = (pr.get("user") or {}).get("login", "unknown")
+                    closed_at = str(pr.get("closed_at") or "")
+                    if head_sha and head_sha != zero_sha:
+                        events.append(
+                            HistoryOverwriteEvent(
+                                event_id=f"PR-{pr_num}",
+                                event_type="closed_pr_orphan",
+                                ref=f"refs/pull/{pr_num}/head ({head_ref})",
+                                before_sha=head_sha,
+                                after_sha=None,
+                                actor=user_login,
+                                created_at=closed_at,
+                                description=f"Closed unmerged PR #{pr_num} ('{pr.get('title', '')}') head commit {head_sha[:10]}",
+                            )
+                        )
+                        if head_sha not in seen_shas:
+                            seen_shas.add(head_sha)
+                            candidate_shas.append(head_sha)
+        except Exception as exc:
+            warnings.append(sanitize_token_in_text(str(exc), self._token))
+
+        # 3. Query public forks and compare branches for divergent / overwritten commits
+        if scan_forks:
+            try:
+                public_forks = self.query_public_forks(target, limit=max_forks)
+                for f in public_forks:
+                    div_commits = self.compare_fork_with_parent(target, f)
+                    for c_sha, c_actor, c_msg in div_commits:
+                        short_msg = c_msg.splitlines()[0] if c_msg else "Commit in fork"
+                        events.append(
+                            HistoryOverwriteEvent(
+                                event_id=f"fork-{f.owner}-{c_sha[:7]}",
+                                event_type="fork_divergence",
+                                ref=f"fork:{f.full_name}:{f.default_branch}",
+                                before_sha=c_sha,
+                                after_sha=None,
+                                actor=c_actor or f.owner,
+                                created_at=f.pushed_at,
+                                description=f"Fork '{f.full_name}' holds commit {c_sha[:10]} not in parent ('{short_msg}')",
+                            )
+                        )
+                        if c_sha not in seen_shas:
+                            seen_shas.add(c_sha)
+                            candidate_shas.append(c_sha)
+            except Exception as exc:
+                warnings.append(sanitize_token_in_text(str(exc), self._token))
+
+        return events, candidate_shas, warnings
+
+    def query_public_forks(
+        self,
+        target: ParsedGitHubTarget,
+        limit: int = 20,
+    ) -> List[ForkForensicsTarget]:
+        forks_url = f"{target.api_repo_url}/forks?sort=newest&per_page={limit}"
+        forks: List[ForkForensicsTarget] = []
+        try:
+            raw_forks = self._get_json(forks_url)
+            if isinstance(raw_forks, list):
+                for item in raw_forks:
+                    if not isinstance(item, dict):
+                        continue
+                    owner_obj = item.get("owner") or {}
+                    owner = str(owner_obj.get("login") or "").strip()
+                    repo = str(item.get("name") or "").strip()
+                    clone_url = str(item.get("clone_url") or f"https://github.com/{owner}/{repo}.git")
+                    html_url = str(item.get("html_url") or f"https://github.com/{owner}/{repo}")
+                    default_branch = str(item.get("default_branch") or "main")
+                    pushed_at = str(item.get("pushed_at") or "")
+                    stars = int(item.get("stargazers_count") or 0)
+                    forks_cnt = int(item.get("forks_count") or 0)
+
+                    if owner and repo:
+                        forks.append(
+                            ForkForensicsTarget(
+                                owner=owner,
+                                repo=repo,
+                                clone_url=clone_url,
+                                html_url=html_url,
+                                default_branch=default_branch,
+                                pushed_at=pushed_at,
+                                stargazers_count=stars,
+                                forks_count=forks_cnt,
+                            )
+                        )
+        except Exception:
+            pass
+        return forks
+
+    def compare_fork_with_parent(
+        self,
+        target: ParsedGitHubTarget,
+        fork: ForkForensicsTarget,
+    ) -> List[Tuple[str, str, str]]:
+        divergent_commits: List[Tuple[str, str, str]] = []
+        compare_urls = [
+            f"{target.api_repo_url}/compare/{target.repo}:{fork.default_branch}...{fork.owner}:{fork.default_branch}",
+            f"{target.api_repo_url}/compare/{fork.default_branch}...{fork.owner}:{fork.default_branch}",
+        ]
+        for c_url in compare_urls:
+            try:
+                data = self._get_json(c_url)
+                if isinstance(data, dict):
+                    commits = data.get("commits") or []
+                    for c in commits:
+                        if not isinstance(c, dict):
+                            continue
+                        sha = str(c.get("sha") or "").strip()
+                        author_obj = c.get("author") or {}
+                        author_login = (author_obj.get("login") if isinstance(author_obj, dict) else "") or fork.owner
+                        commit_inner = c.get("commit") or {}
+                        msg = str(commit_inner.get("message") or "")
+                        if sha:
+                            divergent_commits.append((sha, author_login, msg))
+                    if divergent_commits:
+                        break
+            except Exception:
+                continue
+        return divergent_commits
+
+    def fetch_orphan_commit_via_api(
+        self,
+        target: ParsedGitHubTarget,
+        commit_sha: str,
+        max_text_bytes: int = 10 * 1024 * 1024,
+    ) -> Optional[DanglingCommit]:
+        sha = (commit_sha or "").strip()
+        if not sha:
+            return None
+
+        commit_url = f"{target.api_repo_url}/commits/{sha}"
+        try:
+            data = self._get_json(commit_url)
+            if not isinstance(data, dict):
+                return None
+
+            full_sha = str(data.get("sha") or sha)
+            commit_obj = data.get("commit") or {}
+            author_obj = commit_obj.get("author") or {}
+            author_name = author_obj.get("name") or "Unknown"
+            author_email = author_obj.get("email") or ""
+            author_str = f"{author_name} <{author_email}>" if author_email else author_name
+            date_str = str(author_obj.get("date") or "")
+            message = str(commit_obj.get("message") or "")
+            parents = [
+                str(p.get("sha"))
+                for p in (data.get("parents") or [])
+                if isinstance(p, dict) and p.get("sha")
+            ]
+
+            changed_files: List[str] = []
+            diff_chunks: List[str] = []
+            accumulated_bytes = 0
+
+            for f_item in data.get("files") or []:
