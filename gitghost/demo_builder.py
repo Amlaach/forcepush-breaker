@@ -85,6 +85,40 @@ class DemoBuilder:
         _git(["add", "service.py"])
         _git(["commit", "-m", "feat: add payment processor business logic"])
 
+        # Scenario B: Feature branch with AI-Agent code that was deleted via 'git branch -D'
+        _git(["checkout", "-b", "feature/stripe-webhooks"])
+        (temp_dir / "webhook_handler.py").write_text(
+            '"""Stripe Webhook Verification & Idempotent Event Handler."""\n\n'
+            "import hmac\nimport hashlib\n\n"
+            "def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:\n"
+            "    expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()\n"
+            "    return hmac.compare_digest(expected, signature)\n",
+            encoding="utf-8",
+        )
+        _git(["add", "webhook_handler.py"])
+        _git([
+            "commit",
+            "-m",
+            "feat(webhooks): implement Stripe HMAC signature verifier\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+        ])
+        _git(["checkout", "-"])
+        _git(["branch", "-D", "feature/stripe-webhooks"])
+
+        # Scenario C: Detached unlinked blob (simulates 'git add' followed by 'git reset' without commit)
+        subprocess.run(
+            ["git", "hash-object", "-w", "--stdin"],
+            cwd=str(temp_dir),
+            input=(
+                "# Uncommitted Draft Migration Notes\n"
+                "# Staged briefly via git add, then wiped via git reset --hard\n"
+                "MIGRATION_ROLLBACK_BATCH=2026_10_core_ledger\n"
+            ),
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+        )
+
         return DemoRepoInfo(
             repo_path=temp_dir,
             dangling_commit_subject="chore: temporary test of db credentials and s3 backup",
