@@ -422,3 +422,427 @@
             </div>
 
             <input
+              type="text"
+              id="commitFilterInput"
+              class="input-field"
+              style="min-width:260px;"
+              placeholder="Filter commits by message, file, author, SHA..."
+              oninput="renderCommitsList()"
+            >
+          </div>
+
+          <!-- Split Inspector (Used for BOTH Dangling & Full Branch Commit Log!) -->
+          <div id="subpanelCommitsSplit" class="recovery-split">
+            <div id="commitsListContainer" class="commit-card-list">
+              <div class="card" style="text-align:center;color:var(--text-muted);padding:32px;">
+                Paste a GitHub URL and scan to browse commits.
+              </div>
+            </div>
+
+            <div class="inspector-pane" id="commitInspectorPane">
+              <div id="commitInspectorEmpty" style="margin:auto;text-align:center;padding:40px;color:var(--text-muted);max-width:440px;">
+                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.6" style="margin-bottom:10px;opacity:0.7;"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>
+                <div data-i18n="selectCommitPrompt">בחר קומיט מהרשימה כדי לצפות ב-Diff המלא, לדפדף בכל הקבצים באותו קומיט או להוריד קבצים.</div>
+              </div>
+
+              <div id="commitInspectorContent" style="display:none;flex-direction:column;height:100%;">
+                <div class="inspector-header">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+                    <div>
+                      <div id="inspCommitTitle" style="font-size:15.5px;font-weight:800;color:#ffffff;"></div>
+                      <div id="inspCommitMeta" style="font-size:12px;color:var(--text-muted);margin-top:3px;"></div>
+                    </div>
+                    <span id="inspCommitShaChip" class="code-chip" style="cursor:pointer;" onclick="copyActiveCommitSha()" title="Click to copy full SHA"></span>
+                  </div>
+
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;">
+                    <button class="btn btn-emerald btn-sm" onclick="switchInspectorMode('files')">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                      <span data-i18n="tabFileTree">עץ קבצים מלא בקומיט</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="exportActiveCommitPatch()">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      <span data-i18n="btnExportPatch">ייצא קובץ .patch</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="openActiveCommitOnGitHub()">
+                      <span data-i18n="btnOpenCommitGH">צפה ב-GitHub ↗</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="inspector-subtabs">
+                  <button class="seg-btn active" id="inspTabDiff" onclick="switchInspectorMode('diff')" data-i18n="tabDiffView">תצוגת שינויים (Unified Diff)</button>
+                  <button class="seg-btn" id="inspTabFiles" onclick="switchInspectorMode('files')" data-i18n="tabFileTree">עץ קבצים מלא בקומיט</button>
+                </div>
+
+                <div id="inspDiffBody" style="padding:14px;">
+                  <div id="inspDiffViewer" class="code-view"></div>
+                </div>
+
+                <div id="inspFilesBody" style="display:none;padding:14px;">
+                  <div style="display:grid;grid-template-columns:255px 1fr;gap:12px;">
+                    <div id="inspFilesTreeList" style="max-height:430px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;border-inline-end:1px solid var(--border);padding-inline-end:8px;"></div>
+                    <div style="min-width:0;">
+                      <div id="inspFilePreviewHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+                        <span id="inspPreviewFileName" class="code-chip">Select a file</span>
+                        <div style="display:flex;gap:6px;">
+                          <button class="btn btn-secondary btn-sm" id="btnCopyThisFile" onclick="copyPreviewedFile()" style="display:none;" data-i18n="btnCopyFile">
+                            העתק תוכן
+                          </button>
+                          <button class="btn btn-emerald btn-sm" id="btnSaveThisFileAs" onclick="savePreviewedFileAs()" style="display:none;" data-i18n="btnSaveFile">
+                            שמור קובץ למחשב...
+                          </button>
+                        </div>
+                      </div>
+                      <div id="inspFilePreviewCode" class="code-view">
+                        <div class="diff-line" style="color:var(--text-muted);">Click any file in the commit tree to inspect or download its exact historical snapshot.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-panel C: Remote GitHub Force-Push Events & Forks -->
+          <div id="subpanelRemote" style="display:none;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div class="card">
+                <h3 style="font-size:15px;font-weight:800;color:var(--cyan-bright);margin-bottom:10px;">
+                  GitHub Force-Push &amp; History Overwrite Events
+                </h3>
+                <div id="historyEventsList" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto;">
+                  <div style="color:var(--text-muted);font-size:13px;">No remote history overwrite events detected in recent GitHub Events window.</div>
+                </div>
+              </div>
+
+              <div class="card">
+                <h3 style="font-size:15px;font-weight:800;color:var(--purple-bright);margin-bottom:10px;">
+                  Public Forks &amp; Divergent Branch Audit
+                </h3>
+                <div id="forksAuditList" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto;">
+                  <div style="color:var(--text-muted);font-size:13px;">No public forks detected on this repository.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- VIEW 3: DISCOVERED SECRETS & AI TRIAGE                    -->
+        <!-- ========================================================= -->
+        <section id="viewFindings" class="view-panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <input type="text" id="findingsFilter" class="input-field" style="width:260px;" data-i18n-placeholder="filterFindingsPlaceholder" placeholder="Filter findings..." oninput="filterFindings()">
+              <select id="severityFilter" class="select-field" onchange="filterFindings()">
+                <option value="ALL" data-i18n="sevAll">All Severities</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </select>
+            </div>
+            <div style="font-size:12px;color:var(--neon-green);display:flex;align-items:center;gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span data-i18n="redactionNotice">Strict Redaction Active: Raw tokens are cryptographically masked before render.</span>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="thId">ID</th>
+                  <th data-i18n="thSeverity">Severity</th>
+                  <th data-i18n="thRule">Rule / Finding Type</th>
+                  <th data-i18n="thMasked">Masked Credential</th>
+                  <th data-i18n="thLocation">Location</th>
+                  <th data-i18n="thEntropy">Entropy</th>
+                  <th data-i18n="thVerdict">AI Triage Verdict</th>
+                  <th data-i18n="thActions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="findingsTableBody">
+                <tr>
+                  <td colspan="8" style="text-align:center;color:var(--text-muted);padding:36px;">
+                    Scan a GitHub repository to inspect discovered secrets and AI risk triage.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- VIEW 4: .ENV & CONFIG TIME-MACHINE                        -->
+        <!-- ========================================================= -->
+        <section id="viewTimeMachine" class="view-panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <input type="text" id="timeMachineFilter" class="input-field" style="width:260px;" data-i18n-placeholder="tmFilterPlaceholder" placeholder="Filter config files..." oninput="filterTimeMachine()">
+              <select id="timeMachineTypeFilter" class="select-field" onchange="filterTimeMachine()">
+                <option value="ALL" data-i18n="tmAllTypes">All File Types</option>
+                <option value="env">.env files</option>
+                <option value="key">Private Keys (*.pem, *.key)</option>
+                <option value="credential">Credentials &amp; Secrets</option>
+                <option value="terraform">Terraform State (*.tfstate)</option>
+                <option value="config">App Config (*.json, *.yml)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="thFileName">File Path</th>
+                  <th data-i18n="thCategory">Category</th>
+                  <th data-i18n="thOrigin">Origin Commit / Blob</th>
+                  <th data-i18n="thAuthorDate">Author / Date</th>
+                  <th data-i18n="thActions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="timeMachineTableBody">
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;">Scan a GitHub repository to exhume deleted or historical .env and configuration files.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- VIEW 5: DEEP SEARCH & DETACHED BLOBS                      -->
+        <!-- ========================================================= -->
+        <section id="viewSearchBlobs" class="view-panel">
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="font-size:15px;font-weight:800;color:var(--cyan-bright);margin-bottom:10px;" data-i18n="deepSearchTitle">
+              חיפוש עמוק בכל הקומיטים, ה-Diffs והקבצים בריפו
+            </h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <input
+                type="text"
+                id="deepSearchInput"
+                class="input-field"
+                style="flex:1;min-width:260px;"
+                data-i18n-placeholder="deepSearchPlaceholder"
+                placeholder="Search function name, variable, commit message, file path, or SHA..."
+                onkeydown="if(event.key==='Enter') runDeepSearch()"
+              >
+              <button class="btn btn-primary" onclick="runDeepSearch()" data-i18n="deepSearchBtn">בצע חיפוש עמוק</button>
+            </div>
+            <div id="deepSearchResults" style="margin-top:12px;display:none;flex-direction:column;gap:8px;"></div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <h3 style="font-size:15px;font-weight:800;color:var(--amber);" data-i18n="detachedBlobsTitle">
+                עצמי Blobs מנותקים במסד הנתונים של Git
+              </h3>
+              <span id="blobsCountPill" class="badge badge-medium">0 blobs</span>
+            </div>
+            <div id="danglingBlobsList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;">
+              <div style="color:var(--text-muted);font-size:13px;">No detached blobs detected in remote packfiles.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- VIEW 6: GITHUB HISTORY PURGE & REMEDIATION PLAYBOOK       -->
+        <!-- ========================================================= -->
+        <section id="viewRemediation" class="view-panel">
+          <div class="card">
+            <h3 style="font-size:16px;font-weight:800;margin-bottom:12px;color:#ffffff;" data-i18n="remTitle">
+              פרוטוקול ניקוי היסטוריית GitHub והסרת סודות לצמיתות
+            </h3>
+
+            <div style="background:rgba(255,42,109,0.13);border:1px solid rgba(255,42,109,0.45);border-radius:10px;padding:12px 15px;margin-bottom:18px;color:#ffd0df;font-size:13px;">
+              <strong>[!] Critical Credential Rotation Notice: </strong>
+              <span id="remediationRotationWarning">Always rotate any compromised credentials with your cloud or identity provider BEFORE rewriting GitHub commit history.</span>
+            </div>
+
+            <div id="remediationStepsList"></div>
+
+            <h4 style="font-size:14px;font-weight:800;margin:18px 0 8px;color:var(--neon-green);">Automated GitHub Mirror Purge Scripts (`git filter-repo`)</h4>
+            <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;">
+              <div class="segmented-bar">
+                <button class="seg-btn active" id="btnScriptBash" onclick="switchScriptTab('bash')">Bash (.sh)</button>
+                <button class="seg-btn" id="btnScriptPS" onclick="switchScriptTab('ps')">PowerShell (.ps1)</button>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="copyActiveScript()">Copy Script</button>
+              <button class="btn btn-emerald btn-sm" onclick="saveActiveScriptAs()">Save Script File...</button>
+            </div>
+
+            <div id="bashScriptContainer" class="code-view" style="padding:12px 16px;">
+              <pre id="remediationBashScript" style="white-space:pre-wrap;color:#9efcd6;font-family:inherit;"># Scan a GitHub repo to generate customized Bash mirror-purge script</pre>
+            </div>
+            <div id="psScriptContainer" class="code-view" style="padding:12px 16px;display:none;">
+              <pre id="remediationPSScript" style="white-space:pre-wrap;color:#9efcd6;font-family:inherit;"># Scan a GitHub repo to generate customized PowerShell mirror-purge script</pre>
+            </div>
+
+            <h4 style="font-size:14px;font-weight:800;margin:20px 0 6px;color:var(--purple-bright);">
+              GitHub Support Ticket (Server-Side Commit Cache Purge)
+            </h4>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;">
+              GitHub caches overwritten commit SHAs on its servers even after `git push --force --mirror`. Submit this auto-generated ticket to purge cached commits on GitHub's backend.
+            </p>
+            <div class="code-view" style="padding:12px 16px;">
+              <pre id="remediationSupportTicket" style="white-space:pre-wrap;color:#e9d5ff;font-family:inherit;"># Scan a GitHub repo to generate a ready-to-send GitHub Support cache purge request</pre>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="copySupportTicket()">Copy Support Ticket</button>
+              <button class="btn btn-purple btn-sm" onclick="openExternalUrl('https://support.github.com/contact')">Open GitHub Support ↗</button>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- MODAL 1: FINDING / FILE / BLOB INSPECTOR                        -->
+  <!-- =============================================================== -->
+  <div id="detailModal" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="modalTitle" style="font-size:16px;font-weight:800;color:#ffffff;">Artifact Inspector</h3>
+          <div id="modalSubtitle" class="ltr-mono" style="font-size:11.5px;color:var(--cyan-bright);margin-top:2px;"></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="modalTriageMeta">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Severity &amp; Verdict</div>
+              <div id="modalSeverityBadge" style="margin-top:4px;"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Shannon Entropy</div>
+              <div id="modalEntropyVal" class="ltr-mono" style="font-weight:800;margin-top:4px;color:var(--cyan-bright);"></div>
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Technical Explanation</div>
+            <div id="modalExplanation" style="font-size:13px;margin-top:3px;"></div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Recommended Action</div>
+            <div id="modalAction" style="font-size:13px;margin-top:3px;color:var(--neon-green);"></div>
+          </div>
+          <div id="modalLivenessRow" style="display:none;margin-bottom:12px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Passive Key Liveness Status</div>
+            <div id="modalLivenessBadge" style="margin-top:4px;font-weight:700;"></div>
+            <div id="modalLivenessDetails" style="font-size:12px;color:var(--text-secondary);margin-top:3px;"></div>
+          </div>
+        </div>
+        <div id="modalCodeView" class="code-view"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="modalVerifyBtn" class="btn btn-secondary" style="display:none;" onclick="verifyActiveModalKey()">Verify Key Liveness</button>
+        <button id="modalCopyBtn" class="btn btn-secondary" style="display:none;" onclick="copyModalContent()">Copy Content</button>
+        <button id="modalRecoverBtn" class="btn btn-primary" style="display:none;" onclick="recoverFromActiveModal()">Save / Export Artifact...</button>
+        <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- MODAL 2: SETTINGS & EPHEMERAL CREDENTIALS                       -->
+  <!-- =============================================================== -->
+  <div id="settingsModal" class="modal-overlay" onclick="if(event.target===this) closeSettingsModal()">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-header">
+        <h3 style="font-size:16px;font-weight:800;">Settings &amp; Ephemeral Credentials</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeSettingsModal()">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:16px;">
+        <div>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:6px;">AI Context Triage Engine</label>
+          <select id="aiProviderSelect" class="select-field" style="width:100%;" onchange="updateAISettingsUI()">
+            <option value="heuristic" selected>Heuristic Rule-Engine (Instant / Zero-Latency)</option>
+            <option value="auto">Auto-Detect Configured LLM</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI GPT-4o</option>
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="ollama">Local Ollama (http://127.0.0.1:11434)</option>
+            <option value="none">Disabled</option>
+          </select>
+          <div id="aiKeyInputRow" style="display:none;margin-top:8px;gap:6px;">
+            <input type="password" id="aiApiKeyInput" class="input-field ltr-mono" style="flex:1;" placeholder="API Key (held strictly in-memory)" autocomplete="off">
+            <button class="btn btn-secondary" onclick="saveAIKey()">Save Key</button>
+          </div>
+          <div id="aiKeyConfiguredRow" style="display:none;margin-top:8px;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.35);border-radius:8px;">
+            <span style="font-size:12px;color:var(--neon-green);font-weight:700;">[OK] AI Key Active (In-Memory)</span>
+            <button class="btn btn-secondary btn-sm" onclick="clearAIKey()">Clear</button>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:4px;">GitHub Personal Access Token (Optional Override)</label>
+          <div id="ghSystemAuthNotice" style="font-size:11.5px;color:var(--neon-green);margin-bottom:6px;display:none;">
+            ✓ System GitHub credentials detected automatically via Git Credential Manager (Private repos work out-of-the-box).
+          </div>
+          <div id="ghTokenInputRow" style="display:flex;gap:6px;">
+            <input type="password" id="githubTokenInput" class="input-field ltr-mono" style="flex:1;" placeholder="ghp_... (optional override, held in-memory)" autocomplete="off">
+            <button class="btn btn-secondary" onclick="saveGHToken()">Save Token</button>
+          </div>
+          <div id="ghTokenConfiguredRow" style="display:none;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.35);border-radius:8px;">
+            <span style="font-size:12px;color:var(--neon-green);font-weight:700;">[OK] Custom GitHub Token Active (In-Memory)</span>
+            <button class="btn btn-secondary btn-sm" onclick="clearGHToken()">Clear</button>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:6px;">
+            Shannon Entropy Sensitivity: <span id="entropyVal" class="ltr-mono">4.0</span>
+          </label>
+          <input type="range" id="entropyThreshold" min="3.0" max="5.5" step="0.1" value="4.0" style="width:100%;" oninput="document.getElementById('entropyVal').innerText=this.value">
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="scanForksToggle" checked>
+            <span>Audit Public Forks for Divergent / Overwritten Commits</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="includeRawToggle" onchange="toggleRawRecoveryMode(this.checked)">
+            <span>Allow Unredacted (Raw) File Recovery <span style="color:var(--amber);font-size:11.5px;">(exports unmasked original secrets)</span></span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeSettingsModal()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- MODAL 3: COMMAND PALETTE (Ctrl+K)                               -->
+  <!-- =============================================================== -->
+  <div id="cmdPaletteModal" class="modal-overlay" onclick="if(event.target===this) closeCmdPalette()">
+    <div class="modal-box" style="max-width:560px;">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+        <input
+          type="text"
+          id="cmdPaletteInput"
+          class="input-field"
+          style="width:100%;font-size:14px;"
+          placeholder="Type a command or jump to module..."
+          oninput="renderCmdPaletteItems()"
+          onkeydown="handleCmdPaletteKey(event)"
+        >
+      </div>
+      <div id="cmdPaletteList" style="max-height:340px;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:4px;"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">
+    <span id="toastMessage">Ready</span>
+  </div>
+
+  <!-- __UNFORCE_INLINE_JS__ -->
+</body>
+</html>
