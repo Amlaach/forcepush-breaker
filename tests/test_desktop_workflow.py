@@ -150,3 +150,156 @@ class TestDesktopStudioWorkflows:
                 "object_type": "file",
                 "commit_hash": lost_sha,
                 "file_path": "feature_x.py",
+                "create_backup": True,
+            },
+        )
+        assert rest_file_2["backup_path"] is not None
+        assert Path(rest_file_2["backup_path"]).exists()
+        # Clean untracked files before branch/cherry-pick tests
+        (tmp_path / "feature_x.py").unlink()
+        Path(rest_file_2["backup_path"]).unlink()
+
+        # 4. Path traversal attempt must fail with HTTP 400
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            _post_json(
+                f"{studio_server}/api/git/restore-file",
+                {
+                    "repo_path": str(tmp_path),
+                    "object_type": "file",
+                    "commit_hash": lost_sha,
+                    "file_path": "../outside.py",
+                },
+            )
+        assert exc_info.value.code == 400
+
+        # 5. Restore commit as new branch without switching HEAD
+        branch_res = _post_json(
+            f"{studio_server}/api/git/restore-branch",
+            {
+                "repo_path": str(tmp_path),
+                "commit_hash": lost_sha,
+                "branch_name": "recovered/feature-x",
+                "checkout": False,
+            },
+        )
+        assert branch_res["success"] is True
+        branch_tip = subprocess.check_output(
+            ["git", "rev-parse", "refs/heads/recovered/feature-x"],
+            cwd=str(tmp_path),
+            text=True,
+        ).strip()
+        assert branch_tip == lost_sha
+
+        # 6. Cherry-pick commit onto current main/master branch
+        cp_res = _post_json(
+            f"{studio_server}/api/git/cherry-pick",
+            {"repo_path": str(tmp_path), "commit_hash": lost_sha},
+        )
+        assert cp_res["success"] is True
+        assert (tmp_path / "feature_x.py").exists()
+
+
+class TestEngineFixesAndDaemon:
+    def test_remote_url_not_corrupted_in_remediation_scripts(self):
+        remote = "https://github.com/Amlaach/forcepush-breaker"
+        plan = RemediationGenerator.generate_plan(remote, [], dangling_commits_count=1)
+        assert remote in plan.bash_script
+        assert remote in plan.powershell_script
+        assert "C:\\" not in plan.bash_script
+
+    def test_extended_secret_rules_and_multiline_private_key_line_number(self):
+        redactor = SecretRedactor()
+        # Construct tokens dynamically so static scanners don't flag test literals
+        stripe_tok = "sk_live_" + "4eC39HqLyjWDarjtT1zdp7dc99"
+        pem_block = (
+            "header_1 = true\n"
+            "header_2 = true\n"
+            "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+            "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n"
+            "-----END OPENSSH PRIVATE KEY-----\n"
+        )
+        res_pem = redactor.scan_and_redact(pem_block, file_path="id_ed25519")
+        assert len(res_pem.findings) >= 1
+        assert res_pem.findings[0].line_number == 3
+        assert res_pem.findings[0].raw_value.startswith("-----BEGIN OPENSSH PRIVATE KEY-----")
+
+        res_stripe = redactor.scan_and_redact(f"STRIPE_KEY={stripe_tok}\n", file_path=".env")
+        assert any("Stripe" in f.rule_name for f in res_stripe.findings)
+        assert stripe_tok not in res_stripe.redacted_text
+
+    def test_daemon_handshake_and_graceful_shutdown(self):
+        gitghost_root = Path(__file__).resolve().parent.parent
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "gitghost", "--daemon", "--port", "0"],
+            cwd=str(gitghost_root),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            assert proc.stdout is not None
+            ready_line = proc.stdout.readline().strip()
+            payload = json.loads(ready_line)
+            assert payload["event"] == "server_ready"
+            url = payload["url"]
+
+            with urllib.request.urlopen(f"{url}/api/status", timeout=5) as resp:
+                st = json.loads(resp.read().decode("utf-8"))
+                assert st["status"] == "ok"
+
+            _post_json(f"{url}/api/shutdown", {})
+            proc.wait(timeout=8)
+            assert proc.returncode == 0
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+
+    def test_permissive_github_urls_and_deleted_env_timemachine(self, studio_server: str, tmp_path: Path):
+        from gitghost.github_remote import parse_github_url
+
+        parsed = parse_github_url("https://github.com/Amlaach/forcepush-breaker/tree/main?tab=readme-ov-file")
+        assert parsed is not None
+        assert parsed.owner == "Amlaach"
+        assert parsed.repo == "forcepush-breaker"
+        assert parsed.clone_url == "https://github.com/Amlaach/forcepush-breaker.git"
+
+        # Create a repo where .env was committed and later removed via `git rm` (no force-push)
+        subprocess.run(["git", "init"], cwd=str(tmp_path), check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "SecDev"], cwd=str(tmp_path), check=True)
+        subprocess.run(["git", "config", "user.email", "sec@example.com"], cwd=str(tmp_path), check=True)
+        (tmp_path / ".env").write_text("APP_MODE=production\nPORT=8080\n", encoding="utf-8")
+        subprocess.run(["git", "add", ".env"], cwd=str(tmp_path), check=True)
+        subprocess.run(["git", "commit", "-m", "chore: add env config"], cwd=str(tmp_path), check=True)
+
+        subprocess.run(["git", "rm", ".env"], cwd=str(tmp_path), check=True, capture_output=True)
+        (tmp_path / "main.py").write_text("print('clean')\n", encoding="utf-8")
+        subprocess.run(["git", "add", "main.py"], cwd=str(tmp_path), check=True)
+        subprocess.run(["git", "commit", "-m", "fix: remove env and add main"], cwd=str(tmp_path), check=True)
+
+        scan_res = _post_json(f"{studio_server}/api/scan", {"repo_path": str(tmp_path)})
+        assert len(scan_res["branch_commits"]) >= 2
+        del_cfgs = scan_res["deleted_config_files"]
+        env_entry = next((c for c in del_cfgs if c["file_path"] == ".env"), None)
+        assert env_entry is not None
+
+        # Recover the deleted .env from its pre-deletion parent commit!
+        rec_res = _post_json(
+            f"{studio_server}/api/recover/file",
+            {
+                "repo_path": str(tmp_path),
+                "object_type": "file",
+                "commit_hash": env_entry["commit_hash"],
+                "file_path": ".env",
+            },
+        )
+        assert rec_res["success"] is True
+        assert "APP_MODE=production" in rec_res["content"]
+
+        # On-demand commit diff for branch commit
+        head_sha = scan_res["branch_commits"][0]["commit_hash"]
+        diff_res = _post_json(
+            f"{studio_server}/api/commit/diff",
+            {"repo_path": str(tmp_path), "commit_hash": head_sha},
+        )
+        assert diff_res["success"] is True
+        assert "main.py" in diff_res["diff"]
