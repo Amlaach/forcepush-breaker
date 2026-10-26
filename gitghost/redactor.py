@@ -119,6 +119,46 @@ class SecretRedactor:
             "mask_type": "preserve_edges",
         },
         {
+            "name": "Stripe Secret / Restricted Key",
+            "regex": re.compile(
+                r"\b((?:sk|rk)_(?:live|test)_[0-9a-zA-Z]{24,})\b"
+            ),
+            "severity": "Critical",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "NPM Access Token",
+            "regex": re.compile(r"\b(npm_[A-Za-z0-9]{36})\b"),
+            "severity": "High",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "PyPI Upload Token",
+            "regex": re.compile(r"\b(pypi-[A-Za-z0-9_\-]{50,})\b"),
+            "severity": "High",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "SendGrid API Key",
+            "regex": re.compile(r"\b(SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43})\b"),
+            "severity": "High",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "Slack / Discord Webhook URL",
+            "regex": re.compile(
+                r"\b(https://(?:hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]+|(?:ptb\.|canary\.)?discord(?:app)?\.com/api/webhooks/[0-9]+/[A-Za-z0-9_\-]+))\b"
+            ),
+            "severity": "High",
+            "mask_type": "preserve_edges",
+        },
+        {
+            "name": "Telegram Bot Token",
+            "regex": re.compile(r"\b([0-9]{8,10}:AA[A-Za-z0-9_\-]{33})\b"),
+            "severity": "High",
+            "mask_type": "preserve_edges",
+        },
+        {
             "name": "Private Key Block",
             "regex": re.compile(
                 r"-----BEGIN (?:RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY-----[\s\S]*?-----END (?:RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY-----"
@@ -195,6 +235,7 @@ class SecretRedactor:
             finding_counter += 1
             fid = f"PK-{finding_counter:04d}"
             raw_pk_block = match.group(0)
+            pk_line_number = text[: match.start()].count("\n") + 1
             entropy = shannon_entropy(raw_pk_block)
             masked_pk = "-----BEGIN PRIVATE KEY-----\n[REDACTED_PRIVATE_KEY_BLOCK]\n-----END PRIVATE KEY-----"
             working_text = working_text.replace(raw_pk_block, masked_pk)
@@ -205,12 +246,13 @@ class SecretRedactor:
                     match_type="pattern",
                     severity_estimate="Critical",
                     masked_value="[REDACTED_PRIVATE_KEY_BLOCK]",
-                    line_number=1,
+                    line_number=pk_line_number,
                     context_line="-----BEGIN PRIVATE KEY----- ... [REDACTED_PRIVATE_KEY_BLOCK]",
                     entropy=round(entropy, 2),
                     file_path=file_path,
                     commit_hash=commit_hash,
                     blob_hash=blob_hash,
+                    raw_value=raw_pk_block,
                 )
             )
 
