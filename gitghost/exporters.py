@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from gitghost import __version__
 from gitghost.ai_triage import AITriageResult
 from gitghost.git_forensics import ForensicsScanResult
 from gitghost.redactor import SecretFinding
@@ -281,8 +282,8 @@ class ReportExporter:
                 "tool": {
                     "driver": {
                         "name": "GitGhost",
-                        "version": "0.1.0",
-                        "informationUri": "https://github.com/your-username/gitghost",
+                        "version": __version__,
+                        "informationUri": "https://github.com/Amlaach/forcepush-breaker",
                         "rules": list(rules_dict.values()),
                     }
                 },
