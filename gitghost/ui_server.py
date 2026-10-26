@@ -696,3 +696,701 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 "full_name": f.full_name,
                 "clone_url": f.clone_url,
                 "html_url": f.html_url,
+                "default_branch": f.default_branch,
+                "pushed_at": f.pushed_at,
+                "stargazers_count": f.stargazers_count,
+                "forks_count": f.forks_count,
+            }
+            for f in getattr(pipeline_res, "discovered_forks", [])
+        ]
+
+        gh_parsed = parse_github_url(pipeline_res.remote_url or pipeline_res.repo_path)
+        gh_html_url = gh_parsed.html_url if gh_parsed else ""
+
+        return {
+            "repo_path": pipeline_res.repo_path,
+            "is_remote": pipeline_res.is_remote,
+            "remote_url": pipeline_res.remote_url,
+            "github_html_url": gh_html_url,
+            "github_full_name": gh_parsed.full_name if gh_parsed else "",
+            "scan_timestamp": pipeline_res.scan_result.scan_timestamp,
+            "total_objects_scanned": pipeline_res.scan_result.total_objects_scanned,
+            "repo_metadata": repo_meta_payload,
+            "reflog_entries": reflog_payload,
+            "dangling_commits": commits_payload,
+            "branch_commits": branch_commits_payload,
+            "dangling_blobs": blobs_payload,
+            "deleted_config_files": config_files_payload,
+            "history_events": history_events_payload,
+            "discovered_forks": forks_payload,
+            "findings": findings_payload,
+            "hygiene_score": hygiene_payload,
+            "remediation": remediation_payload,
+        }
+
+    def _resolve_pipeline_result(self, repo_path_str: str) -> Optional[Any]:
+        from gitghost.github_remote import is_github_target, parse_github_url
+        from gitghost.pipeline import run_scan_pipeline
+
+        target = (repo_path_str or "").strip()
+        with _CACHE_LOCK:
+            if target and target in _SCAN_CACHE:
+                return _SCAN_CACHE[target]
+            gh = parse_github_url(target)
+            if gh:
+                for candidate in (gh.clone_url, gh.html_url, gh.full_name):
+                    if candidate in _SCAN_CACHE:
+                        return _SCAN_CACHE[candidate]
+            if target and not is_github_target(target):
+                try:
+                    resolved = str(Path(target).resolve())
+                    if resolved in _SCAN_CACHE:
+                        return _SCAN_CACHE[resolved]
+                except Exception:
+                    pass
+            if "__latest__" in _SCAN_CACHE:
+                if not target or target == ".":
+                    return _SCAN_CACHE["__latest__"]
+
+        if not target:
+            self._send_error(400, "No scanned repository in session yet. Scan a GitHub repository URL first.")
+            return None
+
+        validated = self._validate_target_or_error(target)
+        if validated is None:
+            return None
+        try:
+            pipeline_res = run_scan_pipeline(validated, ai_provider="heuristic", keep_remote_workspace=True)
+            if getattr(pipeline_res, "local_mirror_path", None):
+                _register_session_mirror(pipeline_res.local_mirror_path)
+            _cache_pipeline_result(pipeline_res, validated)
+            return pipeline_res
+        except Exception as exc:
+            self._send_error(500, str(exc))
+            return None
+
+    def _find_commit_obj(self, pipeline_res: Any, commit_hash: str) -> Optional[Any]:
+        for c in pipeline_res.scan_result.dangling_commits:
+            if c.commit_hash == commit_hash or c.commit_hash.startswith(commit_hash):
+                return c
+        for c in getattr(pipeline_res.scan_result, "branch_commits", []):
+            if c.commit_hash == commit_hash or c.commit_hash.startswith(commit_hash):
+                return c
+        return None
+
+    def _handle_commit_diff(self, data: dict):
+        from gitghost.git_forensics import GitForensics
+        from gitghost.pipeline import _scan_unified_diff_by_file
+        from gitghost.redactor import SecretRedactor
+
+        repo_path_str = (data.get("repo_path") or "").strip()
+        commit_hash = (data.get("commit_hash") or "").strip()
+        include_raw = bool(data.get("include_raw", False))
+
+        if not commit_hash:
+            self._send_error(400, "commit_hash is required.")
+            return
+
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+
+        commit_obj = self._find_commit_obj(pipeline_res, commit_hash)
+        if commit_obj:
+            if include_raw and commit_obj.diff_content:
+                self._send_json({"success": True, "commit_hash": commit_obj.commit_hash, "diff": commit_obj.diff_content})
+                return
+            if not include_raw and commit_obj.redacted_diff:
+                self._send_json({"success": True, "commit_hash": commit_obj.commit_hash, "diff": commit_obj.redacted_diff})
+                return
+
+        git_dir = _get_effective_git_dir(pipeline_res)
+        if git_dir:
+            raw_diff = GitForensics(git_dir).read_commit_diff(
+                commit_obj.commit_hash if commit_obj else commit_hash
+            )
+            if raw_diff is not None:
+                if include_raw:
+                    out_diff = raw_diff
+                else:
+                    red = SecretRedactor()
+                    fb = commit_obj.changed_files[0] if (commit_obj and commit_obj.changed_files) else "Diff"
+                    out_diff = _scan_unified_diff_by_file(red, raw_diff, fb, commit_hash).redacted_text
+                    if commit_obj:
+                        commit_obj.diff_content = raw_diff
+                        commit_obj.redacted_diff = out_diff
+                self._send_json({
+                    "success": True,
+                    "commit_hash": commit_obj.commit_hash if commit_obj else commit_hash,
+                    "diff": out_diff,
+                })
+                return
+
+        self._send_json({"success": True, "commit_hash": commit_hash, "diff": ""})
+
+    def _handle_commit_files(self, data: dict):
+        from gitghost.git_forensics import GitForensics
+
+        repo_path_str = (data.get("repo_path") or "").strip()
+        commit_hash = (data.get("commit_hash") or "").strip()
+        if not commit_hash:
+            self._send_error(400, "commit_hash is required.")
+            return
+
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+
+        commit_obj = self._find_commit_obj(pipeline_res, commit_hash)
+        changed_set = set(commit_obj.changed_files) if commit_obj else set()
+        tree_files: List[Dict[str, Any]] = []
+
+        git_dir = _get_effective_git_dir(pipeline_res)
+        if git_dir:
+            forensics = GitForensics(git_dir)
+            full_sha = commit_obj.commit_hash if commit_obj else commit_hash
+            raw_tree = forensics.list_commit_files(full_sha)
+            for item in raw_tree:
+                tree_files.append({
+                    "path": item["path"],
+                    "size": item["size"],
+                    "blob_hash": item["blob_hash"],
+                    "is_changed": item["path"] in changed_set,
+                })
+
+        if not tree_files and commit_obj:
+            snapshots = getattr(commit_obj, "file_snapshots", {}) or {}
+            for fp in commit_obj.changed_files:
+                snap = snapshots.get(fp, "")
+                tree_files.append({
+                    "path": fp,
+                    "size": len(snap.encode("utf-8")) if snap else 0,
+                    "blob_hash": "",
+                    "is_changed": True,
+                })
+
+        tree_files.sort(key=lambda x: (0 if x["is_changed"] else 1, x["path"]))
+        self._send_json({
+            "success": True,
+            "commit_hash": commit_obj.commit_hash if commit_obj else commit_hash,
+            "changed_files": list(changed_set),
+            "files": tree_files,
+        })
+
+    def _handle_commit_file_preview(self, data: dict):
+        from gitghost.git_forensics import GitForensics
+        from gitghost.recovery import ObjectRecoveryEngine
+        from gitghost.redactor import SecretRedactor
+
+        repo_path_str = (data.get("repo_path") or "").strip()
+        commit_hash = (data.get("commit_hash") or "").strip()
+        file_path = (data.get("file_path") or "").strip()
+        include_raw = bool(data.get("include_raw", False))
+
+        if not commit_hash or not file_path:
+            self._send_error(400, "commit_hash and file_path are required.")
+            return
+
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+
+        # 1. Try session Git mirror directly for instant full-file snapshot
+        git_dir = _get_effective_git_dir(pipeline_res)
+        if git_dir:
+            raw_content = GitForensics(git_dir).read_commit_file(commit_hash, file_path)
+            if raw_content is not None:
+                content = (
+                    raw_content
+                    if include_raw
+                    else SecretRedactor().scan_and_redact(
+                        raw_content, file_path=file_path, commit_hash=commit_hash
+                    ).redacted_text
+                )
+                self._send_json({
+                    "success": True,
+                    "file_path": file_path,
+                    "commit_hash": commit_hash,
+                    "is_redacted": not include_raw,
+                    "content": content,
+                })
+                return
+
+        # 2. Fallback to ObjectRecoveryEngine (handles API-recovered commits & pre-populated snapshots)
+        try:
+            artifact = ObjectRecoveryEngine.recover_commit_file(
+                pipeline_res,
+                commit_hash,
+                file_path=file_path,
+                include_raw=include_raw,
+            )
+            self._send_json({
+                "success": True,
+                "file_path": file_path,
+                "commit_hash": artifact.object_hash,
+                "is_redacted": artifact.is_redacted,
+                "content": artifact.content,
+            })
+            return
+        except ValueError:
+            pass
+
+        self._send_error(404, f"Could not read file '{file_path}' at commit '{commit_hash[:10]}'.")
+
+    def _handle_cleanup(self, data: dict):
+        from gitghost.git_forensics import GitForensics
+        from gitghost.github_remote import is_github_target
+
+        repo_path_str = (data.get("repo_path") or ".").strip() or "."
+        if is_github_target(repo_path_str):
+            self._send_error(400, "Use the GitHub Purge Playbook & Support Ticket for remote GitHub repositories.")
+            return
+        repo_path = Path(repo_path_str).resolve()
+        if not GitForensics(repo_path).is_valid_repo():
+            self._send_error(400, "Target is not a valid Git repository.")
+            return
+
+        try:
+            subprocess.run(
+                ["git", "reflog", "expire", "--expire=now", "--expire-unreachable=now", "--all"],
+                cwd=str(repo_path),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "gc", "--prune=now", "--aggressive"],
+                cwd=str(repo_path),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            with _CACHE_LOCK:
+                _SCAN_CACHE.pop(str(repo_path), None)
+            self._send_json({"success": True, "message": "All unreferenced objects permanently excised."})
+        except subprocess.CalledProcessError as e:
+            self._send_error(500, f"Git command failed: {e.stderr or e.stdout}")
+
+    def _handle_git_restore_branch(self, data: dict):
+        from gitghost.github_remote import is_github_target
+        from gitghost.recovery import ObjectRecoveryEngine
+
+        repo_path_str = (data.get("repo_path") or ".").strip() or "."
+        commit_hash = (data.get("commit_hash") or "").strip()
+        branch_name = (data.get("branch_name") or "").strip()
+        checkout = bool(data.get("checkout", False))
+
+        if is_github_target(repo_path_str):
+            self._send_error(400, "Branch restoration requires a local clone.")
+            return
+
+        try:
+            res = ObjectRecoveryEngine.restore_commit_as_branch(
+                repo_path=repo_path_str,
+                commit_hash=commit_hash,
+                branch_name=branch_name,
+                checkout=checkout,
+            )
+            self._send_json(res)
+        except ValueError as ve:
+            self._send_error(400, str(ve))
+        except Exception as exc:
+            self._send_error(500, str(exc))
+
+    def _handle_git_cherry_pick(self, data: dict):
+        from gitghost.github_remote import is_github_target
+        from gitghost.recovery import ObjectRecoveryEngine
+
+        repo_path_str = (data.get("repo_path") or ".").strip() or "."
+        commit_hash = (data.get("commit_hash") or "").strip()
+        no_commit = bool(data.get("no_commit", False))
+
+        if is_github_target(repo_path_str):
+            self._send_error(400, "Cherry-pick requires a local repository.")
+            return
+
+        try:
+            res = ObjectRecoveryEngine.cherry_pick_commit(
+                repo_path=repo_path_str,
+                commit_hash=commit_hash,
+                no_commit=no_commit,
+            )
+            self._send_json(res)
+        except ValueError as ve:
+            self._send_error(400, str(ve))
+        except Exception as exc:
+            self._send_error(500, str(exc))
+
+    def _handle_git_restore_file(self, data: dict):
+        from gitghost.recovery import ObjectRecoveryEngine
+
+        repo_path_str = (data.get("repo_path") or ".").strip() or "."
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+
+        try:
+            res = ObjectRecoveryEngine.restore_file_to_disk(
+                pipeline_res=pipeline_res,
+                object_type=(data.get("object_type") or "file").strip().lower(),
+                commit_hash=(data.get("commit_hash") or "").strip(),
+                blob_hash=(data.get("blob_hash") or "").strip(),
+                file_path=(data.get("file_path") or "").strip(),
+                destination_path=(data.get("destination_path") or "").strip() or None,
+                include_raw=bool(data.get("include_raw", False)),
+                create_backup=bool(data.get("create_backup", True)),
+            )
+            self._send_json(res)
+        except ValueError as ve:
+            self._send_error(400, str(ve))
+        except Exception as exc:
+            self._send_error(500, str(exc))
+
+    def _handle_search(self, data: dict):
+        repo_path_str = (data.get("repo_path") or "").strip()
+        query = (data.get("query") or "").strip()
+        if not query:
+            self._send_json({"matches": [], "query": ""})
+            return
+
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+
+        q_lower = query.lower()
+        matches: List[Dict[str, Any]] = []
+        seen_commits = set()
+
+        all_commits = list(pipeline_res.scan_result.dangling_commits) + list(
+            getattr(pipeline_res.scan_result, "branch_commits", [])
+        )
+
+        for c in all_commits:
+            if c.commit_hash in seen_commits:
+                continue
+            msg_red = c.redacted_message or c.message
+            diff_red = c.redacted_diff or ""
+            in_meta = (
+                q_lower in c.commit_hash.lower()
+                or q_lower in (c.author or "").lower()
+                or q_lower in msg_red.lower()
+                or any(q_lower in fp.lower() for fp in c.changed_files)
+            )
+            in_diff = q_lower in diff_red.lower()
+            if in_meta or in_diff:
+                seen_commits.add(c.commit_hash)
+                snippet = msg_red.splitlines()[0] if msg_red else ""
+                if in_diff:
+                    for ln in diff_red.splitlines():
+                        if q_lower in ln.lower():
+                            snippet = ln[:180]
+                            break
+                matches.append({
+                    "kind": "commit",
+                    "is_dangling": getattr(c, "is_dangling", True),
+                    "hash": c.commit_hash,
+                    "title": (msg_red.splitlines()[0] if msg_red else c.commit_hash[:10]),
+                    "subtitle": f"{c.author} • {c.date[:10] if c.date else ''}",
+                    "snippet": snippet,
+                    "files": c.changed_files,
+                })
+
+        for b in pipeline_res.scan_result.dangling_blobs:
+            if b.is_binary:
+                continue
+            red = b.redacted_content or ""
+            path_str = b.associated_path or "Detached Blob"
+            if q_lower in b.blob_hash.lower() or q_lower in path_str.lower() or q_lower in red.lower():
+                snippet = ""
+                for ln in red.splitlines():
+                    if q_lower in ln.lower():
+                        snippet = ln[:180]
+                        break
+                matches.append({
+                    "kind": "blob",
+                    "hash": b.blob_hash,
+                    "title": path_str,
+                    "subtitle": f"Blob {b.blob_hash[:10]} • {b.size} bytes",
+                    "snippet": snippet or (red[:140] if red else ""),
+                })
+
+        for f in pipeline_res.findings:
+            if (
+                q_lower in f.rule_name.lower()
+                or q_lower in (f.file_path or "").lower()
+                or q_lower in f.finding_id.lower()
+                or q_lower in (f.context_line or "").lower()
+            ):
+                matches.append({
+                    "kind": "finding",
+                    "hash": f.commit_hash or f.blob_hash or "",
+                    "finding_id": f.finding_id,
+                    "title": f"[{f.finding_id}] {f.rule_name}",
+                    "subtitle": f"{f.file_path}:{f.line_number}",
+                    "snippet": f.context_line[:180],
+                })
+
+        self._send_json({"query": query, "matches": matches[:100]})
+
+    def _build_report_payload(self, pipeline_res: Any, fmt: str) -> tuple[str, str, str]:
+        from gitghost.exporters import ReportExporter
+
+        fmt_norm = (fmt or "sarif").lower()
+        if fmt_norm == "sarif":
+            content = ReportExporter.to_sarif(
+                pipeline_res.scan_result, pipeline_res.findings, pipeline_res.triage_map
+            )
+            return content, "unforce_report.sarif", "application/json; charset=utf-8"
+        if fmt_norm == "json":
+            content = ReportExporter.to_json(
+                pipeline_res.scan_result,
+                pipeline_res.findings,
+                pipeline_res.triage_map,
+                pipeline_res.hygiene,
+                pipeline_res.remediation,
+            )
+            return content, "unforce_report.json", "application/json; charset=utf-8"
+        content = ReportExporter.to_markdown(
+            pipeline_res.scan_result,
+            pipeline_res.findings,
+            pipeline_res.triage_map,
+            pipeline_res.hygiene,
+            pipeline_res.remediation,
+        )
+        return content, "unforce_report.md", "text/markdown; charset=utf-8"
+
+    def _handle_download_report_get(self):
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        repo_path_str = (params.get("repo_path") or [""])[0]
+        fmt = (params.get("format") or ["json"])[0]
+        self._handle_download_report({"repo_path": repo_path_str, "format": fmt})
+
+    def _handle_download_report(self, data: dict):
+        repo_path_str = (data.get("repo_path") or "").strip()
+        fmt = (data.get("format") or "json").lower()
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+        content, filename, content_type = self._build_report_payload(pipeline_res, fmt)
+        self._send_download(content.encode("utf-8"), filename, content_type)
+
+    def _handle_download_bundle_get(self):
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        repo_path_str = (params.get("repo_path") or [""])[0]
+        raw_param = (params.get("include_raw") or ["false"])[0].lower()
+        include_raw = raw_param in ("1", "true", "yes")
+        self._handle_download_bundle({"repo_path": repo_path_str, "include_raw": include_raw})
+
+    def _handle_download_bundle(self, data: dict):
+        from gitghost.recovery import ObjectRecoveryEngine
+
+        repo_path_str = (data.get("repo_path") or "").strip()
+        include_raw = bool(data.get("include_raw", False))
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+        try:
+            zip_bytes = ObjectRecoveryEngine.build_recovery_zip_bundle(
+                pipeline_res, include_raw=include_raw
+            )
+            filename = (
+                "unforce_recovery_bundle_raw.zip"
+                if include_raw
+                else "unforce_recovery_bundle.zip"
+            )
+            self._send_download(zip_bytes, filename, "application/zip")
+        except Exception as exc:
+            self._send_error(500, f"Failed to build recovery bundle: {exc}")
+
+    def _handle_recover_file(self, data: dict):
+        from gitghost.git_forensics import GitForensics
+        from gitghost.pipeline import _scan_unified_diff_by_file
+        from gitghost.recovery import ObjectRecoveryEngine
+        from gitghost.redactor import SecretRedactor
+
+        repo_path_str = (data.get("repo_path") or "").strip()
+        include_raw = bool(data.get("include_raw", False))
+        object_type = (data.get("object_type") or "").strip().lower()
+        commit_hash = (data.get("commit_hash") or "").strip()
+        blob_hash = (data.get("blob_hash") or "").strip()
+        file_path = (data.get("file_path") or "").strip()
+
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+
+        artifact_content: Optional[str] = None
+        artifact_filename: str = "recovered.txt"
+        artifact_redacted: bool = not include_raw
+        artifact_source: str = object_type or "file"
+        artifact_hash: str = commit_hash or blob_hash
+
+        try:
+            if object_type == "blob" or (blob_hash and not commit_hash):
+                art = ObjectRecoveryEngine.recover_blob(pipeline_res, blob_hash, include_raw=include_raw)
+                artifact_content, artifact_filename, artifact_redacted = art.content, art.filename, art.is_redacted
+                artifact_source, artifact_hash, file_path = art.source_type, art.object_hash, art.file_path or file_path
+            elif object_type == "diff" or (commit_hash and not file_path and object_type != "file"):
+                try:
+                    art = ObjectRecoveryEngine.recover_commit_diff(pipeline_res, commit_hash, include_raw=include_raw)
+                    artifact_content, artifact_filename, artifact_redacted = art.content, art.filename, art.is_redacted
+                    artifact_source, artifact_hash = art.source_type, art.object_hash
+                except ValueError:
+                    git_dir = _get_effective_git_dir(pipeline_res)
+                    if git_dir:
+                        raw_d = GitForensics(git_dir).read_commit_diff(commit_hash)
+                        if raw_d:
+                            artifact_content = (
+                                raw_d
+                                if include_raw
+                                else _scan_unified_diff_by_file(SecretRedactor(), raw_d, "Diff", commit_hash).redacted_text
+                            )
+                            artifact_filename = f"commit_{commit_hash[:10]}.patch"
+                            artifact_source = "commit_diff"
+            elif commit_hash:
+                # Prefer direct mirror read if available (supports both dangling & historical branch commits)
+                git_dir = _get_effective_git_dir(pipeline_res)
+                if git_dir and file_path:
+                    raw_f = GitForensics(git_dir).read_commit_file(commit_hash, file_path)
+                    if raw_f is not None:
+                        artifact_content = (
+                            raw_f
+                            if include_raw
+                            else SecretRedactor().scan_and_redact(raw_f, file_path=file_path, commit_hash=commit_hash).redacted_text
+                        )
+                        base_n = Path(file_path).name or "recovered_file.txt"
+                        artifact_filename = base_n
+                        artifact_source = "commit_file"
+
+                if artifact_content is None:
+                    art = ObjectRecoveryEngine.recover_commit_file(
+                        pipeline_res, commit_hash, file_path=file_path or None, include_raw=include_raw
+                    )
+                    artifact_content, artifact_filename, artifact_redacted = art.content, art.filename, art.is_redacted
+                    artifact_source, artifact_hash = art.source_type, art.object_hash
+            else:
+                self._send_error(400, "Must provide commit_hash or blob_hash for recovery.")
+                return
+        except ValueError as ve:
+            self._send_error(404, str(ve))
+            return
+        except Exception as exc:
+            self._send_error(500, f"Recovery failed: {exc}")
+            return
+
+        if artifact_content is None:
+            self._send_error(404, "Requested object could not be recovered.")
+            return
+
+        if data.get("download"):
+            self._send_download(
+                artifact_content.encode("utf-8"),
+                artifact_filename,
+                "text/plain; charset=utf-8",
+            )
+            return
+
+        self._send_json({
+            "success": True,
+            "filename": artifact_filename,
+            "content": artifact_content,
+            "is_redacted": artifact_redacted,
+            "source_type": artifact_source,
+            "object_hash": artifact_hash,
+            "file_path": file_path,
+        })
+
+    def _handle_export(self, data: dict):
+        from gitghost.github_remote import is_github_target
+
+        repo_path_str = (data.get("repo_path") or ".").strip() or "."
+        fmt = (data.get("format", "sarif") or "sarif").lower()
+
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if pipeline_res is None:
+            return
+
+        content, filename, _ = self._build_report_payload(pipeline_res, fmt)
+        custom_out = (data.get("output_path") or "").strip()
+        if custom_out:
+            out_file = Path(custom_out).resolve()
+        else:
+            target_dir = Path.cwd() if is_github_target(repo_path_str) else Path(repo_path_str).resolve()
+            out_file = target_dir / filename
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        out_file.write_text(content, encoding="utf-8")
+        self._send_json({"success": True, "file_path": str(out_file), "filename": out_file.name, "content": content})
+
+    def _handle_hook(self, data: dict):
+        from gitghost.exporters import ReportExporter
+        from gitghost.github_remote import is_github_target
+
+        repo_path_str = (data.get("repo_path") or ".").strip() or "."
+        if is_github_target(repo_path_str):
+            self._send_error(400, "Pre-push hook installation applies to local clones.")
+            return
+        repo_path = Path(repo_path_str).resolve()
+        success, hook_path, notice = ReportExporter.install_pre_push_hook(repo_path)
+        if success:
+            self._send_json({"success": True, "hook_path": hook_path, "notice": notice})
+        else:
+            self._send_error(400, f"Failed to install pre-push hook: {hook_path}")
+
+    def _handle_verify_key(self, data: dict):
+        from gitghost.github_remote import parse_github_url
+        from gitghost.liveness import SafeKeyLivenessChecker
+
+        finding_id = str(data.get("finding_id") or "").strip()
+        rule_name = str(data.get("rule_name") or "").strip()
+        raw_token = str(data.get("raw_token") or "").strip()
+        repo_path = str(data.get("repo_path") or "").strip()
+
+        if not raw_token and finding_id:
+            with _CACHE_LOCK:
+                cached = _SCAN_CACHE.get(repo_path)
+                if not cached:
+                    gh = parse_github_url(repo_path)
+                    if gh:
+                        cached = _SCAN_CACHE.get(gh.clone_url) or _SCAN_CACHE.get(gh.html_url)
+                if not cached:
+                    cached = _SCAN_CACHE.get("__latest__")
+                if cached:
+                    for f in cached.findings:
+                        if f.finding_id == finding_id:
+                            rule_name = rule_name or f.rule_name
+                            raw_token = f.raw_value or ""
+                            break
+
+        if not raw_token:
+            self._send_error(400, "Token value could not be resolved. Please scan the repository first.")
+            return
+
+        result = SafeKeyLivenessChecker.check(
+            token=raw_token,
+            rule_name=rule_name,
+            finding_id=finding_id,
+        )
+        self._send_json(result.to_dict())
+
+
+def start_ui_server(host: str = "127.0.0.1", start_port: int = 8765) -> tuple[ThreadingHTTPServer, int]:
+    """Starts the UnForce UI HTTP server on the requested or first available port (start_port=0 for OS-assigned)."""
+    if start_port == 0:
+        server = ThreadingHTTPServer((host, 0), GitGhostRequestHandler)
+        bound_port = int(server.server_address[1])
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
+        return server, bound_port
+
+    port = start_port
+    while port < start_port + 30:
+        try:
+            server = ThreadingHTTPServer((host, port), GitGhostRequestHandler)
+            server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+            server_thread.start()
+            return server, port
+        except OSError:
+            port += 1
+    raise RuntimeError(f"Could not bind UI server to any port between {start_port} and {port}")
