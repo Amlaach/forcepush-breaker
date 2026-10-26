@@ -9,12 +9,27 @@ active (ACTIVE) or have been successfully rotated/revoked (REVOKED).
 from __future__ import annotations
 
 import json
+import os
 import re
+import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
+
+
+def _urlopen_safe(req: urllib.request.Request, timeout: int) -> Any:
+    """Opens URL with standard SSL verification, falling back only when local SSL proxy intercepts."""
+    try:
+        return urllib.request.urlopen(req, timeout=timeout)
+    except urllib.error.HTTPError:
+        raise
+    except urllib.error.URLError as exc:
+        if "CERTIFICATE_VERIFY_FAILED" in str(exc):
+            ctx = ssl._create_unverified_context()
+            return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+        raise
 
 
 @dataclass(frozen=True)
@@ -114,7 +129,7 @@ class SafeKeyLivenessChecker:
             method="GET",
         )
         try:
-            with urllib.request.urlopen(req, timeout=cls.PROBE_TIMEOUT_SECONDS) as resp:
+            with _urlopen_safe(req, timeout=cls.PROBE_TIMEOUT_SECONDS) as resp:
                 data = json.loads(resp.read().decode("utf-8", errors="replace"))
                 rate = data.get("rate") or {}
                 limit = rate.get("limit", "?")
@@ -166,7 +181,7 @@ class SafeKeyLivenessChecker:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=cls.PROBE_TIMEOUT_SECONDS) as resp:
+            with _urlopen_safe(req, timeout=cls.PROBE_TIMEOUT_SECONDS) as resp:
                 data = json.loads(resp.read().decode("utf-8", errors="replace"))
                 if data.get("ok"):
                     team = data.get("team", "Unknown")
@@ -237,7 +252,7 @@ class SafeKeyLivenessChecker:
             method="GET",
         )
         try:
-            with urllib.request.urlopen(req, timeout=cls.PROBE_TIMEOUT_SECONDS) as resp:
+            with _urlopen_safe(req, timeout=cls.PROBE_TIMEOUT_SECONDS) as resp:
                 if resp.status == 200:
                     return KeyLivenessResult(
                         finding_id=finding_id,
@@ -286,7 +301,7 @@ class SafeKeyLivenessChecker:
             method="GET",
         )
         try:
-            with urllib.request.urlopen(req, timeout=cls.PROBE_TIMEOUT_SECONDS) as resp:
+            with _urlopen_safe(req, timeout=cls.PROBE_TIMEOUT_SECONDS) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8", errors="replace"))
                     name = data.get("name", "token")
