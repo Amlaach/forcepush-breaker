@@ -859,3 +859,864 @@ function renderRemoteEventsAndForks(events, forks) {
     evBox.innerHTML = events
       .map(
         (ev) => `<div style="padding:10px 12px;border-radius:9px;background:var(--bg-card);border:1px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="badge ${ev.event_type === "force_push" ? "badge-critical" : "badge-medium"}">${escapeHtml(ev.event_type)}</span>
+            <span class="ltr-mono" style="font-size:11px;color:var(--text-muted);">${escapeHtml((ev.created_at || "").slice(0, 19))}</span>
+          </div>
+          <div style="font-size:12.5px;margin-top:6px;color:#ffffff;">${escapeHtml(ev.description || "")}</div>
+          <div style="font-size:11.5px;color:var(--cyan-bright);margin-top:4px;" class="ltr-mono">Actor: @${escapeHtml(ev.actor || "unknown")} ${ev.before_sha ? "• Before: " + escapeHtml(ev.before_sha.slice(0, 10)) : ""}</div>
+        </div>`
+      )
+      .join("");
+  }
+
+  if (!forks.length) {
+    fkBox.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">No public forks found on this GitHub repository.</div>`;
+  } else {
+    fkBox.innerHTML = forks
+      .map((fk) => {
+        const forkUrl = fk.html_url || `https://github.com/${fk.full_name}`;
+        return `<div style="padding:10px 12px;border-radius:9px;background:var(--bg-card);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;color:#ffffff;" class="ltr-mono">${escapeHtml(fk.full_name)}</div>
+            <div style="font-size:11.5px;color:var(--text-muted);" class="ltr-mono">Branch: ${escapeHtml(fk.default_branch || "main")} • Pushed: ${escapeHtml((fk.pushed_at || "").slice(0, 10))}</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-primary btn-sm" onclick="loadSampleGitHubUrl('${escapeHtml(forkUrl)}')">Scan Fork</button>
+            <button class="btn btn-secondary btn-sm" onclick="openExternalUrl('${escapeHtml(forkUrl)}')">GitHub ↗</button>
+          </div>
+        </div>`;
+      })
+      .join("");
+  }
+}
+
+/* ---- View 3: Secrets & AI Triage ---- */
+function filterFindings() {
+  const tbody = document.getElementById("findingsTableBody");
+  if (!tbody || !currentScanData) return;
+
+  const q = ((document.getElementById("findingsFilter") || {}).value || "").trim().toLowerCase();
+  const sev = ((document.getElementById("severityFilter") || {}).value || "ALL").toUpperCase();
+  const findings = (currentScanData.findings || []).filter((f) => {
+    const fSev = String(f.triage_severity || f.severity_estimate || "HIGH").toUpperCase();
+    if (sev !== "ALL" && fSev !== sev) return false;
+    if (!q) return true;
+    const sha = f.commit_hash || f.blob_hash || "";
+    return (
+      (f.rule_name || "").toLowerCase().includes(q) ||
+      (f.file_path || "").toLowerCase().includes(q) ||
+      (f.masked_value || "").toLowerCase().includes(q) ||
+      sha.toLowerCase().includes(q)
+    );
+  });
+
+  if (!findings.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--neon-green);padding:32px;" class="ltr-mono">[CLEAN] 0 matching secret exposures detected.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = findings
+    .map((f, idx) => {
+      const fSev = String(f.triage_severity || f.severity_estimate || "High");
+      const sevCls =
+        fSev.toLowerCase() === "critical"
+          ? "badge-critical"
+          : fSev.toLowerCase() === "high"
+          ? "badge-high"
+          : fSev.toLowerCase() === "medium"
+          ? "badge-medium"
+          : "badge-low";
+      const sha = f.commit_hash || f.blob_hash || "";
+      const verdict = f.is_false_positive
+        ? "Likely False Positive"
+        : `${fSev} Risk (${f.triage_risk_score ?? "8.0"}/10)`;
+      return `<tr>
+        <td class="ltr-mono" style="color:var(--text-muted);">${escapeHtml(f.finding_id || "#" + (idx + 1))}</td>
+        <td><span class="badge ${sevCls}">${escapeHtml(fSev)}</span></td>
+        <td style="font-weight:700;color:#ffffff;">${escapeHtml(f.rule_name)}</td>
+        <td><span class="code-chip" style="color:#ff94b4;border-color:rgba(255,42,109,0.35);">${escapeHtml(f.masked_value)}</span></td>
+        <td class="ltr-mono" style="font-size:12px;">${escapeHtml(f.file_path || "blob")}:${f.line_number || 1} @ ${escapeHtml(sha.slice(0, 8))}</td>
+        <td class="ltr-mono">${Number(f.entropy || 0).toFixed(2)}</td>
+        <td style="font-size:12px;color:var(--text-secondary);">${escapeHtml(verdict)}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="inspectFinding('${escapeHtml(f.finding_id || "")}', ${idx})">Inspect</button>
+          </div>
+        </td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function inspectFinding(findingId, fallbackIdx) {
+  if (!currentScanData) return;
+  const findings = currentScanData.findings || [];
+  const f = findings.find((x) => x.finding_id === findingId) || findings[fallbackIdx];
+  if (!f) return;
+
+  const sha = f.commit_hash || f.blob_hash || "";
+  const fSev = String(f.triage_severity || f.severity_estimate || "High");
+
+  activeModalContext = {
+    type: "finding",
+    finding: f,
+    copyText: f.diff_hunk || f.context_line || f.masked_value || "",
+  };
+
+  document.getElementById("modalTitle").textContent = f.rule_name || "Secret Finding";
+  document.getElementById("modalSubtitle").textContent = `${f.file_path || "detached_blob"}:${f.line_number || 1} • SHA: ${sha}`;
+  document.getElementById("modalTriageMeta").style.display = "block";
+  document.getElementById("modalSeverityBadge").innerHTML = `<span class="badge badge-critical">${escapeHtml(fSev)}</span>`;
+  document.getElementById("modalEntropyVal").textContent = `${Number(f.entropy || 0).toFixed(2)} bits/char`;
+  document.getElementById("modalExplanation").textContent =
+    f.triage_explanation || "Detected credential pattern in repository object database.";
+  document.getElementById("modalAction").textContent =
+    f.triage_action || "Rotate this credential immediately and purge GitHub commit history.";
+  document.getElementById("modalLivenessRow").style.display = "none";
+
+  renderDiffLines(document.getElementById("modalCodeView"), f.diff_hunk || f.context_line || f.masked_value);
+
+  document.getElementById("modalVerifyBtn").style.display = "inline-flex";
+  document.getElementById("modalCopyBtn").style.display = "inline-flex";
+  document.getElementById("modalRecoverBtn").style.display = f.file_path || f.blob_hash ? "inline-flex" : "none";
+  document.getElementById("detailModal").classList.add("active");
+}
+
+async function verifyActiveModalKey() {
+  if (!activeModalContext || activeModalContext.type !== "finding") return;
+  const f = activeModalContext.finding;
+  const row = document.getElementById("modalLivenessRow");
+  const badge = document.getElementById("modalLivenessBadge");
+  const details = document.getElementById("modalLivenessDetails");
+  row.style.display = "block";
+  badge.textContent = "Probing vendor endpoint passively...";
+  details.textContent = "";
+
+  try {
+    const resp = await apiFetch("/api/verify/key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo_path: activeRepoTarget,
+        finding_id: f.finding_id,
+        rule_name: f.rule_name,
+      }),
+    });
+    const res = await resp.json();
+    if (!resp.ok || res.error) throw new Error(res.error || "Verification error");
+    const st = res.status || "UNVERIFIABLE";
+    badge.style.color = st === "ACTIVE" ? "var(--rose)" : st === "REVOKED" ? "var(--neon-green)" : "var(--amber)";
+    badge.textContent = `[${st}] (${res.provider || "Provider"})`;
+    details.textContent = res.details || "";
+  } catch (err) {
+    badge.style.color = "var(--amber)";
+    badge.textContent = "[UNVERIFIABLE]";
+    details.textContent = err.message;
+  }
+}
+
+/* ---- View 4: .env & Config Time-Machine ---- */
+function classifyConfigCategory(filePath) {
+  const lower = String(filePath || "").toLowerCase();
+  const base = lower.split("/").pop() || "";
+  if (base.startsWith(".env") || lower.endsWith(".env") || lower.includes(".env.")) return "env";
+  if (/\.(pem|key|p12|pfx|jks|keystore|asc)$/.test(lower) || base.includes("id_rsa") || base.includes("id_ed25519")) return "key";
+  if (lower.endsWith(".tfstate") || lower.endsWith(".tfvars")) return "terraform";
+  if (/(secret|credential|token|passwd|htpasswd|netrc|npmrc|pypirc|dockercfg|kubeconfig)/.test(lower)) return "credential";
+  if (/\.(yml|yaml|toml|ini|conf|cfg)$/.test(lower) || /(config|settings)\.(json|js|ts|py)$/.test(lower)) return "config";
+  return null;
+}
+
+function buildTimeMachineEntries(data) {
+  if (!data) return [];
+  const entries = [];
+  const seen = new Set();
+
+  // 1. Deleted & sensitive config files discovered by backend forensics (ghost + git rm parent_sha)
+  (data.deleted_config_files || []).forEach((cf) => {
+    const key = `${cf.commit_hash || cf.blob_hash}:${cf.file_path}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    entries.push({
+      filePath: cf.file_path,
+      category: cf.file_type || classifyConfigCategory(cf.file_path) || "config",
+      originType: cf.blob_hash && !cf.commit_hash ? "blob" : "file",
+      recoverCommitSha: cf.commit_hash || "",
+      blobHash: cf.blob_hash || "",
+      displaySha: cf.commit_hash || cf.blob_hash || "",
+      author: cf.author || "Unknown",
+      date: (cf.date || "").slice(0, 16),
+      note: "Exhumed Config Snapshot",
+    });
+  });
+
+  // 2. Branch commits touching sensitive config files
+  (data.branch_commits || []).forEach((c) => {
+    (c.changed_files || []).forEach((fp) => {
+      const cat = classifyConfigCategory(fp);
+      if (!cat) return;
+      const key = `${c.commit_hash}:${fp}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      entries.push({
+        filePath: fp,
+        category: cat,
+        originType: "file",
+        recoverCommitSha: c.commit_hash,
+        blobHash: "",
+        displaySha: c.commit_hash,
+        author: c.author || "Unknown",
+        date: (c.date || "").slice(0, 16),
+        note: "Historical Commit Snapshot",
+      });
+    });
+  });
+
+  // 3. Detached Blobs
+  (data.dangling_blobs || []).forEach((b) => {
+    const key = `blob:${b.blob_hash}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    entries.push({
+      filePath: b.associated_path || `detached_blob_${b.blob_hash.slice(0, 8)}.txt`,
+      category: classifyConfigCategory(b.associated_path || "") || "credential",
+      originType: "blob",
+      recoverCommitSha: "",
+      blobHash: b.blob_hash,
+      displaySha: b.blob_hash,
+      author: "Detached Git Blob",
+      date: `${b.size || 0} bytes`,
+      note: "Unlinked Blob",
+    });
+  });
+
+  return entries;
+}
+
+function filterTimeMachine() {
+  const tbody = document.getElementById("timeMachineTableBody");
+  if (!tbody || !currentScanData) return;
+
+  cachedTimeMachineEntries = buildTimeMachineEntries(currentScanData);
+  const q = ((document.getElementById("timeMachineFilter") || {}).value || "").trim().toLowerCase();
+  const catFilter = (document.getElementById("timeMachineTypeFilter") || {}).value || "ALL";
+
+  const filtered = cachedTimeMachineEntries.filter((e) => {
+    if (catFilter !== "ALL" && e.category !== catFilter) return false;
+    if (!q) return true;
+    return e.filePath.toLowerCase().includes(q) || (e.displaySha || "").toLowerCase().includes(q);
+  });
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;">No matching .env or sensitive configuration snapshots found in this repository.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered
+    .map((e) => {
+      const realIdx = cachedTimeMachineEntries.indexOf(e);
+      const badgeCls = e.category === "env" || e.category === "key" ? "badge-critical" : "badge-medium";
+      return `<tr>
+        <td class="ltr-mono" style="font-weight:700;color:#ffffff;">${escapeHtml(e.filePath)}</td>
+        <td><span class="badge ${badgeCls}">${escapeHtml(e.category.toUpperCase())}</span></td>
+        <td class="ltr-mono"><span class="code-chip">${escapeHtml((e.displaySha || "").slice(0, 10))}</span> <span style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(e.note)}</span></td>
+        <td class="ltr-mono" style="font-size:12px;color:var(--text-secondary);">${escapeHtml(e.author)} • ${escapeHtml(e.date)}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="previewTimeMachineEntry(${realIdx})">Preview</button>
+            <button class="btn btn-emerald btn-sm" onclick="downloadTimeMachineEntry(${realIdx})">Save File</button>
+          </div>
+        </td>
+      </tr>`;
+    })
+    .join("");
+}
+
+async function fetchTimeMachineContent(entry) {
+  const includeRaw = Boolean((document.getElementById("includeRawToggle") || {}).checked);
+  const payload =
+    entry.originType === "blob"
+      ? { repo_path: activeRepoTarget, object_type: "blob", blob_hash: entry.blobHash, include_raw: includeRaw }
+      : {
+          repo_path: activeRepoTarget,
+          object_type: "file",
+          commit_hash: entry.recoverCommitSha,
+          file_path: entry.filePath,
+          include_raw: includeRaw,
+        };
+  const resp = await apiFetch("/api/recover/file", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const res = await resp.json();
+  if (!resp.ok || res.error) throw new Error(res.error || "Could not recover snapshot");
+  return res;
+}
+
+async function previewTimeMachineEntry(idx) {
+  const entry = cachedTimeMachineEntries[idx];
+  if (!entry) return;
+  try {
+    const res = await fetchTimeMachineContent(entry);
+    activeModalContext = {
+      type: "file",
+      filename: res.filename || entry.filePath.split("/").pop() || "recovered.env",
+      content: res.content || "",
+      copyText: res.content || "",
+    };
+    document.getElementById("modalTitle").textContent = entry.filePath;
+    document.getElementById("modalSubtitle").textContent = `${entry.note} • ${res.is_redacted ? "Strict Redaction Active" : "Raw Unmasked"}`;
+    document.getElementById("modalTriageMeta").style.display = "none";
+    renderDiffLines(document.getElementById("modalCodeView"), res.content || "(empty file)");
+    document.getElementById("modalVerifyBtn").style.display = "none";
+    document.getElementById("modalCopyBtn").style.display = "inline-flex";
+    document.getElementById("modalRecoverBtn").style.display = "inline-flex";
+    document.getElementById("detailModal").classList.add("active");
+  } catch (err) {
+    showToast(`✗ ${err.message}`);
+  }
+}
+
+async function downloadTimeMachineEntry(idx) {
+  const entry = cachedTimeMachineEntries[idx];
+  if (!entry) return;
+  try {
+    const res = await fetchTimeMachineContent(entry);
+    await saveTextArtifact(res.filename || entry.filePath.split("/").pop() || "recovered_config.txt", res.content || "");
+  } catch (err) {
+    showToast(`✗ ${err.message}`);
+  }
+}
+
+/* ---- View 5: Deep Search & Detached Blobs ---- */
+async function runDeepSearch() {
+  const q = ((document.getElementById("deepSearchInput") || {}).value || "").trim();
+  const box = document.getElementById("deepSearchResults");
+  if (!box) return;
+  if (!currentScanData || !activeRepoTarget) {
+    showToast(t("invalidGhUrl"));
+    return;
+  }
+  if (!q) return;
+
+  box.style.display = "flex";
+  box.innerHTML = `<div style="color:var(--cyan-bright);font-size:12.5px;" class="ltr-mono">Searching across all commits, diffs, and blobs...</div>`;
+
+  try {
+    const resp = await apiFetch("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo_path: activeRepoTarget, query: q }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || "Search error");
+    const matches = data.matches || [];
+    if (!matches.length) {
+      box.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">0 matches found for "${escapeHtml(q)}".</div>`;
+      return;
+    }
+    box.innerHTML = matches
+      .map((m) => {
+        const sub = m.is_dangling ? "dangling" : "branch";
+        const clickHandler =
+          m.kind === "commit"
+            ? `jumpToCommit('${escapeHtml(m.hash)}', '${sub}')`
+            : m.kind === "blob"
+            ? `inspectDetachedBlob('${escapeHtml(m.hash)}')`
+            : `inspectFinding('${escapeHtml(m.finding_id || "")}', 0)`;
+        return `<div class="commit-item-card" onclick="${clickHandler}">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="badge badge-medium">${escapeHtml((m.kind || "match").toUpperCase())}</span>
+            <span class="code-chip">${escapeHtml((m.hash || "").slice(0, 10))}</span>
+          </div>
+          <div style="font-weight:700;color:#ffffff;margin-top:5px;">${escapeHtml(m.title || "")}</div>
+          <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;" class="ltr-mono">${escapeHtml(m.subtitle || "")}</div>
+          <div style="font-size:12px;color:var(--neon-green);margin-top:4px;" class="ltr-mono">${escapeHtml(m.snippet || "")}</div>
+        </div>`;
+      })
+      .join("");
+  } catch (err) {
+    box.innerHTML = `<div class="term-err">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderDetachedBlobs(blobs) {
+  const pill = document.getElementById("blobsCountPill");
+  const grid = document.getElementById("danglingBlobsList");
+  if (pill) pill.textContent = `${blobs.length} blobs`;
+  if (!grid) return;
+
+  if (!blobs.length) {
+    grid.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">0 detached unlinked blobs in remote packfiles.</div>`;
+    return;
+  }
+
+  grid.innerHTML = blobs
+    .map(
+      (b) => `<div class="card" style="display:flex;flex-direction:column;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="code-chip">${escapeHtml(b.blob_hash.slice(0, 12))}</span>
+            <span style="font-size:11.5px;color:var(--text-muted);" class="ltr-mono">${b.size || 0} B</span>
+          </div>
+          <pre style="margin-top:8px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-secondary);white-space:pre-wrap;max-height:90px;overflow:hidden;" class="ltr-mono">${escapeHtml((b.redacted_content || "").slice(0, 220))}</pre>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-secondary btn-sm" onclick="inspectDetachedBlob('${escapeHtml(b.blob_hash)}')">Inspect</button>
+        </div>
+      </div>`
+    )
+    .join("");
+}
+
+async function inspectDetachedBlob(blobSha) {
+  try {
+    const includeRaw = Boolean((document.getElementById("includeRawToggle") || {}).checked);
+    const resp = await apiFetch("/api/recover/file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo_path: activeRepoTarget,
+        object_type: "blob",
+        blob_hash: blobSha,
+        include_raw: includeRaw,
+      }),
+    });
+    const res = await resp.json();
+    if (!resp.ok || res.error) throw new Error(res.error || "Blob fetch failed");
+    activeModalContext = {
+      type: "file",
+      filename: res.filename || `blob_${blobSha.slice(0, 10)}.txt`,
+      content: res.content || "",
+      copyText: res.content || "",
+    };
+    document.getElementById("modalTitle").textContent = `Detached Blob ${blobSha.slice(0, 12)}`;
+    document.getElementById("modalSubtitle").textContent = res.is_redacted ? "Strict Redaction Active" : "Raw Unmasked Blob";
+    document.getElementById("modalTriageMeta").style.display = "none";
+    renderDiffLines(document.getElementById("modalCodeView"), res.content || "");
+    document.getElementById("modalVerifyBtn").style.display = "none";
+    document.getElementById("modalCopyBtn").style.display = "inline-flex";
+    document.getElementById("modalRecoverBtn").style.display = "inline-flex";
+    document.getElementById("detailModal").classList.add("active");
+  } catch (err) {
+    showToast(`✗ ${err.message}`);
+  }
+}
+
+/* ---- View 6: GitHub History Purge & Remediation ---- */
+function renderRemediation(rem) {
+  if (rem.rotation_warning) {
+    document.getElementById("remediationRotationWarning").textContent = rem.rotation_warning;
+  }
+  const stepsBox = document.getElementById("remediationStepsList");
+  const steps = rem.steps || [];
+  if (stepsBox) {
+    stepsBox.innerHTML = steps
+      .map(
+        (s, i) => `<div style="padding:11px 14px;margin-bottom:8px;border-radius:9px;background:var(--bg-card);border:1px solid var(--border);font-size:13px;">
+          <div style="font-weight:800;color:var(--neon-green);margin-bottom:3px;">Step ${s.order || i + 1}: ${escapeHtml(s.title || "")}</div>
+          <div style="color:var(--text-secondary);font-size:12.5px;">${escapeHtml(s.description || "")}</div>
+        </div>`
+      )
+      .join("");
+  }
+  document.getElementById("remediationBashScript").textContent = rem.bash_script || "# No Bash script generated";
+  document.getElementById("remediationPSScript").textContent = rem.powershell_script || "# No PowerShell script generated";
+  document.getElementById("remediationSupportTicket").textContent =
+    rem.github_support_ticket ||
+    `Subject: Urgent Request to Purge Cached Commit SHAs on ${activeGithubHtmlUrl || "Repository"}\n\nHello GitHub Support,\n\nWe recently performed a history rewrite (git filter-repo + force push) on ${activeGithubHtmlUrl || "<owner/repo>"} to excise sensitive data. Please purge all unreachable/cached commit views and pull-request refs on GitHub's servers.\n\nThank you.`;
+}
+
+function switchScriptTab(lang) {
+  activeScriptLang = lang;
+  document.getElementById("btnScriptBash").classList.toggle("active", lang === "bash");
+  document.getElementById("btnScriptPS").classList.toggle("active", lang === "ps");
+  document.getElementById("bashScriptContainer").style.display = lang === "bash" ? "block" : "none";
+  document.getElementById("psScriptContainer").style.display = lang === "ps" ? "block" : "none";
+}
+
+async function copyActiveScript() {
+  const txt =
+    activeScriptLang === "bash"
+      ? document.getElementById("remediationBashScript").textContent
+      : document.getElementById("remediationPSScript").textContent;
+  await writeClipboardTextSafe(txt);
+  showToast("✓ Remediation script copied to clipboard");
+}
+
+async function saveActiveScriptAs() {
+  const isBash = activeScriptLang === "bash";
+  const txt = isBash
+    ? document.getElementById("remediationBashScript").textContent
+    : document.getElementById("remediationPSScript").textContent;
+  await saveTextArtifact(isBash ? "purge_github_history.sh" : "purge_github_history.ps1", txt);
+}
+
+async function copySupportTicket() {
+  const txt = document.getElementById("remediationSupportTicket").textContent;
+  await writeClipboardTextSafe(txt);
+  showToast("✓ GitHub Support purge ticket copied");
+}
+
+/* ---- Modal Helpers & Artifact Saving ---- */
+function closeModal() {
+  document.getElementById("detailModal").classList.remove("active");
+}
+
+async function copyModalContent() {
+  if (!activeModalContext) return;
+  await writeClipboardTextSafe(activeModalContext.copyText || "");
+  showToast("✓ Copied to clipboard");
+}
+
+async function recoverFromActiveModal() {
+  if (!activeModalContext) return;
+  if (activeModalContext.type === "file") {
+    await saveTextArtifact(activeModalContext.filename || "artifact.txt", activeModalContext.content || "");
+    return;
+  }
+  if (activeModalContext.type === "finding") {
+    const f = activeModalContext.finding;
+    const includeRaw = Boolean((document.getElementById("includeRawToggle") || {}).checked);
+    try {
+      const resp = await apiFetch("/api/recover/file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repo_path: activeRepoTarget,
+          object_type: f.blob_hash && !f.commit_hash ? "blob" : "file",
+          commit_hash: f.commit_hash || "",
+          blob_hash: f.blob_hash || "",
+          file_path: f.file_path || "",
+          include_raw: includeRaw,
+        }),
+      });
+      const res = await resp.json();
+      if (!resp.ok || res.error) throw new Error(res.error || "Export failed");
+      await saveTextArtifact(res.filename || "finding_artifact.txt", res.content || "");
+    } catch (err) {
+      showToast(`✗ ${err.message}`);
+    }
+  }
+}
+
+async function saveTextArtifact(defaultFilename, content) {
+  if (window.unforceDesktop && typeof window.unforceDesktop.saveFileDialog === "function") {
+    const res = await window.unforceDesktop.saveFileDialog({
+      defaultPath: defaultFilename,
+      content: String(content ?? ""),
+      encoding: "utf8",
+    });
+    if (res && res.saved) {
+      showToast(`✓ Saved: ${res.filePath}`);
+    }
+    return;
+  }
+  const blob = new Blob([String(content ?? "")], { type: "text/plain;charset=utf-8" });
+  triggerBrowserDownload(blob, defaultFilename);
+  showToast(`✓ Downloaded ${defaultFilename}`);
+}
+
+function triggerBrowserDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+/* ---- Top Toolbar Exports (ZIP Bundle, JSON, MD, SARIF) ---- */
+async function downloadReport(fmt) {
+  if (!currentScanData || !activeRepoTarget) {
+    showToast(t("invalidGhUrl"));
+    return;
+  }
+  try {
+    const qRepo = encodeURIComponent(activeRepoTarget);
+    const resp = await apiFetch(`/api/download/report?repo_path=${qRepo}&format=${encodeURIComponent(fmt)}`);
+    if (!resp.ok) {
+      const errJson = await resp.json().catch(() => ({}));
+      throw new Error(errJson.error || `HTTP ${resp.status}`);
+    }
+    const text = await resp.text();
+    const ext = fmt === "markdown" ? "md" : fmt === "sarif" ? "sarif" : "json";
+    await saveTextArtifact(`unforce_audit_report.${ext}`, text);
+  } catch (err) {
+    showToast(`✗ ${err.message}`);
+  }
+}
+
+function exportSARIF() {
+  return downloadReport("sarif");
+}
+
+async function downloadRecoveryBundle() {
+  if (!currentScanData || !activeRepoTarget) {
+    showToast(t("invalidGhUrl"));
+    return;
+  }
+  try {
+    const includeRaw = Boolean((document.getElementById("includeRawToggle") || {}).checked);
+    const qRepo = encodeURIComponent(activeRepoTarget);
+    const resp = await apiFetch(`/api/download/bundle?repo_path=${qRepo}&include_raw=${includeRaw ? "true" : "false"}`);
+    if (!resp.ok) {
+      const errJson = await resp.json().catch(() => ({}));
+      throw new Error(errJson.error || `HTTP ${resp.status}`);
+    }
+    const arrayBuf = await resp.arrayBuffer();
+    const defaultName = "unforce_recovery_bundle.zip";
+
+    if (window.unforceDesktop && typeof window.unforceDesktop.saveFileDialog === "function") {
+      const bytes = new Uint8Array(arrayBuf);
+      let binary = "";
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const b64 = btoa(binary);
+      const saved = await window.unforceDesktop.saveFileDialog({
+        defaultPath: defaultName,
+        content: b64,
+        encoding: "base64",
+      });
+      if (saved && saved.saved) showToast(`✓ Saved ZIP Bundle: ${saved.filePath}`);
+      return;
+    }
+    triggerBrowserDownload(new Blob([arrayBuf], { type: "application/zip" }), defaultName);
+    showToast(`✓ Downloaded ${defaultName}`);
+  } catch (err) {
+    showToast(`✗ ${err.message}`);
+  }
+}
+
+/* ---- Settings & Ephemeral In-Memory Credentials ---- */
+function openSettingsModal() {
+  document.getElementById("settingsModal").classList.add("active");
+  updateAISettingsUI();
+  refreshGHStatusUI();
+}
+function closeSettingsModal() {
+  document.getElementById("settingsModal").classList.remove("active");
+}
+
+function updateAISettingsUI() {
+  const prov = (document.getElementById("aiProviderSelect") || {}).value || "heuristic";
+  const labelMap = {
+    heuristic: "AI: Heuristic",
+    auto: "AI: Auto",
+    gemini: "AI: Gemini",
+    openai: "AI: OpenAI",
+    anthropic: "AI: Claude",
+    ollama: "AI: Ollama",
+    none: "AI: Off",
+  };
+  document.getElementById("aiStatusText").textContent = labelMap[prov] || "AI: Heuristic";
+  const needsKey = ["gemini", "openai", "anthropic", "auto"].includes(prov);
+  const hasKey = Boolean(ephemeralSession.aiKey);
+  document.getElementById("aiKeyInputRow").style.display = needsKey && !hasKey ? "flex" : "none";
+  document.getElementById("aiKeyConfiguredRow").style.display = hasKey ? "flex" : "none";
+}
+
+function saveAIKey() {
+  const val = (document.getElementById("aiApiKeyInput").value || "").trim();
+  if (!val) return;
+  ephemeralSession.aiKey = val;
+  document.getElementById("aiApiKeyInput").value = "";
+  updateAISettingsUI();
+  showToast("✓ AI API Key held strictly in-memory");
+}
+
+function clearAIKey() {
+  ephemeralSession.aiKey = "";
+  updateAISettingsUI();
+}
+
+function saveGHToken() {
+  const val = (document.getElementById("githubTokenInput").value || "").trim();
+  if (!val) return;
+  ephemeralSession.ghToken = val;
+  document.getElementById("githubTokenInput").value = "";
+  refreshGHStatusUI();
+  showToast("✓ GitHub Token held strictly in-memory");
+}
+
+function clearGHToken() {
+  ephemeralSession.ghToken = "";
+  refreshGHStatusUI();
+}
+
+function refreshGHStatusUI() {
+  const inRow = document.getElementById("ghTokenInputRow");
+  const okRow = document.getElementById("ghTokenConfiguredRow");
+  const autoNote = document.getElementById("ghSystemAuthNotice");
+  const ghText = document.getElementById("ghStatusText");
+  const ghDot = document.getElementById("ghDot");
+  const hasCustom = Boolean(ephemeralSession.ghToken);
+
+  inRow.style.display = hasCustom ? "none" : "flex";
+  okRow.style.display = hasCustom ? "flex" : "none";
+  autoNote.style.display = ephemeralSession.ghAutoDetected ? "block" : "none";
+
+  if (hasCustom) {
+    ghText.textContent = "GH: Custom PAT";
+    ghDot.className = "dot dot-green";
+  } else if (ephemeralSession.ghAutoDetected) {
+    ghText.textContent = "GH: Auto-Auth";
+    ghDot.className = "dot dot-green";
+  } else {
+    ghText.textContent = "GH: Public";
+    ghDot.className = "dot dot-cyan";
+  }
+}
+
+function toggleRawRecoveryMode(enabled) {
+  showToast(enabled ? "⚠ Raw unredacted file export enabled" : "✓ Strict Redaction Active");
+}
+
+/* ---- Command Palette (Ctrl+K) ---- */
+function getPaletteCommands() {
+  return [
+    { label: "📋 Paste GitHub URL & Scan Now", action: () => pasteAndScanGitHub() },
+    { label: "📊 Jump to Command HUD & Hygiene Score", action: () => switchView("overview") },
+    { label: "🌿 Jump to Commit & File-Tree Explorer", action: () => switchView("commits") },
+    { label: "🔑 Jump to Discovered Secrets & AI Triage", action: () => switchView("findings") },
+    { label: "⏱ Jump to .env & Config Time-Machine", action: () => switchView("timemachine") },
+    { label: "🔍 Jump to Deep Search & Detached Blobs", action: () => switchView("searchblobs") },
+    { label: "🛡 Jump to GitHub History Purge Playbook", action: () => switchView("remediation") },
+    { label: "📦 Export Full Recovery Bundle (.ZIP)", action: () => downloadRecoveryBundle() },
+    { label: "🌐 Switch Language (עברית / English)", action: () => toggleLanguage() },
+    { label: "⚙ Open Settings & Credentials", action: () => openSettingsModal() },
+  ];
+}
+
+function openCmdPalette() {
+  cmdSelectedIndex = 0;
+  const modal = document.getElementById("cmdPaletteModal");
+  const input = document.getElementById("cmdPaletteInput");
+  modal.classList.add("active");
+  input.value = "";
+  renderCmdPaletteItems();
+  setTimeout(() => input.focus(), 30);
+}
+
+function closeCmdPalette() {
+  document.getElementById("cmdPaletteModal").classList.remove("active");
+}
+
+function renderCmdPaletteItems() {
+  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
+  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
+  const list = document.getElementById("cmdPaletteList");
+  if (!items.length) {
+    list.innerHTML = `<div style="padding:12px;color:var(--text-muted);text-align:center;">No matching commands</div>`;
+    return;
+  }
+  if (cmdSelectedIndex >= items.length) cmdSelectedIndex = 0;
+  list.innerHTML = items
+    .map(
+      (item, idx) => `<button class="cmd-item ${idx === cmdSelectedIndex ? "selected" : ""}" onclick="runPaletteCommand(${idx})">
+        <span>${escapeHtml(item.label)}</span>
+      </button>`
+    )
+    .join("");
+}
+
+function runPaletteCommand(idx) {
+  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
+  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
+  closeCmdPalette();
+  if (items[idx]) items[idx].action();
+}
+
+function handleCmdPaletteKey(e) {
+  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
+  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
+  if (e.key === "Escape") {
+    closeCmdPalette();
+  } else if (e.key === "ArrowDown") {
+    e.preventDefault();
+    cmdSelectedIndex = (cmdSelectedIndex + 1) % Math.max(items.length, 1);
+    renderCmdPaletteItems();
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    cmdSelectedIndex = (cmdSelectedIndex - 1 + Math.max(items.length, 1)) % Math.max(items.length, 1);
+    renderCmdPaletteItems();
+  } else if (e.key === "Enter" && items.length) {
+    e.preventDefault();
+    runPaletteCommand(cmdSelectedIndex);
+  }
+}
+
+/* ---- Boot Initialization ---- */
+function applyEmbeddedLogo() {
+  const uri = window.UNFORCE_LOGO_DATA_URI;
+  if (!uri) return;
+  const tbImg = document.getElementById("titlebarLogoImg");
+  const tbSvg = document.getElementById("titlebarFallbackSvg");
+  if (tbImg) {
+    tbImg.src = uri;
+    tbImg.style.display = "inline-block";
+    if (tbSvg) tbSvg.style.display = "none";
+  }
+  const sbImg = document.getElementById("sidebarLogoImg");
+  const sbSvg = document.getElementById("sidebarFallbackSvg");
+  if (sbImg) {
+    sbImg.src = uri;
+    sbImg.style.display = "block";
+    if (sbSvg) sbSvg.style.display = "none";
+  }
+}
+
+async function initBackendTelemetry() {
+  try {
+    const resp = await apiFetch("/api/system/info");
+    if (!resp.ok) return;
+    const info = await resp.json();
+    const gitText = document.getElementById("gitHealthText");
+    if (gitText && info.git_version) {
+      gitText.textContent = info.git_version.replace("git version ", "GIT ");
+    }
+    if (info.version) {
+      document.getElementById("titlebarVerBadge").textContent = `v${info.version}`;
+      document.getElementById("footerVersionText").textContent = `v${info.version}`;
+    }
+    ephemeralSession.ghAutoDetected = Boolean(info.github_auth_auto);
+    refreshGHStatusUI();
+    if (info.github_auth_auto) {
+      logTerminal("AUTH", "Git Credential Manager detected -> Private & Public GitHub repos enabled automatically.", "ok");
+    }
+  } catch (_) {}
+}
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    openCmdPalette();
+  } else if (e.key === "Escape") {
+    closeModal();
+    closeSettingsModal();
+    closeCmdPalette();
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (!window.unforceDesktop || !window.unforceDesktop.isElectron) {
+    const winControls = document.querySelector(".titlebar-controls");
+    if (winControls) winControls.style.display = "none";
+  }
+  applyEmbeddedLogo();
+  applyLanguage();
+
+  const params = new URLSearchParams(window.location.search);
+  const initialRepo = params.get("repo");
+  if (initialRepo && parseGitHubRepoInput(initialRepo)) {
+    const input = document.getElementById("repoPathInput");
+    input.value = parseGitHubRepoInput(initialRepo).cleanUrl;
+    updateTargetTypeBadge();
+    setTimeout(() => startScan(), 60);
+  }
+
+  initBackendTelemetry();
+});
