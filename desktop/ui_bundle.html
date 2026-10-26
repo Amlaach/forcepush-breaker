@@ -1,0 +1,4033 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UnForce (ForcePush-Breaker) — GitGhost Cyber Forensics Studio</title>
+  <style>
+/* UnForce / GitGhost — Elite Cyber-Forensics Hacker Studio Stylesheet */
+:root {
+  --bg-void: #03060d;
+  --bg-base: #060b16;
+  --bg-panel: #091122;
+  --bg-card: #0c172c;
+  --bg-card-hover: #10203d;
+  --bg-input: #050a14;
+  --border: #162847;
+  --border-bright: #00e5ff55;
+  --neon-green: #00ff9d;
+  --neon-green-dim: rgba(0, 255, 157, 0.14);
+  --cyan: #00e5ff;
+  --cyan-bright: #5ceeff;
+  --cyan-dim: rgba(0, 229, 255, 0.13);
+  --purple: #a855f7;
+  --purple-bright: #d8b4fe;
+  --amber: #ffb800;
+  --rose: #ff2a6d;
+  --emerald: #00ff9d;
+  --magenta: #c084fc;
+  --text-primary: #e8f3ff;
+  --text-secondary: #9bb4d4;
+  --text-muted: #5e789c;
+  --font-sans: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", Roboto, sans-serif;
+  --font-mono: "Cascadia Code", "JetBrains Mono", "Consolas", "SFMono-Regular", monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* Subtle cyber tactical grid backdrop */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 157, 0.022) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+
+.ltr-mono {
+  direction: ltr !important;
+  unicode-bidi: isolate;
+  font-family: var(--font-mono);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-void);
+}
+::-webkit-scrollbar-thumb {
+  background: #1a3158;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00e5ff88;
+}
+
+/* Custom Frameless Chromium Titlebar */
+.desktop-titlebar {
+  position: relative;
+  z-index: 50;
+  height: 36px;
+  background: linear-gradient(90deg, #040812 0%, #071124 50%, #040812 100%);
+  border-bottom: 1px solid #132746;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: 12px 0;
+  -webkit-app-region: drag;
+  direction: ltr;
+}
+
+.titlebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cyan-bright);
+  letter-spacing: 0.04em;
+}
+
+.titlebar-logo-img {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  box-shadow: 0 0 8px rgba(0, 255, 157, 0.45);
+}
+
+.titlebar-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 255, 157, 0.12);
+  border: 1px solid rgba(0, 255, 157, 0.35);
+  color: var(--neon-green);
+}
+
+.titlebar-center {
+  -webkit-app-region: no-drag;
+}
+
+.cmd-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 260px;
+  height: 25px;
+  padding: 0 10px;
+  background: #060d1b;
+  border: 1px solid #1a335c;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cmd-trigger-btn:hover {
+  border-color: var(--cyan);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.18);
+}
+
+.kbd-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  background: #0e1c36;
+  border: 1px solid #243f6b;
+  border-radius: 4px;
+  color: var(--cyan-bright);
+}
+
+.titlebar-controls {
+  display: flex;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.win-btn {
+  width: 44px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.win-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+.win-btn.win-close:hover {
+  background: #e11d48;
+  color: #ffffff;
+}
+
+/* App Shell */
+.app-shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: calc(100vh - 36px);
+  width: 100%;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 258px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #060c18 0%, #040811 100%);
+  border-inline-end: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 12px;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.sidebar-logo-row {
+  padding: 4px 6px 10px;
+  border-bottom: 1px solid rgba(22, 40, 71, 0.85);
+}
+
+.brand-cluster {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brand-emblem {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #050a14;
+  border: 1px solid rgba(0, 255, 157, 0.45);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.brand-emblem img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.brand-name {
+  font-family: var(--font-mono);
+  font-size: 15.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  background: linear-gradient(90deg, #ffffff 0%, #5ceeff 55%, #00ff9d 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.sidebar-section-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 0 8px;
+  margin-bottom: 6px;
+}
+
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  text-align: start;
+}
+
+.nav-item:hover {
+  background: rgba(0, 229, 255, 0.06);
+  color: #ffffff;
+}
+
+.nav-item.active {
+  background: linear-gradient(90deg, rgba(0, 255, 157, 0.13) 0%, rgba(0, 229, 255, 0.08) 100%);
+  border-color: rgba(0, 255, 157, 0.4);
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(0, 255, 157, 0.08);
+}
+
+.nav-item-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.nav-item.active .nav-item-left svg {
+  stroke: var(--neon-green);
+}
+
+.nav-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #0d1a31;
+  border: 1px solid #1d355e;
+  color: var(--cyan-bright);
+}
+
+.nav-badge.alert {
+  background: rgba(255, 42, 109, 0.18);
+  border-color: rgba(255, 42, 109, 0.5);
+  color: #ff6b9b;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 170px;
+  overflow-y: auto;
+}
+
+.recent-repo-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(22, 40, 71, 0.7);
+  background: rgba(9, 17, 34, 0.7);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+  text-align: left;
+  transition: all 0.14s ease;
+}
+.recent-repo-btn:hover {
+  border-color: var(--cyan);
+  color: var(--neon-green);
+  background: rgba(0, 229, 255, 0.08);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.git-health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #475569;
+  display: inline-block;
+}
+.dot-green {
+  background: var(--neon-green);
+  box-shadow: 0 0 8px var(--neon-green);
+}
+.dot-cyan {
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+}
+.dot-amber {
+  background: var(--amber);
+  box-shadow: 0 0 8px var(--amber);
+}
+
+/* Main Workspace */
+.workspace-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: transparent;
+}
+
+/* Top GitHub Command Bar */
+.top-toolbar {
+  background: linear-gradient(180deg, rgba(9, 18, 36, 0.96) 0%, rgba(6, 12, 24, 0.96) 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toolbar-upper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.target-bar-row {
+  flex: 1;
+  min-width: 340px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.repo-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: var(--bg-input);
+  border: 1.5px solid #1e3a68;
+  border-radius: 9px;
+  padding-inline: 11px 8px;
+  height: 40px;
+  transition: all 0.16s ease;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.55);
+}
+
+.repo-input-wrap:focus-within {
+  border-color: var(--neon-green);
+  box-shadow: 0 0 0 3px rgba(0, 255, 157, 0.14), 0 0 18px rgba(0, 229, 255, 0.16);
+}
+
+.repo-input-icon {
+  color: var(--neon-green);
+  display: inline-flex;
+  align-items: center;
+  margin-inline-end: 8px;
+  flex-shrink: 0;
+}
+
+.repo-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  min-width: 140px;
+  user-select: text;
+}
+.repo-input::placeholder {
+  color: #4d6a92;
+  font-weight: 400;
+}
+
+.target-type-pill {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  color: var(--cyan-bright);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: #081223;
+  border: 1px solid #193158;
+  color: var(--text-secondary);
+}
+.status-pill:hover {
+  border-color: var(--cyan);
+  color: #ffffff;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 7px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #00ff9d 0%, #00d4ff 100%);
+  color: #020813;
+  border-color: #5ceeff;
+  box-shadow: 0 0 18px rgba(0, 255, 157, 0.28);
+}
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px rgba(0, 255, 157, 0.48);
+}
+
+.btn-paste {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.42);
+  color: var(--cyan-bright);
+  height: 40px;
+}
+.btn-paste:hover:not(:disabled) {
+  background: rgba(0, 229, 255, 0.22);
+  border-color: var(--neon-green);
+  color: #ffffff;
+}
+
+.btn-secondary {
+  background: #0b162b;
+  border-color: #1d355e;
+  color: var(--text-primary);
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--cyan);
+  background: #10203d;
+}
+
+.btn-purple {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(0, 229, 255, 0.2) 100%);
+  border-color: rgba(192, 132, 252, 0.55);
+  color: #f3e8ff;
+}
+.btn-purple:hover:not(:disabled) {
+  border-color: #e9d5ff;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.3);
+}
+
+.btn-emerald {
+  background: rgba(0, 255, 157, 0.15);
+  border-color: rgba(0, 255, 157, 0.45);
+  color: var(--neon-green);
+}
+.btn-emerald:hover:not(:disabled) {
+  background: rgba(0, 255, 157, 0.25);
+  color: #ffffff;
+}
+
+.btn-danger {
+  background: rgba(255, 42, 109, 0.16);
+  border-color: rgba(255, 42, 109, 0.48);
+  color: #ff80a8;
+}
+.btn-danger:hover:not(:disabled) {
+  background: rgba(255, 42, 109, 0.28);
+  color: #ffffff;
+}
+
+/* Progress Bar */
+.scan-progress-box {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 255, 157, 0.06);
+  border: 1px solid rgba(0, 255, 157, 0.3);
+}
+.scan-progress-box.active {
+  display: flex;
+}
+.scan-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: #081326;
+  overflow: hidden;
+}
+.scan-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--neon-green), var(--cyan));
+  box-shadow: 0 0 12px var(--neon-green);
+  transition: width 0.25s ease;
+}
+
+/* Main Content Scroll */
+.content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 28px;
+}
+
+.repo-meta-strip {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  margin-bottom: 14px;
+  border-radius: 9px;
+  background: rgba(9, 20, 40, 0.9);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+}
+.repo-meta-strip.active {
+  display: flex;
+}
+
+.view-panel {
+  display: none;
+}
+.view-panel.active {
+  display: block;
+}
+
+/* Cards & Cyber HUD Panels */
+.card {
+  background: linear-gradient(180deg, rgba(12, 23, 44, 0.94) 0%, rgba(8, 16, 32, 0.94) 100%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.38);
+}
+
+/* Welcome Hacker Hero Card */
+.welcome-banner {
+  background:
+    radial-gradient(circle at 85% 20%, rgba(0, 255, 157, 0.11), transparent 45%),
+    radial-gradient(circle at 15% 80%, rgba(0, 229, 255, 0.1), transparent 45%),
+    linear-gradient(135deg, #071226 0%, #050b17 100%);
+  border: 1px solid rgba(0, 255, 157, 0.35);
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.08);
+}
+
+.cyber-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--neon-green);
+  background: rgba(0, 255, 157, 0.1);
+  border: 1px solid rgba(0, 255, 157, 0.32);
+  padding: 3px 9px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+
+.welcome-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.welcome-step-box {
+  background: rgba(4, 9, 20, 0.72);
+  border: 1px solid #183059;
+  border-radius: 9px;
+  padding: 10px 12px;
+}
+
+.sample-targets-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.sample-chip {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 229, 255, 0.09);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  color: var(--cyan-bright);
+  cursor: pointer;
+  direction: ltr;
+  transition: all 0.14s ease;
+}
+.sample-chip:hover {
+  background: rgba(0, 255, 157, 0.16);
+  border-color: var(--neon-green);
+  color: #ffffff;
+}
+
+/* Overview Grid & Gauge */
+.overview-hero-grid {
+  display: grid;
+  grid-template-columns: 270px 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 980px) {
+  .overview-hero-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.score-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.gauge-wrap {
+  position: relative;
+  width: 146px;
+  height: 146px;
+  margin: 8px 0;
+}
+
+.gauge-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.gauge-bg {
+  fill: none;
+  stroke: #112240;
+  stroke-width: 11;
+}
+
+.gauge-arc {
+  fill: none;
+  stroke: var(--neon-green);
+  stroke-width: 11;
+  stroke-linecap: round;
+  stroke-dasharray: 440;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.7s ease, stroke 0.4s ease;
+}
+
+.gauge-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.gauge-num {
+  font-family: var(--font-mono);
+  font-size: 34px;
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.gauge-grade {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--neon-green);
+  margin-top: 4px;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.kpi-card {
+  background: linear-gradient(180deg, rgba(12, 24, 46, 0.95) 0%, rgba(8, 16, 32, 0.95) 100%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 15px 16px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.kpi-card:hover {
+  border-color: var(--cyan);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 229, 255, 0.12);
+}
+
+.kpi-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.kpi-val {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 6px 0 3px;
+}
+
+.kpi-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* Live Hacker Forensics Terminal */
+.hacker-terminal {
+  background: #02050b;
+  border: 1px solid rgba(0, 255, 157, 0.35);
+  border-radius: 11px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  box-shadow: inset 0 0 24px rgba(0, 255, 157, 0.04);
+}
+
+.terminal-header {
+  background: #061020;
+  border-bottom: 1px solid #13284a;
+  padding: 7px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  direction: ltr;
+}
+
+.terminal-dots {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.terminal-dots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.terminal-body {
+  padding: 10px 14px;
+  max-height: 155px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  direction: ltr;
+  text-align: left;
+  color: #9efcd6;
+  user-select: text;
+}
+
+.term-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.term-ts {
+  color: #4c6b94;
+  margin-right: 8px;
+}
+.term-cmd {
+  color: var(--cyan-bright);
+  font-weight: 700;
+}
+.term-ok {
+  color: var(--neon-green);
+}
+.term-warn {
+  color: var(--amber);
+}
+.term-err {
+  color: var(--rose);
+}
+
+/* Segmented Controls & Inputs */
+.segmented-bar {
+  display: inline-flex;
+  background: #060d1b;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 3px;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.seg-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+.seg-btn:hover {
+  color: #ffffff;
+}
+.seg-btn.active {
+  background: rgba(0, 229, 255, 0.16);
+  color: var(--neon-green);
+  box-shadow: inset 0 0 0 1px rgba(0, 255, 157, 0.35);
+}
+
+.input-field, .select-field {
+  height: 36px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid #1c345c;
+  background: var(--bg-input);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  user-select: text;
+}
+.input-field:focus, .select-field:focus {
+  border-color: var(--cyan);
+}
+
+/* Split Commit Explorer */
+.recovery-split {
+  display: grid;
+  grid-template-columns: 370px 1fr;
+  gap: 14px;
+  min-height: 520px;
+}
+
+@media (max-width: 1020px) {
+  .recovery-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.commit-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 640px;
+  overflow-y: auto;
+  padding-inline-end: 4px;
+}
+
+.commit-item-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+.commit-item-card:hover {
+  border-color: rgba(0, 229, 255, 0.5);
+  background: var(--bg-card-hover);
+}
+.commit-item-card.active {
+  border-color: var(--neon-green);
+  background: linear-gradient(135deg, rgba(0, 255, 157, 0.1) 0%, rgba(0, 229, 255, 0.08) 100%);
+  box-shadow: 0 0 16px rgba(0, 255, 157, 0.12);
+}
+
+.inspector-pane {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 520px;
+}
+
+.inspector-header {
+  padding: 14px 16px;
+  background: #071021;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inspector-subtabs {
+  padding: 8px 16px;
+  background: #050b18;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+
+/* Code & Diff Viewer */
+.code-view {
+  background: #030710;
+  border: 1px solid #142646;
+  border-radius: 9px;
+  padding: 10px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow: auto;
+  max-height: 450px;
+  direction: ltr;
+  text-align: left;
+  user-select: text;
+}
+
+.diff-line {
+  padding: 1px 14px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.diff-add {
+  background: rgba(0, 255, 157, 0.11);
+  color: #7bf7c4;
+}
+.diff-del {
+  background: rgba(255, 42, 109, 0.13);
+  color: #ff94b4;
+}
+.diff-hunk {
+  background: rgba(0, 229, 255, 0.1);
+  color: var(--cyan-bright);
+  font-weight: 700;
+}
+
+.code-chip {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #08152b;
+  border: 1px solid #1d3a68;
+  color: var(--cyan-bright);
+  direction: ltr;
+  display: inline-block;
+  user-select: text;
+}
+
+.tree-file-btn {
+  width: 100%;
+  text-align: left;
+  direction: ltr;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-file-btn:hover {
+  background: rgba(0, 229, 255, 0.08);
+  color: #ffffff;
+}
+.tree-file-btn.active {
+  background: rgba(0, 255, 157, 0.14);
+  border-color: rgba(0, 255, 157, 0.4);
+  color: var(--neon-green);
+}
+
+/* Tables & Badges */
+.table-wrap {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  background: #071022;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 11px 14px;
+  text-align: start;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(22, 40, 71, 0.6);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+tr:hover td {
+  background: rgba(0, 229, 255, 0.035);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.badge-critical {
+  background: rgba(255, 42, 109, 0.18);
+  border-color: rgba(255, 42, 109, 0.55);
+  color: #ff7aa6;
+}
+.badge-high {
+  background: rgba(255, 184, 0, 0.16);
+  border-color: rgba(255, 184, 0, 0.5);
+  color: #ffd166;
+}
+.badge-medium {
+  background: rgba(0, 229, 255, 0.14);
+  border-color: rgba(0, 229, 255, 0.42);
+  color: var(--cyan-bright);
+}
+.badge-low {
+  background: rgba(0, 255, 157, 0.13);
+  border-color: rgba(0, 255, 157, 0.4);
+  color: var(--neon-green);
+}
+
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(2, 5, 12, 0.8);
+  backdrop-filter: blur(5px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 780px;
+  max-height: 88vh;
+  background: #081122;
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75), 0 0 30px rgba(0, 229, 255, 0.12);
+}
+
+.modal-header {
+  padding: 14px 18px;
+  background: #060c19;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  padding: 12px 18px;
+  background: #060c19;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Command Palette Item */
+.cmd-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: start;
+}
+.cmd-item:hover, .cmd-item.selected {
+  background: rgba(0, 255, 157, 0.12);
+  border-color: rgba(0, 255, 157, 0.4);
+  color: var(--neon-green);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  inset-inline-end: 22px;
+  z-index: 200;
+  background: #071326;
+  border: 1px solid var(--neon-green);
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), 0 0 18px rgba(0, 255, 157, 0.22);
+  transform: translateY(80px);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.22s ease;
+}
+.toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+</style>
+</head>
+<body>
+
+  <!-- Custom Frameless Chromium Titlebar -->
+  <div id="desktopTitlebar" class="desktop-titlebar">
+    <div class="titlebar-brand">
+      <img id="titlebarLogoImg" class="titlebar-logo-img" alt="" style="display:none;">
+      <svg id="titlebarFallbackSvg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.2">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        <polygon points="13 6 8 14 12 14 11 18 16 10 12 10 13 6"></polygon>
+      </svg>
+      <span>UNFORCE // FORCEPUSH-BREAKER</span>
+      <span id="titlebarVerBadge" class="titlebar-badge">v1.0.0</span>
+    </div>
+
+    <div class="titlebar-center">
+      <button class="cmd-trigger-btn" onclick="openCmdPalette()" title="Ctrl+K">
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <span data-i18n="cmdPlaceholder">פקודה מהירה או ניווט... (Ctrl+K)</span>
+        </span>
+        <span class="kbd-pill">Ctrl+K</span>
+      </button>
+    </div>
+
+    <div class="titlebar-controls">
+      <button class="win-btn" onclick="winMinimize()" title="Minimize">
+        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+      <button class="win-btn" onclick="winMaximize()" title="Maximize">
+        <svg width="11" height="11" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+      <button class="win-btn win-close" onclick="winClose()" title="Close">
+        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1.4"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="currentColor" stroke-width="1.4"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="app-shell">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo-row">
+        <div class="brand-cluster">
+          <div class="brand-emblem">
+            <img id="sidebarLogoImg" alt="UnForce Logo" style="display:none;">
+            <svg id="sidebarFallbackSvg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              <polygon points="13 6 8 14 12 14 11 18 16 10 12 10 13 6"></polygon>
+            </svg>
+          </div>
+          <div>
+            <div class="brand-name">UNFORCE</div>
+            <div class="brand-sub" data-i18n="brandSub">פורנזיקת GitHub, שחזור קומיטים וציד סודות</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick GitHub URL Actions -->
+      <div>
+        <div class="sidebar-section-label" data-i18n="secQuickStart">סריקת GitHub מהירה</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <button class="btn btn-primary" style="width:100%;height:36px;font-size:12.5px;" onclick="pasteAndScanGitHub()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span data-i18n="qaPasteAndScan">הדבק כתובת מ-GitHub וסרוק</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:flex-start;padding-inline:10px;" onclick="focusGitHubInput()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+            <span data-i18n="qaFocusInput">הזן כתובת ריפו מ-GitHub</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Forensics Modules Navigation -->
+      <div>
+        <div class="sidebar-section-label" data-i18n="secWorkspace">מודולי פורנזיקה</div>
+        <div class="nav-list">
+          <button class="nav-item active" data-view="overview" onclick="switchView('overview')">
+            <span class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              <span data-i18n="navOverview">מוקד בקרה וציון אבטחה</span>
+            </span>
+            <span id="navBadgeScore" class="nav-badge">—</span>
+          </button>
+
+          <button class="nav-item" data-view="commits" onclick="switchView('commits')">
+            <span class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>
+              <span data-i18n="navCommits">חוקר קומיטים ועצי קבצים</span>
+            </span>
+            <span id="navBadgeCommits" class="nav-badge">0</span>
+          </button>
+
+          <button class="nav-item" data-view="findings" onclick="switchView('findings')">
+            <span class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg>
+              <span data-i18n="navFindings">סודות ודליפות מידע</span>
+            </span>
+            <span id="navBadgeFindings" class="nav-badge">0</span>
+          </button>
+
+          <button class="nav-item" data-view="timemachine" onclick="switchView('timemachine')">
+            <span class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span data-i18n="navTimeMachine">מכונת זמן לקבצי .env</span>
+            </span>
+            <span id="navBadgeTimeMachine" class="nav-badge">0</span>
+          </button>
+
+          <button class="nav-item" data-view="searchblobs" onclick="switchView('searchblobs')">
+            <span class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <span data-i18n="navSearchBlobs">חיפוש עמוק ועצמי רפאים</span>
+            </span>
+            <span id="navBadgeBlobs" class="nav-badge">0</span>
+          </button>
+
+          <button class="nav-item" data-view="remediation" onclick="switchView('remediation')">
+            <span class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              <span data-i18n="navRemediation">ניקוי היסטוריה ב-GitHub</span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Recent Scanned GitHub Repos -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-inline:8px;margin-bottom:6px;">
+          <span class="sidebar-section-label" style="padding:0;margin:0;" data-i18n="secRecent">ריפואים שנסרקו לאחרונה</span>
+          <button onclick="clearRecentRepos()" style="background:none;border:none;color:var(--text-muted);font-size:11px;cursor:pointer;" title="Clear">✕</button>
+        </div>
+        <div id="recentReposList" class="recent-list">
+          <div style="font-size:11.5px;color:var(--text-muted);padding:4px 8px;" data-i18n="recentEmpty">טרם נסרקו ריפואים מ-GitHub.</div>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer: System Telemetry -->
+      <div class="sidebar-footer">
+        <div class="git-health-row">
+          <span style="display:inline-flex;align-items:center;gap:6px;">
+            <span id="gitHealthDot" class="dot dot-green"></span>
+            <span id="gitHealthText" class="ltr-mono" style="font-size:11px;">ENGINE ONLINE</span>
+          </span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span>GitGhost // UnForce</span>
+          <span id="footerVersionText" class="ltr-mono">v1.0.0</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <div class="workspace-main">
+      <!-- Top GitHub Repo URL Command Bar (ONLY Repo Selection Method) -->
+      <header class="top-toolbar">
+        <div class="toolbar-upper">
+          <div class="target-bar-row">
+            <div class="repo-input-wrap">
+              <span class="repo-input-icon" title="GitHub Repository URL">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+              </span>
+              <input
+                type="text"
+                id="repoPathInput"
+                class="repo-input ltr-mono"
+                placeholder="https://github.com/owner/repo"
+                value=""
+                spellcheck="false"
+                autocomplete="off"
+                oninput="updateTargetTypeBadge()"
+                onkeydown="if(event.key==='Enter') startScan()"
+              >
+              <span id="repoTargetBadge" class="target-type-pill">
+                <span id="repoTargetBadgeText" data-i18n="githubTargetPill">GitHub Repo</span>
+              </span>
+            </div>
+
+            <button class="btn btn-paste" onclick="pasteGitHubUrlOnly()" title="הדבק כתובת מלוח ההעתקה">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span data-i18n="pasteBtn">הדבק URL</span>
+            </button>
+
+            <button class="btn btn-primary" style="height:40px;" id="scanBtn" onclick="startScan()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              <span id="scanBtnText" data-i18n="scanBtn">סרוק ריפו מ-GitHub</span>
+            </button>
+          </div>
+
+          <div class="toolbar-actions">
+            <div class="status-pill" onclick="openSettingsModal()" style="cursor:pointer;" title="AI Triage Engine">
+              <span id="aiDot" class="dot dot-green"></span>
+              <span id="aiStatusText" class="ltr-mono" style="font-size:11px;">AI: Heuristic</span>
+            </div>
+            <div class="status-pill" onclick="openSettingsModal()" style="cursor:pointer;" title="GitHub Auth Status">
+              <span id="ghDot" class="dot dot-cyan"></span>
+              <span id="ghStatusText" class="ltr-mono" style="font-size:11px;">GH: Ready</span>
+            </div>
+
+            <button class="btn btn-purple btn-sm" onclick="downloadRecoveryBundle()" title="Download Full Forensics & Recovery ZIP Bundle">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span data-i18n="bundleBtn">חבילת שחזור (.ZIP)</span>
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadReport('json')" title="Export JSON Audit">JSON</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadReport('markdown')" title="Export Markdown Report">MD</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportSARIF()" title="Export SARIF 2.1.0">SARIF</button>
+
+            <button class="btn btn-secondary btn-sm" id="langSwitchBtn" onclick="toggleLanguage()" title="Switch Language / החלף שפה">
+              EN / עב
+            </button>
+
+            <button class="btn btn-secondary btn-sm" onclick="openSettingsModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span data-i18n="settingsBtn">הגדרות</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Progress Indicator -->
+        <div id="scanProgressContainer" class="scan-progress-box">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--neon-green);font-weight:700;">
+            <span id="progressStatusText" class="ltr-mono">Acquiring GitHub bare mirror...</span>
+            <span id="progressPctText" class="ltr-mono">0%</span>
+          </div>
+          <div class="scan-progress-track">
+            <div id="scanProgressFill" class="scan-progress-fill"></div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Scrollable Viewport -->
+      <main class="content-scroll">
+
+        <!-- Active GitHub Target Strip -->
+        <div id="repoMetaStrip" class="repo-meta-strip">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span id="metaRepoPath" class="code-chip" style="font-weight:700;color:var(--neon-green);border-color:rgba(0,255,157,0.4);"></span>
+            <span id="metaBranchBadge" class="badge badge-medium ltr-mono"></span>
+            <span id="metaCleanBadge" class="badge badge-low ltr-mono"></span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="openActiveRepoOnGitHub()">
+              <span data-i18n="btnOpenGitHub">פתח ריפו ב-GitHub ↗</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- VIEW 1: CYBER COMMAND HUD & SCORECARD                     -->
+        <!-- ========================================================= -->
+        <section id="viewOverview" class="view-panel active">
+          <!-- Onboarding Hacker Hero Card -->
+          <div id="welcomeBanner" class="welcome-banner">
+            <div style="flex:1;min-width:300px;">
+              <div class="cyber-tag">
+                <span>●</span>
+                <span data-i18n="cyberTag">CYBER GIT FORENSICS // GITHUB MIRROR ENGINE</span>
+              </div>
+              <h1 style="font-size:20px;font-weight:900;margin-bottom:6px;color:#ffffff;" data-i18n="heroTitle">
+                העתק כתובת ריפו מ-GitHub — וחשוף כל קומיט, קובץ או סוד שנמחקו
+              </h1>
+              <p style="color:var(--text-secondary);font-size:13.5px;max-width:820px;" data-i18n="heroDesc">
+                סריקת פורנזיקה עמוקה למאגרי GitHub (ציבוריים ופרטיים): חילוץ קומיטים שנדרסו ב-Force-Push, עיון מלא בעץ הקבצים של כל קומיט בהיסטוריה, שחזור קבצי .env שנמחקו וזיהוי מפתחות API דולפים.
+              </p>
+
+              <div class="welcome-steps">
+                <div class="welcome-step-box">
+                  <div style="font-weight:800;color:var(--neon-green);margin-bottom:4px;" data-i18n="step1Title">1. העתק קישור של ריפו מ-GitHub</div>
+                  <div style="font-size:12px;color:var(--text-secondary);" data-i18n="step1Desc">העתק כל כתובת מהדפדפן (למשל https://github.com/owner/repo) — תומך אוטומטית גם בריפואים פרטיים שלך.</div>
+                </div>
+                <div class="welcome-step-box">
+                  <div style="font-weight:800;color:var(--cyan-bright);margin-bottom:4px;" data-i18n="step2Title">2. לחץ ״הדבק וסרוק״</div>
+                  <div style="font-size:12px;color:var(--text-secondary);" data-i18n="step2Desc">המנוע מוריד תמונת מראה מלאה, סורק אירועי Force-Push, היסטוריית קומיטים, עצי קבצים ורמות אנטרופיה.</div>
+                </div>
+                <div class="welcome-step-box">
+                  <div style="font-weight:800;color:var(--purple-bright);margin-bottom:4px;" data-i18n="step3Title">3. צפה ב-Diff, שחזר או נקה</div>
+                  <div style="font-size:12px;color:var(--text-secondary);" data-i18n="step3Desc">דפדף בכל קובץ בכל נקודת זמן, אמת האם מפתח API עדיין פעיל, וייצא דוח או חבילת שחזור (.ZIP).</div>
+                </div>
+              </div>
+
+              <div class="sample-targets-row">
+                <span style="font-size:12px;color:var(--text-muted);font-weight:700;" data-i18n="sampleLabel">בדיקה מהירה (לחץ לטעינה):</span>
+                <button class="sample-chip" onclick="loadSampleGitHubUrl('https://github.com/Amlaach/forcepush-breaker')">github.com/Amlaach/forcepush-breaker</button>
+                <button class="sample-chip" onclick="loadSampleGitHubUrl('https://github.com/octocat/Spoon-Knife')">github.com/octocat/Spoon-Knife</button>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px;min-width:230px;">
+              <button class="btn btn-primary" style="height:44px;font-size:14px;" onclick="pasteAndScanGitHub()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                <span data-i18n="qaPasteAndScan">הדבק כתובת מ-GitHub וסרוק</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Hacker Forensics Operations Console -->
+          <div class="hacker-terminal">
+            <div class="terminal-header">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div class="terminal-dots">
+                  <span style="background:#ff2a6d;"></span>
+                  <span style="background:#ffb800;"></span>
+                  <span style="background:#00ff9d;"></span>
+                </div>
+                <span style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:var(--neon-green);letter-spacing:0.06em;" data-i18n="terminalTitle">LIVE FORENSICS OPS CONSOLE</span>
+              </div>
+              <button onclick="clearTerminalLogs()" style="background:none;border:none;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;cursor:pointer;">[CLEAR]</button>
+            </div>
+            <div id="terminalLogBody" class="terminal-body">
+              <div class="term-line"><span class="term-ts">[READY]</span><span class="term-ok">UnForce Cyber-Forensics Engine initialized. Strict cryptographic secret masking active.</span></div>
+              <div class="term-line"><span class="term-ts">[INPUT]</span><span>Awaiting target GitHub repository URL (https://github.com/owner/repo)...</span></div>
+            </div>
+          </div>
+
+          <!-- Top KPI & Hygiene Gauge -->
+          <div class="overview-hero-grid">
+            <div class="card score-card">
+              <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.06em;">
+                <span data-i18n="scoreTitle">Repo Hygiene Score</span>
+              </div>
+              <div class="gauge-wrap">
+                <svg class="gauge-svg" viewBox="0 0 160 160">
+                  <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
+                  <circle id="gaugeCircle" class="gauge-arc" cx="80" cy="80" r="70"></circle>
+                </svg>
+                <div class="gauge-center">
+                  <span id="scoreNumber" class="gauge-num">100</span>
+                  <span id="scoreGrade" class="gauge-grade">A+ READY</span>
+                </div>
+              </div>
+              <div id="scoreSummary" style="font-size:12.5px;color:var(--text-muted);" data-i18n="scoreReady">
+                הדבק כתובת GitHub למעלה כדי להתחיל בסריקה.
+              </div>
+            </div>
+
+            <div class="kpi-grid">
+              <div class="kpi-card" onclick="openCommitsWithSubtab('dangling')">
+                <div class="kpi-top">
+                  <span data-i18n="kpiCommits">קומיטים יתומים / Force-Push</span>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--magenta)" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
+                </div>
+                <div id="statCommits" class="kpi-val">0</div>
+                <div class="kpi-sub" data-i18n="kpiCommitsSub">קומיטים שנדרסו או נותקו מההיסטוריה</div>
+              </div>
+
+              <div class="kpi-card" onclick="openCommitsWithSubtab('branch')">
+                <div class="kpi-top">
+                  <span data-i18n="kpiBranchCommits">קומיטים בהיסטוריית הריפו</span>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                </div>
+                <div id="statBranchCommits" class="kpi-val" style="color:var(--cyan-bright);">0</div>
+                <div class="kpi-sub" data-i18n="kpiBranchCommitsSub">זמינים לעיון מלא ב-Diff ובעץ הקבצים</div>
+              </div>
+
+              <div class="kpi-card" onclick="switchView('findings')">
+                <div class="kpi-top">
+                  <span data-i18n="kpiSecrets">סודות ופרטי גישה שזוהו</span>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+                </div>
+                <div id="statSecrets" class="kpi-val" style="color:var(--neon-green);">0</div>
+                <div id="statSecretsBreakdown" class="kpi-sub" data-i18n="kpiSecretsSub">מוסווים קריפטוגרפית (Strict Redaction)</div>
+              </div>
+
+              <div class="kpi-card" onclick="switchView('timemachine')">
+                <div class="kpi-top">
+                  <span data-i18n="kpiConfigs">קבצי .env / Blobs שנחשפו</span>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div id="statTotalObjects" class="kpi-val">0</div>
+                <div class="kpi-sub" data-i18n="kpiConfigsSub">קבצי הגדרות שנמחקו או עצמים מנותקים</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deductions & Latest Commits Row -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div class="card">
+              <h3 style="font-size:15px;font-weight:800;color:var(--cyan-bright);margin-bottom:10px;" data-i18n="deductionsTitle">
+                פירוט ממצאים והפחתות ציון
+              </h3>
+              <div id="deductionsList" style="display:flex;flex-direction:column;gap:8px;">
+                <div style="color:var(--neon-green);font-size:13px;" class="ltr-mono">[READY] Paste a GitHub URL and execute scan.</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h3 style="font-size:15px;font-weight:800;color:var(--neon-green);" data-i18n="latestCommitsTitle">קומיטים אחרונים ונקודות שחזור</h3>
+                <button class="btn btn-secondary btn-sm" onclick="switchView('commits')" data-i18n="openExplorerBtn">לסייר הקומיטים ←</button>
+              </div>
+              <div id="overviewRecentCommits" style="display:flex;flex-direction:column;gap:8px;">
+                <div style="color:var(--text-muted);font-size:13px;">Run a GitHub scan to inspect commits and file trees.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- VIEW 2: COMMIT & FILE-TREE FORENSICS EXPLORER             -->
+        <!-- ========================================================= -->
+        <section id="viewCommits" class="view-panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="segmented-bar">
+              <button class="seg-btn active" id="segBtnDangling" onclick="switchCommitSubtab('dangling')">
+                <span data-i18n="subtabDangling">קומיטים יתומים / Force-Push</span>
+                (<span id="subCountDangling">0</span>)
+              </button>
+              <button class="seg-btn" id="segBtnBranch" onclick="switchCommitSubtab('branch')">
+                <span data-i18n="subtabBranch">כל היסטוריית הקומיטים בריפו</span>
+                (<span id="subCountBranch">0</span>)
+              </button>
+              <button class="seg-btn" id="segBtnRemote" onclick="switchCommitSubtab('remote')">
+                <span data-i18n="subtabRemote">אירועי Force-Push ו-Forks</span>
+                (<span id="subCountRemote">0</span>)
+              </button>
+            </div>
+
+            <input
+              type="text"
+              id="commitFilterInput"
+              class="input-field"
+              style="min-width:260px;"
+              placeholder="Filter commits by message, file, author, SHA..."
+              oninput="renderCommitsList()"
+            >
+          </div>
+
+          <!-- Split Inspector (Used for BOTH Dangling & Full Branch Commit Log!) -->
+          <div id="subpanelCommitsSplit" class="recovery-split">
+            <div id="commitsListContainer" class="commit-card-list">
+              <div class="card" style="text-align:center;color:var(--text-muted);padding:32px;">
+                Paste a GitHub URL and scan to browse commits.
+              </div>
+            </div>
+
+            <div class="inspector-pane" id="commitInspectorPane">
+              <div id="commitInspectorEmpty" style="margin:auto;text-align:center;padding:40px;color:var(--text-muted);max-width:440px;">
+                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.6" style="margin-bottom:10px;opacity:0.7;"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>
+                <div data-i18n="selectCommitPrompt">בחר קומיט מהרשימה כדי לצפות ב-Diff המלא, לדפדף בכל הקבצים באותו קומיט או להוריד קבצים.</div>
+              </div>
+
+              <div id="commitInspectorContent" style="display:none;flex-direction:column;height:100%;">
+                <div class="inspector-header">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+                    <div>
+                      <div id="inspCommitTitle" style="font-size:15.5px;font-weight:800;color:#ffffff;"></div>
+                      <div id="inspCommitMeta" style="font-size:12px;color:var(--text-muted);margin-top:3px;"></div>
+                    </div>
+                    <span id="inspCommitShaChip" class="code-chip" style="cursor:pointer;" onclick="copyActiveCommitSha()" title="Click to copy full SHA"></span>
+                  </div>
+
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;">
+                    <button class="btn btn-emerald btn-sm" onclick="switchInspectorMode('files')">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                      <span data-i18n="tabFileTree">עץ קבצים מלא בקומיט</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="exportActiveCommitPatch()">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      <span data-i18n="btnExportPatch">ייצא קובץ .patch</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="openActiveCommitOnGitHub()">
+                      <span data-i18n="btnOpenCommitGH">צפה ב-GitHub ↗</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="inspector-subtabs">
+                  <button class="seg-btn active" id="inspTabDiff" onclick="switchInspectorMode('diff')" data-i18n="tabDiffView">תצוגת שינויים (Unified Diff)</button>
+                  <button class="seg-btn" id="inspTabFiles" onclick="switchInspectorMode('files')" data-i18n="tabFileTree">עץ קבצים מלא בקומיט</button>
+                </div>
+
+                <div id="inspDiffBody" style="padding:14px;">
+                  <div id="inspDiffViewer" class="code-view"></div>
+                </div>
+
+                <div id="inspFilesBody" style="display:none;padding:14px;">
+                  <div style="display:grid;grid-template-columns:255px 1fr;gap:12px;">
+                    <div id="inspFilesTreeList" style="max-height:430px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;border-inline-end:1px solid var(--border);padding-inline-end:8px;"></div>
+                    <div style="min-width:0;">
+                      <div id="inspFilePreviewHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+                        <span id="inspPreviewFileName" class="code-chip">Select a file</span>
+                        <div style="display:flex;gap:6px;">
+                          <button class="btn btn-secondary btn-sm" id="btnCopyThisFile" onclick="copyPreviewedFile()" style="display:none;" data-i18n="btnCopyFile">
+                            העתק תוכן
+                          </button>
+                          <button class="btn btn-emerald btn-sm" id="btnSaveThisFileAs" onclick="savePreviewedFileAs()" style="display:none;" data-i18n="btnSaveFile">
+                            שמור קובץ למחשב...
+                          </button>
+                        </div>
+                      </div>
+                      <div id="inspFilePreviewCode" class="code-view">
+                        <div class="diff-line" style="color:var(--text-muted);">Click any file in the commit tree to inspect or download its exact historical snapshot.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-panel C: Remote GitHub Force-Push Events & Forks -->
+          <div id="subpanelRemote" style="display:none;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div class="card">
+                <h3 style="font-size:15px;font-weight:800;color:var(--cyan-bright);margin-bottom:10px;">
+                  GitHub Force-Push &amp; History Overwrite Events
+                </h3>
+                <div id="historyEventsList" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto;">
+                  <div style="color:var(--text-muted);font-size:13px;">No remote history overwrite events detected in recent GitHub Events window.</div>
+                </div>
+              </div>
+
+              <div class="card">
+                <h3 style="font-size:15px;font-weight:800;color:var(--purple-bright);margin-bottom:10px;">
+                  Public Forks &amp; Divergent Branch Audit
+                </h3>
+                <div id="forksAuditList" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto;">
+                  <div style="color:var(--text-muted);font-size:13px;">No public forks detected on this repository.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- VIEW 3: DISCOVERED SECRETS & AI TRIAGE                    -->
+        <!-- ========================================================= -->
+        <section id="viewFindings" class="view-panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <input type="text" id="findingsFilter" class="input-field" style="width:260px;" data-i18n-placeholder="filterFindingsPlaceholder" placeholder="Filter findings..." oninput="filterFindings()">
+              <select id="severityFilter" class="select-field" onchange="filterFindings()">
+                <option value="ALL" data-i18n="sevAll">All Severities</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </select>
+            </div>
+            <div style="font-size:12px;color:var(--neon-green);display:flex;align-items:center;gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span data-i18n="redactionNotice">Strict Redaction Active: Raw tokens are cryptographically masked before render.</span>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="thId">ID</th>
+                  <th data-i18n="thSeverity">Severity</th>
+                  <th data-i18n="thRule">Rule / Finding Type</th>
+                  <th data-i18n="thMasked">Masked Credential</th>
+                  <th data-i18n="thLocation">Location</th>
+                  <th data-i18n="thEntropy">Entropy</th>
+                  <th data-i18n="thVerdict">AI Triage Verdict</th>
+                  <th data-i18n="thActions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="findingsTableBody">
+                <tr>
+                  <td colspan="8" style="text-align:center;color:var(--text-muted);padding:36px;">
+                    Scan a GitHub repository to inspect discovered secrets and AI risk triage.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- VIEW 4: .ENV & CONFIG TIME-MACHINE                        -->
+        <!-- ========================================================= -->
+        <section id="viewTimeMachine" class="view-panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <input type="text" id="timeMachineFilter" class="input-field" style="width:260px;" data-i18n-placeholder="tmFilterPlaceholder" placeholder="Filter config files..." oninput="filterTimeMachine()">
+              <select id="timeMachineTypeFilter" class="select-field" onchange="filterTimeMachine()">
+                <option value="ALL" data-i18n="tmAllTypes">All File Types</option>
+                <option value="env">.env files</option>
+                <option value="key">Private Keys (*.pem, *.key)</option>
+                <option value="credential">Credentials &amp; Secrets</option>
+                <option value="terraform">Terraform State (*.tfstate)</option>
+                <option value="config">App Config (*.json, *.yml)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="thFileName">File Path</th>
+                  <th data-i18n="thCategory">Category</th>
+                  <th data-i18n="thOrigin">Origin Commit / Blob</th>
+                  <th data-i18n="thAuthorDate">Author / Date</th>
+                  <th data-i18n="thActions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="timeMachineTableBody">
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;">Scan a GitHub repository to exhume deleted or historical .env and configuration files.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- VIEW 5: DEEP SEARCH & DETACHED BLOBS                      -->
+        <!-- ========================================================= -->
+        <section id="viewSearchBlobs" class="view-panel">
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="font-size:15px;font-weight:800;color:var(--cyan-bright);margin-bottom:10px;" data-i18n="deepSearchTitle">
+              חיפוש עמוק בכל הקומיטים, ה-Diffs והקבצים בריפו
+            </h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <input
+                type="text"
+                id="deepSearchInput"
+                class="input-field"
+                style="flex:1;min-width:260px;"
+                data-i18n-placeholder="deepSearchPlaceholder"
+                placeholder="Search function name, variable, commit message, file path, or SHA..."
+                onkeydown="if(event.key==='Enter') runDeepSearch()"
+              >
+              <button class="btn btn-primary" onclick="runDeepSearch()" data-i18n="deepSearchBtn">בצע חיפוש עמוק</button>
+            </div>
+            <div id="deepSearchResults" style="margin-top:12px;display:none;flex-direction:column;gap:8px;"></div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <h3 style="font-size:15px;font-weight:800;color:var(--amber);" data-i18n="detachedBlobsTitle">
+                עצמי Blobs מנותקים במסד הנתונים של Git
+              </h3>
+              <span id="blobsCountPill" class="badge badge-medium">0 blobs</span>
+            </div>
+            <div id="danglingBlobsList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;">
+              <div style="color:var(--text-muted);font-size:13px;">No detached blobs detected in remote packfiles.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- VIEW 6: GITHUB HISTORY PURGE & REMEDIATION PLAYBOOK       -->
+        <!-- ========================================================= -->
+        <section id="viewRemediation" class="view-panel">
+          <div class="card">
+            <h3 style="font-size:16px;font-weight:800;margin-bottom:12px;color:#ffffff;" data-i18n="remTitle">
+              פרוטוקול ניקוי היסטוריית GitHub והסרת סודות לצמיתות
+            </h3>
+
+            <div style="background:rgba(255,42,109,0.13);border:1px solid rgba(255,42,109,0.45);border-radius:10px;padding:12px 15px;margin-bottom:18px;color:#ffd0df;font-size:13px;">
+              <strong>[!] Critical Credential Rotation Notice: </strong>
+              <span id="remediationRotationWarning">Always rotate any compromised credentials with your cloud or identity provider BEFORE rewriting GitHub commit history.</span>
+            </div>
+
+            <div id="remediationStepsList"></div>
+
+            <h4 style="font-size:14px;font-weight:800;margin:18px 0 8px;color:var(--neon-green);">Automated GitHub Mirror Purge Scripts (`git filter-repo`)</h4>
+            <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;">
+              <div class="segmented-bar">
+                <button class="seg-btn active" id="btnScriptBash" onclick="switchScriptTab('bash')">Bash (.sh)</button>
+                <button class="seg-btn" id="btnScriptPS" onclick="switchScriptTab('ps')">PowerShell (.ps1)</button>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="copyActiveScript()">Copy Script</button>
+              <button class="btn btn-emerald btn-sm" onclick="saveActiveScriptAs()">Save Script File...</button>
+            </div>
+
+            <div id="bashScriptContainer" class="code-view" style="padding:12px 16px;">
+              <pre id="remediationBashScript" style="white-space:pre-wrap;color:#9efcd6;font-family:inherit;"># Scan a GitHub repo to generate customized Bash mirror-purge script</pre>
+            </div>
+            <div id="psScriptContainer" class="code-view" style="padding:12px 16px;display:none;">
+              <pre id="remediationPSScript" style="white-space:pre-wrap;color:#9efcd6;font-family:inherit;"># Scan a GitHub repo to generate customized PowerShell mirror-purge script</pre>
+            </div>
+
+            <h4 style="font-size:14px;font-weight:800;margin:20px 0 6px;color:var(--purple-bright);">
+              GitHub Support Ticket (Server-Side Commit Cache Purge)
+            </h4>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;">
+              GitHub caches overwritten commit SHAs on its servers even after `git push --force --mirror`. Submit this auto-generated ticket to purge cached commits on GitHub's backend.
+            </p>
+            <div class="code-view" style="padding:12px 16px;">
+              <pre id="remediationSupportTicket" style="white-space:pre-wrap;color:#e9d5ff;font-family:inherit;"># Scan a GitHub repo to generate a ready-to-send GitHub Support cache purge request</pre>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="copySupportTicket()">Copy Support Ticket</button>
+              <button class="btn btn-purple btn-sm" onclick="openExternalUrl('https://support.github.com/contact')">Open GitHub Support ↗</button>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- MODAL 1: FINDING / FILE / BLOB INSPECTOR                        -->
+  <!-- =============================================================== -->
+  <div id="detailModal" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="modalTitle" style="font-size:16px;font-weight:800;color:#ffffff;">Artifact Inspector</h3>
+          <div id="modalSubtitle" class="ltr-mono" style="font-size:11.5px;color:var(--cyan-bright);margin-top:2px;"></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="modalTriageMeta">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Severity &amp; Verdict</div>
+              <div id="modalSeverityBadge" style="margin-top:4px;"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Shannon Entropy</div>
+              <div id="modalEntropyVal" class="ltr-mono" style="font-weight:800;margin-top:4px;color:var(--cyan-bright);"></div>
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Technical Explanation</div>
+            <div id="modalExplanation" style="font-size:13px;margin-top:3px;"></div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Recommended Action</div>
+            <div id="modalAction" style="font-size:13px;margin-top:3px;color:var(--neon-green);"></div>
+          </div>
+          <div id="modalLivenessRow" style="display:none;margin-bottom:12px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Passive Key Liveness Status</div>
+            <div id="modalLivenessBadge" style="margin-top:4px;font-weight:700;"></div>
+            <div id="modalLivenessDetails" style="font-size:12px;color:var(--text-secondary);margin-top:3px;"></div>
+          </div>
+        </div>
+        <div id="modalCodeView" class="code-view"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="modalVerifyBtn" class="btn btn-secondary" style="display:none;" onclick="verifyActiveModalKey()">Verify Key Liveness</button>
+        <button id="modalCopyBtn" class="btn btn-secondary" style="display:none;" onclick="copyModalContent()">Copy Content</button>
+        <button id="modalRecoverBtn" class="btn btn-primary" style="display:none;" onclick="recoverFromActiveModal()">Save / Export Artifact...</button>
+        <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- MODAL 2: SETTINGS & EPHEMERAL CREDENTIALS                       -->
+  <!-- =============================================================== -->
+  <div id="settingsModal" class="modal-overlay" onclick="if(event.target===this) closeSettingsModal()">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-header">
+        <h3 style="font-size:16px;font-weight:800;">Settings &amp; Ephemeral Credentials</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeSettingsModal()">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:16px;">
+        <div>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:6px;">AI Context Triage Engine</label>
+          <select id="aiProviderSelect" class="select-field" style="width:100%;" onchange="updateAISettingsUI()">
+            <option value="heuristic" selected>Heuristic Rule-Engine (Instant / Zero-Latency)</option>
+            <option value="auto">Auto-Detect Configured LLM</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI GPT-4o</option>
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="ollama">Local Ollama (http://127.0.0.1:11434)</option>
+            <option value="none">Disabled</option>
+          </select>
+          <div id="aiKeyInputRow" style="display:none;margin-top:8px;gap:6px;">
+            <input type="password" id="aiApiKeyInput" class="input-field ltr-mono" style="flex:1;" placeholder="API Key (held strictly in-memory)" autocomplete="off">
+            <button class="btn btn-secondary" onclick="saveAIKey()">Save Key</button>
+          </div>
+          <div id="aiKeyConfiguredRow" style="display:none;margin-top:8px;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.35);border-radius:8px;">
+            <span style="font-size:12px;color:var(--neon-green);font-weight:700;">[OK] AI Key Active (In-Memory)</span>
+            <button class="btn btn-secondary btn-sm" onclick="clearAIKey()">Clear</button>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:4px;">GitHub Personal Access Token (Optional Override)</label>
+          <div id="ghSystemAuthNotice" style="font-size:11.5px;color:var(--neon-green);margin-bottom:6px;display:none;">
+            ✓ System GitHub credentials detected automatically via Git Credential Manager (Private repos work out-of-the-box).
+          </div>
+          <div id="ghTokenInputRow" style="display:flex;gap:6px;">
+            <input type="password" id="githubTokenInput" class="input-field ltr-mono" style="flex:1;" placeholder="ghp_... (optional override, held in-memory)" autocomplete="off">
+            <button class="btn btn-secondary" onclick="saveGHToken()">Save Token</button>
+          </div>
+          <div id="ghTokenConfiguredRow" style="display:none;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.35);border-radius:8px;">
+            <span style="font-size:12px;color:var(--neon-green);font-weight:700;">[OK] Custom GitHub Token Active (In-Memory)</span>
+            <button class="btn btn-secondary btn-sm" onclick="clearGHToken()">Clear</button>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:6px;">
+            Shannon Entropy Sensitivity: <span id="entropyVal" class="ltr-mono">4.0</span>
+          </label>
+          <input type="range" id="entropyThreshold" min="3.0" max="5.5" step="0.1" value="4.0" style="width:100%;" oninput="document.getElementById('entropyVal').innerText=this.value">
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="scanForksToggle" checked>
+            <span>Audit Public Forks for Divergent / Overwritten Commits</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="includeRawToggle" onchange="toggleRawRecoveryMode(this.checked)">
+            <span>Allow Unredacted (Raw) File Recovery <span style="color:var(--amber);font-size:11.5px;">(exports unmasked original secrets)</span></span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeSettingsModal()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- MODAL 3: COMMAND PALETTE (Ctrl+K)                               -->
+  <!-- =============================================================== -->
+  <div id="cmdPaletteModal" class="modal-overlay" onclick="if(event.target===this) closeCmdPalette()">
+    <div class="modal-box" style="max-width:560px;">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+        <input
+          type="text"
+          id="cmdPaletteInput"
+          class="input-field"
+          style="width:100%;font-size:14px;"
+          placeholder="Type a command or jump to module..."
+          oninput="renderCmdPaletteItems()"
+          onkeydown="handleCmdPaletteKey(event)"
+        >
+      </div>
+      <div id="cmdPaletteList" style="max-height:340px;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:4px;"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">
+    <span id="toastMessage">Ready</span>
+  </div>
+
+  <script>
+window.UNFORCE_LOGO_DATA_URI = "data:image/webp;base64,UklGRvIPAABXRUJQVlA4WAoAAAAQAAAAXwAAXwAAQUxQSLABAAABkFzbtqpK+5x9/y+X7xYPgwTKLQrvQQQvAUii3N0zcG3Rhi5nl/LeGO/0yiJiAlCz0EhHa500FjRvNPpW58Lg1p2W3hpc6Gw5jdYQwb2nLo7V8vHFU3sJNmFuC70vkhQR05ZGhCR96S2YWz3w0CtJEWp5hKRXh4i6hu2VUq22w2YyLD9WZBJ6vAybBSsvle7LlRnM558p4Wfz/gtnpZQr+k/cDygyCh1wB2C28F5Jv18wAM6+0u6TMN8zymu0x0EeV+LHWehXFVmFrjptc5LZZNNKV6l3SzmtyCt0uvgwt6Hb/dzuG25rmtdUt4E7ud3577/fIm7ndht2X5FX6L75MLehl9O5nS6lq9S7xTYniqxCk02jX83sqrPwuBI/zmK+Z5TXaI8DZD+vPgmYLbzP6v2CAYD7AUVGoQPuP8BZKeWKjp/7/LOMns0Tv7aVl/m8XDHMguXHikxCj5cxEwzbK6VabYehLg+9khTRtghJrw4R9c1tofdFkiJi2tKIkKQvvQXzBgAH9566OFbLxxdP7SUczRqNvtW5MLh1p6W3Bhc6W06joflCIx2tddJYUBNWUDggHA4AADA3AJ0BKmAAYAA+MRaHQqIhC1ZmqhABglsAL2SAVveSH238ovZtrX9e/CfKjFr7OuWbtN+YJ+pv6y9ZjzC/s761X6gezb+3fiB8AH9C/0PWKf2L/l+wB+y/pd/9r/RfBH+0X/f/0HwFfzb+9f/D2APQAznO+fxK+SfX/1Iv6bwsc5/6r0J/j/2Y+++UX+x8Ofd/+6eoF6p/v/5fefbti65+gR7B/Nv8b+ZH+V/Wv2gtUTu1/p/cA/lX8y/zP5XfA3+18IvzD2AP5j/Uv8r/e/2t/vf0ofv/+x/yn9+/af2a/mf97/1P+W/dL/F/YJ/Hf53/mP7H/l//F/jP///5fuR9df7H+xl+sf/jKLgD2qnQVgjkkWb8q7ER8ZV+P0C2rHFzeBc9/vV8Cwqpj/7BJolr2qLH9LjwQjSWavT7m/0eTpJKZ3uHBBOVxEQ+Cy9++62RKVLPjpY3zy7weIya5UR+vpyRu+sKf2Ep8WOApQwuFBYpWcAWrCdseHYsx2lwfZeyKLZrG1JCLELOG30TfJ9t0j6Ku5aYID4vcgVHyX/iccDpm4c1E5QXUN8FEvnvf6KrWtZDe8Ki71VbkpXW4XM1GAD++b1ohjC1K5urkysH9nWC9Mf1uBHyYXZNFBxkYDevB6HyV/33B7khP1ADXZskqZeT8wJecUIAm8RHy2uOPtfSTyc08wiYOJ+7DVsRTkkE+LI6mZ5QZzYW+0d9Xrzyc1207nGEfM3ChXI0ypE+rGb1FQThwdf064RXvzYbR2tPymQeijOxl5PXkGbud3/nd9mUgy9v6hBeyB+lljIhHAtf+/y2CBx43z7/Uh84aDbK0X+f8Bgindam9KwAcjOXUNdPd04Wrn3YXukOKEDUv9lD/EhdMigEXBIKqy3DRieRDp76cDRJh294QFGZQ6pcdRH25yS8n6clSk+fUwD7z8GqrZGgT/RK/ypzIOiueDzNk9VxOQcTL+bro9CDv5cb90k3Z46IVgt8SdERmXc/BHNf5DcneObbtRKz5iCtE3e5p9yekkUey6R1XGogZbu4ZhZ8DWd6kq3/5RiP6vkHoHYaszrwr6gVHicfWXsfT4dXg9qeuFeIxN+kvr9A2GYXTmRlpiobVliI02e2lRxcORSMZvWRLb08EBhr0yGhSUj0iy4a7vH7mBMjeIlv663RTNUj+KptSRZ+aMlaBWvJo0f3tKtvyhvwpErfQYxXFAKRtiHKJD15tLD/DI/XetzRxB0JGhVIaD94E8dyV9WtuNFO0711JdXa38C3httfjz/O/Qw3UQbbOq2lmYBAkRjRBK5pGCr9f/nnC46SiHqxxVHxGeHDcX1aGfuaRZHvxrafDnP4P/kZwb9/ewpOAfdxkqdCvXTf/ZIlTKLC7z3jg8u4prURarbj+Cu6vexq20FHJhDSKxN6U/o2YQ/Sp3lwc3ePc4AyfCZ+jVXJxbicWGwNL4XiyUY7bLcSRQpsLdNg2ZUZPDouDz1Z0ZmmheBaJH4AQIn3jYO5lEHTbxwxe3uFlwqQMeZEL1S8tH2NRdWpw3YkP/7UDT+Vk1q+c9SuN0TNv2W0LHBz2+AW24HtLQS0SQ8ykOaXvN7YXSaPsQvqACtIkWME99lrWI3eErMTpim/kNakwTSNXg65/yqJ2dYknq5eoOThuT5VB+a+FmAs9gwhqQA0knrW7kWrExSeN1XFLrut5aX9YhNsM8rGcdI+0QmxENJ1dauM1jLFsTrKQkiKNGWIOFiurVMOfi2L4hr8EajYx98Ji4rWfAz8wExlAHJe4zs/6KVskWwVjHu5IQY66jXx87GRxfkl8AW8CRM9AZh2CuEQ0yg/ouThykut+C+IaFg8+JCCBdgTtQ4OCKeFe1QsqEPTS6LcYaKsWGHMIgRSOaQW7FDvXss1tLzk3qQwohjhlObbmyQfXeOQbJs5hHHTxje6pKcdCnY5CPd7/1rFb/xULTembgVmww71LHubazutEvXNz/9MV+hTPO/dXcDhKIySXr9M4BjdVnmOv/Kmsbst8fOXzL9cK9kMr9BLEnJFMENy00sdVZfkgYcuGIbl086orR0VbGvhRzHFMYjyhhiNKRKV//OLUT7R+xkmmXaRImzKNgcAu0FAjRSf9VbkUf/M+g60rFT/g3XzwS+0zdhYPy51z10b2vEuvuxpkIrDLndBk/2jNR0Bih9cYi80Bi+GLF6dpnV92negOIF1om/Tjye9Tq1QmuSbDNzuFCyJr/ApQzhyZNezu3A/XrEK3miJzkDjihu/hBzzMbLCDLqziPfHYoMGO26B0fUFkhySihFnT5PjmmwjID6/LseaGiGNXo7vA4wtV4SASE0xdEhKufDTL3sW11tF9CNvqL9DqpYkiWYlbVLqXYehMtw7qzlvR1rcTZ9XGOyxFy/zm6OS6E4sBML3XaQFdGMwjObUQTEu5PgXtf6lG4T9X24vVeH+FGwO/c76tLabz9HGld3Qf0g7cjIRsDhLIoNXq0dl/4GlihMMtkkaQdACabGbulOUodb4yHkhI03XTOryQtfFUHARW4biSHDNf/n7X1oQv+Zag1wpNKidJsCHYYQOKMlt2eQN49fHBI4/7wqEi7t5C5Plr/CdWr1wF8IXDK8KgKx/7rL1yErKQd34LzSJcbTVLXhG+qotR5h+sk/1SXFAoNDz6zoeru6OF2fViaJB1UkSF2PDZn4TXf6S+bS9TyNBMz9aabjl8OXbQhv/FtVmxzyANEdg+rRZ8rBSpIaWv4VVGfodPbpF/USkihhOqHPecHUQ21umcmcn+hrF7xyi/rT8wOXFBgqVgHyMJ8gFzdW2c5vIIBcXIQ/q69pvkuNKKq/J2qlduV9/3gRAX5UX/Dp8ig12JnluIQ2xGqezQsAVmSA7zQEtOiL66PUWgdJHmyMCUJoe5iOa9QxBSleZ+JjWEDc8/8NsZWDnpE7kgbJH3QdtnbULKopdFh5qNuB/lcCJLpT/nq/vARdgjkvhOdn3eqtWvHjd/jkKKkmo/tOIVtCWsQGi21P7fVi2gs7bKvEpAfAmwZ0FaEzVeZMbvTJ3/otwbvNv66clO8DQU4Th4rBxB6ltl0xxFjHDS5zQdSypqIPTlpb3gturGLF9UbEbaFv8ynF5S71pLtT+gXrnoysMbplZ8ADMzUAxw2iwUmdZPFVGWPNLEYGrINvVtMeXSs4o1mdcWBwa4l5mji3c0pbiSwxpsewVhf+/xE4z7fS2Z29WLUsHbIQQ5/8sjrjviWNecmiq5cVYoIpOt+zssmt3kwuEnWBrrqr923u/OdYc5cixNLPBdZT22NODR08Ot5RoAulQWfS7MEBFq/pMsO6MhFM7twA+u0Eb+vhDE6GhR7T4kA+Dwt2pX1XeB/X7klVrstLFCRkNn+NyYicqRkBszuSy3vgUTr+hyqNUzEb6H84mNjS4qTUuB/ChiiYoMw6tPb+XMz20kOfUL29WQLmOvx9lJyLZCVlGLJ7Z5OGDHQXInYxjV+HSCTUyGf/HJOT/wKQS71Aitj/OBxfytJQD/M7GBApGYLntqPOMB7C8RXEI8oI38oPthyKfNCW12L1IubxBVWDIn0+h7wiXmxKyKIAOtZB4MKiSuf6Neeiv8BWGwMP3YXU8BcdTcq2S7IoYV9t6oubPzGwfbUf9DLvKYDV7VR7rGahPridPp4Hrjisr584vQMhfGC85D3GpMzGzpEO6Br6nVdd2KjUzvrA1JXs3HHR3WMX7W2MsiowSQjbaQ3sbFfEfTlOWYNoyckvcqu+cqrTOlutEU0SquvY83Xei7uN/WpZTnDO1Blk7eY4zknQrtB5BHHRFcWpuZEA4+3gF4/PtSodB/003x45f9qQf8GO9pRr8M2wTlw+fUJBPdyeQv3Z7NOmsv9zwZTuHkCzssOBMnIhSxzowMI5x+SjoX6+vVfgQ2/gtdyLDSjczbvQjnzPCu9tJQZsc72n128i76F5YGrFx45Ct9ESovIp4Wz994BmofULUzDrk8sug/tXMPRIh1YhiaP0ZGOWzoMzphyt14W6VdtNft5L5mO2sv/LDZTEHd42zPwuU7RdauKXkw7Dm1e2Dt5t81X7nHBcPMvG3/F+USEhs9mIl7IGkiHxgK+dLr0/QTQxd4TkZ8nWKOQo7iwmGE0ycKd8tz+PDVSA8veGiIpu1QQrLQof2hYyYt3Z5ZGvu9sxG6HA+b9XUG0sUv1uY9ES+4B8D5PqUWNM1u2mErrkjCz5lMwG/SMIFY6T/mtG9S2RlYfGG9pZk8NaJnwXW5uaRMj1Bfc5+VL6NPF8AYdB5UVYBWFMDbFGZbN15L1tlRRHIF9/nYXLaoWNgTX8W4M+Fdq5pmkvC3bIOiFXX1LlACmterRz8H8kdE36K4jDbmFls9Pjeo0K2cv3GSjqgvx72IcwKlGg8uqxFPKfSoEGad7MiLKG5gJEpXBQsVQ90i6SV2shxagiba+DQsbML5rkZYI1AV8guh2iUDowtdp0tOrLt6FUA/1JPvIPtoXnS/NIdO5kPJouUDtM03CzK6aphIfpc4PagifDyL8b5Qy74626EaoCkoAOw7pCVfs0Qh8K9xNhoPrvmsyB0ABPKKfp3WjAWu9gAry4nhRE1Ptit9qf/aHbobyv3Jvxj83czcvOwYYLu7h1xmr5lvzSjH9Xrr/L638l9nPt1pGSFwd0QBPOBBzeXMLS1wdX51+dF98sIUyLlRElD6XWzNPB+ZH635CAc822OrYOMcjjPXwDhEJDuH+2s7A1uZWdQ7QYnPD58/kWXGYez7hreyllfTH4cVZQs18bMxXl4y4y3avUXDGxRCYr86DDPRLQu5igAAA==";
+
+</script>
+<script>
+/* Bilingual Cyber-Forensics Dictionary (Hebrew RTL default + English LTR) */
+window.UNFORCE_I18N = {
+  he: {
+    cmdPlaceholder: "פקודה מהירה או ניווט... (Ctrl+K)",
+    brandSub: "פורנזיקת GitHub, שחזור קומיטים וציד סודות",
+    secQuickStart: "סריקת GitHub מהירה",
+    qaPasteAndScan: "הדבק כתובת מ-GitHub וסרוק",
+    qaFocusInput: "הזן כתובת ריפו מ-GitHub",
+    secWorkspace: "מודולי פורנזיקה",
+    navOverview: "מוקד בקרה וציון אבטחה",
+    navCommits: "חוקר קומיטים ועצי קבצים",
+    navFindings: "סודות ודליפות מידע",
+    navTimeMachine: "מכונת זמן לקבצי .env",
+    navSearchBlobs: "חיפוש עמוק ועצמי רפאים",
+    navRemediation: "ניקוי היסטוריה ב-GitHub",
+    secRecent: "ריפואים שנסרקו לאחרונה",
+    recentEmpty: "טרם נסרקו ריפואים מ-GitHub.",
+    pasteBtn: "הדבק URL",
+    scanBtn: "סרוק ריפו מ-GitHub",
+    scanningBtn: "מבצע חקירה...",
+    githubTargetPill: "GitHub Repo",
+    bundleBtn: "חבילת שחזור (.ZIP)",
+    settingsBtn: "הגדרות",
+    btnOpenGitHub: "פתח ריפו ב-GitHub ↗",
+    cyberTag: "CYBER GIT FORENSICS // GITHUB MIRROR ENGINE",
+    heroTitle: "העתק כתובת ריפו מ-GitHub — וחשוף כל קומיט, קובץ או סוד שנמחקו",
+    heroDesc: "סריקת פורנזיקה עמוקה למאגרי GitHub (ציבוריים ופרטיים): חילוץ קומיטים שנדרסו ב-Force-Push, עיון מלא בעץ הקבצים של כל קומיט בהיסטוריה, שחזור קבצי .env שנמחקו וזיהוי מפתחות API דולפים.",
+    step1Title: "1. העתק קישור של ריפו מ-GitHub",
+    step1Desc: "העתק כל כתובת מהדפדפן (למשל https://github.com/owner/repo) — תומך אוטומטית גם בריפואים פרטיים שלך.",
+    step2Title: "2. לחץ ״הדבק וסרוק״",
+    step2Desc: "המנוע מוריד תמונת מראה מלאה, סורק אירועי Force-Push, היסטוריית קומיטים, עצי קבצים ורמות אנטרופיה.",
+    step3Title: "3. צפה ב-Diff, שחזר או נקה",
+    step3Desc: "דפדף בכל קובץ בכל נקודת זמן, אמת האם מפתח API עדיין פעיל, וייצא דוח או חבילת שחזור (.ZIP).",
+    sampleLabel: "בדיקה מהירה (לחץ לטעינה):",
+    scoreTitle: "Repo Hygiene Score",
+    scoreReady: "הדבק כתובת GitHub למעלה כדי להתחיל בסריקה.",
+    kpiCommits: "קומיטים יתומים / Force-Push",
+    kpiCommitsSub: "קומיטים שנדרסו או נותקו מההיסטוריה",
+    kpiBranchCommits: "קומיטים בהיסטוריית הריפו",
+    kpiBranchCommitsSub: "זמינים לעיון מלא ב-Diff ובעץ הקבצים",
+    kpiSecrets: "סודות ופרטי גישה שזוהו",
+    kpiSecretsSub: "מוסווים קריפטוגרפית (Strict Redaction)",
+    kpiConfigs: "קבצי .env / Blobs שנחשפו",
+    kpiConfigsSub: "קבצי הגדרות שנמחקו או עצמים מנותקים",
+    terminalTitle: "LIVE FORENSICS OPS CONSOLE",
+    deductionsTitle: "פירוט ממצאים והפחתות ציון",
+    latestCommitsTitle: "קומיטים אחרונים ונקודות שחזור",
+    openExplorerBtn: "לסייר הקומיטים ←",
+    subtabDangling: "קומיטים יתומים / Force-Push",
+    subtabBranch: "כל היסטוריית הקומיטים בריפו",
+    subtabRemote: "אירועי Force-Push ו-Forks",
+    selectCommitPrompt: "בחר קומיט מהרשימה כדי לצפות ב-Diff המלא, לדפדף בכל הקבצים באותו קומיט או להוריד קבצים.",
+    btnExportPatch: "ייצא קובץ .patch",
+    btnOpenCommitGH: "צפה ב-GitHub ↗",
+    tabDiffView: "תצוגת שינויים (Unified Diff)",
+    tabFileTree: "עץ קבצים מלא בקומיט",
+    btnSaveFile: "שמור קובץ למחשב...",
+    btnCopyFile: "העתק תוכן",
+    redactionNotice: "Strict Redaction Active: Raw tokens are cryptographically masked before render.",
+    filterFindingsPlaceholder: "סנן ממצאים לפי קובץ, סוג מפתח, SHA...",
+    sevAll: "כל רמות החומרה",
+    thId: "מזהה",
+    thSeverity: "חומרה",
+    thRule: "סוג ממצא / כלל",
+    thMasked: "ערך מוסווה",
+    thLocation: "מיקום בהיסטוריה",
+    thEntropy: "אנטרופיה",
+    thVerdict: "אבחון AI / הקשר",
+    thActions: "פעולות",
+    tmFilterPlaceholder: "סנן לפי שם קובץ (.env, key, json)...",
+    tmAllTypes: "כל סוגי הקבצים",
+    thFileName: "נתיב קובץ",
+    thCategory: "קטגוריה",
+    thOrigin: "מקור בהיסטוריה",
+    thAuthorDate: "מחבר ותאריך",
+    deepSearchTitle: "חיפוש עמוק בכל הקומיטים, ה-Diffs והקבצים בריפו",
+    deepSearchPlaceholder: "חפש שם פונקציה, משתנה, הודעת קומיט, נתיב קובץ או SHA...",
+    deepSearchBtn: "בצע חיפוש עמוק",
+    detachedBlobsTitle: "עצמי Blobs מנותקים במסד הנתונים של Git",
+    remTitle: "פרוטוקול ניקוי היסטוריית GitHub והסרת סודות לצמיתות",
+    invalidGhUrl: "נא להדביק כתובת ריפו תקינה מ-GitHub (לדוגמה: https://github.com/owner/repo)",
+    clipboardEmpty: "לוח ההעתקה ריק — העתק כתובת ריפו מ-GitHub ונסה שוב"
+  },
+  en: {
+    cmdPlaceholder: "Quick command or jump to view... (Ctrl+K)",
+    brandSub: "GitHub History Forensics & Secret Hunter",
+    secQuickStart: "Quick GitHub Target",
+    qaPasteAndScan: "Paste GitHub URL & Scan",
+    qaFocusInput: "Enter GitHub Repo URL",
+    secWorkspace: "Forensics Modules",
+    navOverview: "Command HUD & Hygiene",
+    navCommits: "Commit & File-Tree Explorer",
+    navFindings: "Secrets & AI Triage",
+    navTimeMachine: ".env & Config Time-Machine",
+    navSearchBlobs: "Deep Search & Ghost Blobs",
+    navRemediation: "GitHub History Purge",
+    secRecent: "Recent GitHub Targets",
+    recentEmpty: "No GitHub repos scanned yet.",
+    pasteBtn: "Paste URL",
+    scanBtn: "Scan GitHub Repo",
+    scanningBtn: "Scanning Target...",
+    githubTargetPill: "GitHub Repo",
+    bundleBtn: "Recovery Bundle (.ZIP)",
+    settingsBtn: "Settings",
+    btnOpenGitHub: "Open on GitHub ↗",
+    cyberTag: "CYBER GIT FORENSICS // GITHUB MIRROR ENGINE",
+    heroTitle: "Paste Any GitHub Repo URL — Exhume Deleted Commits, Files & Secrets",
+    heroDesc: "Deep GitHub repository forensics (public & private): uncover force-pushed ghost commits, browse full historical file trees at any commit, recover deleted .env configs, and audit leaked API keys.",
+    step1Title: "1. Copy a GitHub Repo URL",
+    step1Desc: "Copy any GitHub link from your browser (e.g. https://github.com/owner/repo) — private repos work automatically via Git Credential Manager.",
+    step2Title: "2. Click 'Paste & Scan'",
+    step2Desc: "UnForce acquires a bare mirror, audits Force-Push events, commit diffs, historical file trees, and Shannon entropy.",
+    step3Title: "3. Inspect, Recover or Purge",
+    step3Desc: "Preview any file at any commit, passively verify key liveness, download a .ZIP bundle, or generate GitHub filter-repo purge scripts.",
+    sampleLabel: "Quick target (click to load):",
+    scoreTitle: "Repo Hygiene Score",
+    scoreReady: "Paste a GitHub repository URL above to start forensic analysis.",
+    kpiCommits: "Ghost / Force-Push Commits",
+    kpiCommitsSub: "Unreachable or overwritten commits exhumed",
+    kpiBranchCommits: "Audited Repo Commits",
+    kpiBranchCommitsSub: "Full commit history ready for Diff & Tree inspection",
+    kpiSecrets: "Secrets & Leaks Detected",
+    kpiSecretsSub: "Cryptographically masked (Strict Redaction)",
+    kpiConfigs: "Exhumed .env & Ghost Blobs",
+    kpiConfigsSub: "Deleted config files & detached git blobs",
+    terminalTitle: "LIVE FORENSICS OPS CONSOLE",
+    deductionsTitle: "Hygiene Score Breakdown",
+    latestCommitsTitle: "Latest Commits & Recovery Targets",
+    openExplorerBtn: "Open Commit Explorer →",
+    subtabDangling: "Ghost / Force-Push Commits",
+    subtabBranch: "Full Repo Commit Log",
+    subtabRemote: "GitHub Force-Push & Forks",
+    selectCommitPrompt: "Select any commit on the left to inspect its Unified Diff, browse its complete file tree, or download snapshots.",
+    btnExportPatch: "Export .patch",
+    btnOpenCommitGH: "View on GitHub ↗",
+    tabDiffView: "Unified Diff",
+    tabFileTree: "Commit File Tree",
+    btnSaveFile: "Save File As...",
+    btnCopyFile: "Copy Content",
+    redactionNotice: "Strict Redaction Active: Raw tokens are cryptographically masked before render.",
+    filterFindingsPlaceholder: "Filter findings by file, rule, SHA...",
+    sevAll: "All Severities",
+    thId: "ID",
+    thSeverity: "Severity",
+    thRule: "Rule / Finding Type",
+    thMasked: "Masked Credential",
+    thLocation: "Location",
+    thEntropy: "Entropy",
+    thVerdict: "AI Triage Verdict",
+    thActions: "Actions",
+    tmFilterPlaceholder: "Filter by file path (.env, key, json)...",
+    tmAllTypes: "All File Types",
+    thFileName: "File Path",
+    thCategory: "Category",
+    thOrigin: "Origin Commit / Blob",
+    thAuthorDate: "Author / Date",
+    deepSearchTitle: "Deep Search Across All Commits, Diffs & Blobs",
+    deepSearchPlaceholder: "Search function name, variable, commit message, file path, or SHA...",
+    deepSearchBtn: "Run Deep Search",
+    detachedBlobsTitle: "Detached Git Blobs",
+    remTitle: "GitHub History Purge & Secret Excision Playbook",
+    invalidGhUrl: "Please paste a valid GitHub repository URL (e.g. https://github.com/owner/repo)",
+    clipboardEmpty: "Clipboard is empty — copy a GitHub repository URL first"
+  }
+};
+
+</script>
+<script>
+/* UnForce (ForcePush-Breaker) — Cyber-Forensics Studio Frontend Engine */
+"use strict";
+
+let currentLang = localStorage.getItem("unforce_lang") || "he";
+let API_BASE = window.UNFORCE_API_BASE || "";
+let currentScanData = null;
+let activeRepoTarget = "";
+let activeGithubHtmlUrl = "";
+let activeView = "overview";
+let activeCommitSubtab = "dangling";
+let activeCommitObj = null;
+let activePreviewedFile = null;
+let activeScriptLang = "bash";
+let activeModalContext = null;
+let ephemeralSession = { aiKey: "", ghToken: "", ghAutoDetected: false };
+let seenPhaseLogs = new Set();
+let cmdSelectedIndex = 0;
+let cachedTimeMachineEntries = [];
+
+function t(key) {
+  const dict = (window.UNFORCE_I18N && window.UNFORCE_I18N[currentLang]) || window.UNFORCE_I18N.he;
+  return dict[key] || (window.UNFORCE_I18N.en && window.UNFORCE_I18N.en[key]) || key;
+}
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/* ---- Dynamic Backend URL Resolution (Instant file:// + HTTP compatibility) ---- */
+async function ensureApiBase() {
+  if (API_BASE) return API_BASE;
+  if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+    API_BASE = window.location.origin;
+    return API_BASE;
+  }
+  if (window.unforceDesktop && typeof window.unforceDesktop.getBackendUrl === "function") {
+    const url = await window.unforceDesktop.getBackendUrl();
+    if (url) {
+      API_BASE = url.replace(/\/+$/, "");
+      return API_BASE;
+    }
+  }
+  return "";
+}
+
+async function apiFetch(endpoint, options = {}) {
+  const base = await ensureApiBase();
+  return fetch(`${base}${endpoint}`, options);
+}
+
+/* ---- GitHub URL Parsing & Validation (ONLY Allowed Target Method) ---- */
+function parseGitHubRepoInput(rawInput) {
+  const raw = String(rawInput || "").trim();
+  if (!raw) return null;
+  if (/^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith("/") || raw.startsWith("\\") || raw.startsWith(".")) {
+    return null;
+  }
+  let m = raw.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/i);
+  if (!m) {
+    m = raw.match(/^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i);
+  }
+  if (!m) {
+    m = raw.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
+  }
+  if (!m) return null;
+  const owner = m[1];
+  const repo = m[2].replace(/\.git$/i, "");
+  const reserved = ["settings", "orgs", "organizations", "users", "marketplace", "explore", "topics", "login"];
+  if (!owner || !repo || reserved.includes(owner.toLowerCase())) return null;
+  return {
+    owner,
+    repo,
+    slug: `${owner}/${repo}`,
+    cleanUrl: `https://github.com/${owner}/${repo}`,
+  };
+}
+
+function updateTargetTypeBadge() {
+  const input = document.getElementById("repoPathInput");
+  const badge = document.getElementById("repoTargetBadgeText");
+  const pill = document.getElementById("repoTargetBadge");
+  if (!input || !badge || !pill) return;
+  const parsed = parseGitHubRepoInput(input.value);
+  if (parsed) {
+    badge.textContent = parsed.slug;
+    pill.style.borderColor = "rgba(0, 255, 157, 0.5)";
+    pill.style.color = "var(--neon-green)";
+  } else {
+    badge.textContent = t("githubTargetPill");
+    pill.style.borderColor = "rgba(0, 229, 255, 0.35)";
+    pill.style.color = "var(--cyan-bright)";
+  }
+}
+
+/* ---- Live Hacker Terminal Stream ---- */
+function logTerminal(tag, message, tone = "") {
+  const body = document.getElementById("terminalLogBody");
+  if (!body) return;
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  const cls = tone === "ok" ? "term-ok" : tone === "warn" ? "term-warn" : tone === "err" ? "term-err" : tone === "cmd" ? "term-cmd" : "";
+  const div = document.createElement("div");
+  div.className = "term-line";
+  div.innerHTML = `<span class="term-ts">[${hh}:${mm}:${ss}] [${escapeHtml(tag)}]</span><span class="${cls}">${escapeHtml(message)}</span>`;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+function clearTerminalLogs() {
+  const body = document.getElementById("terminalLogBody");
+  if (body) body.innerHTML = "";
+  logTerminal("SYS", "Console cleared. Ready for next GitHub target.", "ok");
+}
+
+/* ---- Clipboard & Quick Input Helpers ---- */
+async function readClipboardTextSafe() {
+  try {
+    if (window.unforceDesktop && typeof window.unforceDesktop.readClipboard === "function") {
+      return (await window.unforceDesktop.readClipboard()) || "";
+    }
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      return (await navigator.clipboard.readText()) || "";
+    }
+  } catch (_) {}
+  return "";
+}
+
+async function writeClipboardTextSafe(text) {
+  try {
+    if (window.unforceDesktop && typeof window.unforceDesktop.writeClipboard === "function") {
+      await window.unforceDesktop.writeClipboard(String(text || ""));
+      return true;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(String(text || ""));
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+async function pasteGitHubUrlOnly() {
+  const clip = (await readClipboardTextSafe()).trim();
+  const input = document.getElementById("repoPathInput");
+  if (!clip) {
+    showToast(t("clipboardEmpty"));
+    if (input) input.focus();
+    return false;
+  }
+  const parsed = parseGitHubRepoInput(clip);
+  if (input) {
+    input.value = parsed ? parsed.cleanUrl : clip;
+    updateTargetTypeBadge();
+    input.focus();
+  }
+  if (!parsed) {
+    showToast(t("invalidGhUrl"));
+    return false;
+  }
+  logTerminal("CLIPBOARD", `Target loaded: ${parsed.cleanUrl}`, "cmd");
+  return true;
+}
+
+async function pasteAndScanGitHub() {
+  const input = document.getElementById("repoPathInput");
+  const clip = (await readClipboardTextSafe()).trim();
+  if (clip && parseGitHubRepoInput(clip)) {
+    input.value = parseGitHubRepoInput(clip).cleanUrl;
+    updateTargetTypeBadge();
+    await startScan();
+    return;
+  }
+  if (input && parseGitHubRepoInput(input.value)) {
+    await startScan();
+    return;
+  }
+  if (input) input.focus();
+  showToast(t("invalidGhUrl"));
+}
+
+function focusGitHubInput() {
+  const input = document.getElementById("repoPathInput");
+  if (input) {
+    input.focus();
+    input.select();
+  }
+}
+
+function loadSampleGitHubUrl(url) {
+  const input = document.getElementById("repoPathInput");
+  if (!input) return;
+  input.value = url;
+  updateTargetTypeBadge();
+  startScan();
+}
+
+/* ---- Window Controls & External Links ---- */
+function winMinimize() {
+  if (window.unforceDesktop && window.unforceDesktop.minimize) window.unforceDesktop.minimize();
+}
+function winMaximize() {
+  if (window.unforceDesktop && window.unforceDesktop.maximize) window.unforceDesktop.maximize();
+}
+function winClose() {
+  if (window.unforceDesktop && window.unforceDesktop.close) window.unforceDesktop.close();
+}
+
+function openExternalUrl(url) {
+  if (!url) return;
+  if (window.unforceDesktop && window.unforceDesktop.openExternal) {
+    window.unforceDesktop.openExternal(url);
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
+function openActiveRepoOnGitHub() {
+  if (activeGithubHtmlUrl) {
+    openExternalUrl(activeGithubHtmlUrl);
+  }
+}
+
+function openActiveCommitOnGitHub() {
+  if (!activeCommitObj || !activeGithubHtmlUrl) return;
+  openExternalUrl(`${activeGithubHtmlUrl}/commit/${activeCommitObj.commit_hash}`);
+}
+
+/* ---- Toast ---- */
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  const txt = document.getElementById("toastMessage");
+  if (!el || !txt) return;
+  txt.textContent = msg;
+  el.classList.add("show");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 3400);
+}
+
+/* ---- Language & RTL/LTR ---- */
+function applyLanguage() {
+  document.documentElement.lang = currentLang;
+  document.documentElement.dir = currentLang === "he" ? "rtl" : "ltr";
+
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.getAttribute("data-i18n");
+    if (key) el.textContent = t(key);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    const key = el.getAttribute("data-i18n-placeholder");
+    if (key) el.setAttribute("placeholder", t(key));
+  });
+  updateTargetTypeBadge();
+  renderRecentRepos();
+}
+
+function toggleLanguage() {
+  currentLang = currentLang === "he" ? "en" : "he";
+  localStorage.setItem("unforce_lang", currentLang);
+  applyLanguage();
+}
+
+/* ---- Recent Scanned GitHub Repos ---- */
+function getRecentRepos() {
+  try {
+    const arr = JSON.parse(localStorage.getItem("unforce_recent_gh_repos") || "[]");
+    return Array.isArray(arr) ? arr.filter((u) => Boolean(parseGitHubRepoInput(u))) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function addRecentRepo(cleanUrl) {
+  const parsed = parseGitHubRepoInput(cleanUrl);
+  if (!parsed) return;
+  let list = getRecentRepos().filter((item) => item.toLowerCase() !== parsed.cleanUrl.toLowerCase());
+  list.unshift(parsed.cleanUrl);
+  list = list.slice(0, 8);
+  localStorage.setItem("unforce_recent_gh_repos", JSON.stringify(list));
+  renderRecentRepos();
+}
+
+function clearRecentRepos() {
+  localStorage.removeItem("unforce_recent_gh_repos");
+  renderRecentRepos();
+}
+
+function renderRecentRepos() {
+  const box = document.getElementById("recentReposList");
+  if (!box) return;
+  const list = getRecentRepos();
+  if (!list.length) {
+    box.innerHTML = `<div style="font-size:11.5px;color:var(--text-muted);padding:4px 8px;">${escapeHtml(t("recentEmpty"))}</div>`;
+    return;
+  }
+  box.innerHTML = list
+    .map((url) => {
+      const p = parseGitHubRepoInput(url);
+      const label = p ? p.slug : url;
+      return `<button class="recent-repo-btn" onclick="loadSampleGitHubUrl('${escapeHtml(url)}')" title="${escapeHtml(url)}">
+        <span style="color:var(--neon-green);">●</span>
+        <span>${escapeHtml(label)}</span>
+      </button>`;
+    })
+    .join("");
+}
+
+/* ---- Navigation ---- */
+function switchView(viewName) {
+  activeView = viewName;
+  const map = {
+    overview: "viewOverview",
+    commits: "viewCommits",
+    findings: "viewFindings",
+    timemachine: "viewTimeMachine",
+    searchblobs: "viewSearchBlobs",
+    remediation: "viewRemediation",
+  };
+  Object.entries(map).forEach(([k, id]) => {
+    const panel = document.getElementById(id);
+    if (panel) panel.classList.toggle("active", k === viewName);
+  });
+  document.querySelectorAll(".nav-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-view") === viewName);
+  });
+}
+
+function openCommitsWithSubtab(subtab) {
+  switchView("commits");
+  switchCommitSubtab(subtab);
+}
+
+/* ---- Scan Execution ---- */
+async function startScan() {
+  const input = document.getElementById("repoPathInput");
+  const rawVal = (input ? input.value : "").trim();
+  const parsed = parseGitHubRepoInput(rawVal);
+
+  if (!parsed) {
+    showToast(t("invalidGhUrl"));
+    logTerminal("ERR", t("invalidGhUrl"), "err");
+    if (input) input.focus();
+    return;
+  }
+
+  input.value = parsed.cleanUrl;
+  updateTargetTypeBadge();
+
+  const scanBtn = document.getElementById("scanBtn");
+  const scanBtnText = document.getElementById("scanBtnText");
+  const progBox = document.getElementById("scanProgressContainer");
+  const progFill = document.getElementById("scanProgressFill");
+  const progTxt = document.getElementById("progressStatusText");
+  const progPct = document.getElementById("progressPctText");
+
+  if (scanBtn) scanBtn.disabled = true;
+  if (scanBtnText) scanBtnText.textContent = t("scanningBtn");
+  if (progBox) progBox.classList.add("active");
+  if (progFill) progFill.style.width = "6%";
+  if (progTxt) progTxt.textContent = `Connecting to GitHub: ${parsed.slug}...`;
+  if (progPct) progPct.textContent = "6%";
+
+  seenPhaseLogs.clear();
+  logTerminal("TARGET", `$ unforce scan ${parsed.cleanUrl} --mirror --forensics`, "cmd");
+
+  const aiProvider = (document.getElementById("aiProviderSelect") || {}).value || "heuristic";
+  const entropy = parseFloat((document.getElementById("entropyThreshold") || {}).value || "4.0");
+  const scanForks = Boolean((document.getElementById("scanForksToggle") || { checked: true }).checked);
+
+  try {
+    const startResp = await apiFetch("/api/scan/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo_path: parsed.cleanUrl,
+        ai_provider: aiProvider,
+        ai_api_key: ephemeralSession.aiKey || undefined,
+        github_token: ephemeralSession.ghToken || undefined,
+        entropy_threshold: entropy,
+        scan_forks: scanForks,
+      }),
+    });
+    const startJson = await startResp.json();
+    if (!startResp.ok || startJson.error) {
+      throw new Error(startJson.error || `HTTP ${startResp.status}`);
+    }
+
+    const jobId = startJson.job_id;
+    let finalResult = null;
+
+    while (true) {
+      await new Promise((r) => setTimeout(r, 240));
+      const stResp = await apiFetch(`/api/scan/status?job_id=${encodeURIComponent(jobId)}`);
+      const stData = await stResp.json();
+      if (!stResp.ok && !stData.status) {
+        throw new Error(stData.error || "Failed polling scan status");
+      }
+
+      const pct = Number(stData.progress_pct || 0);
+      if (progFill) progFill.style.width = `${pct}%`;
+      if (progPct) progPct.textContent = `${pct}%`;
+      if (progTxt && stData.phase_message) progTxt.textContent = stData.phase_message;
+
+      if (Array.isArray(stData.phase_logs)) {
+        stData.phase_logs.forEach((entry) => {
+          const msg = typeof entry === "string" ? entry : entry.msg || "";
+          if (msg && !seenPhaseLogs.has(msg)) {
+            seenPhaseLogs.add(msg);
+            const tone = msg.startsWith("[ERROR]") ? "err" : pct >= 100 ? "ok" : "";
+            logTerminal("GIT", msg, tone);
+          }
+        });
+      }
+
+      if (stData.status === "completed") {
+        finalResult = stData.result;
+        break;
+      }
+      if (stData.status === "failed") {
+        throw new Error(stData.error || "Scan failed");
+      }
+    }
+
+    activeRepoTarget = finalResult.repo_path || parsed.cleanUrl;
+    activeGithubHtmlUrl = finalResult.github_html_url || parsed.cleanUrl;
+    addRecentRepo(parsed.cleanUrl);
+    renderScanResult(finalResult, parsed);
+
+    const ghostCount = (finalResult.dangling_commits || []).length;
+    const branchCount = (finalResult.branch_commits || []).length;
+    const secCount = (finalResult.findings || []).length;
+    logTerminal(
+      "DONE",
+      `Audit complete on ${parsed.slug} -> Hygiene: ${finalResult.hygiene_score.score}/100 | Ghost Commits: ${ghostCount} | Repo Commits: ${branchCount} | Secrets: ${secCount}`,
+      secCount > 0 ? "warn" : "ok"
+    );
+    showToast(`✓ ${parsed.slug} — Score: ${finalResult.hygiene_score.score}/100`);
+  } catch (err) {
+    logTerminal("ERROR", String(err.message || err), "err");
+    showToast(`✗ ${err.message || err}`);
+  } finally {
+    if (scanBtn) scanBtn.disabled = false;
+    if (scanBtnText) scanBtnText.textContent = t("scanBtn");
+    setTimeout(() => {
+      if (progBox) progBox.classList.remove("active");
+    }, 900);
+  }
+}
+
+/* ---- Render Full Scan Dashboard ---- */
+function renderScanResult(data, parsedTarget) {
+  currentScanData = data;
+  const welcome = document.getElementById("welcomeBanner");
+  if (welcome) welcome.style.display = "none";
+
+  // Meta Strip
+  const strip = document.getElementById("repoMetaStrip");
+  if (strip) strip.classList.add("active");
+  const metaPath = document.getElementById("metaRepoPath");
+  if (metaPath) metaPath.textContent = parsedTarget ? parsedTarget.cleanUrl : data.github_html_url || data.repo_path;
+  const metaBranch = document.getElementById("metaBranchBadge");
+  const curBranch = (data.repo_metadata && data.repo_metadata.current_branch) || "main";
+  if (metaBranch) metaBranch.textContent = `HEAD: ${curBranch}`;
+  const metaClean = document.getElementById("metaCleanBadge");
+  if (metaClean) metaClean.textContent = `OBJECTS SCANNED: ${data.total_objects_scanned || 0}`;
+
+  // Score Gauge
+  const scoreObj = data.hygiene_score || { score: 100, grade: "A+", summary: "", deductions: [] };
+  const score = Number(scoreObj.score ?? 100);
+  const circle = document.getElementById("gaugeCircle");
+  if (circle) {
+    const circumference = 440;
+    circle.style.strokeDashoffset = String(circumference - (score / 100) * circumference);
+    circle.style.stroke = score >= 85 ? "var(--neon-green)" : score >= 60 ? "var(--amber)" : "var(--rose)";
+  }
+  document.getElementById("scoreNumber").textContent = String(score);
+  document.getElementById("scoreGrade").textContent = scoreObj.grade || "A+";
+  document.getElementById("scoreSummary").textContent = scoreObj.summary || "";
+
+  // KPIs & Sidebar Badges
+  const danglingCommits = data.dangling_commits || [];
+  const branchCommits = data.branch_commits || [];
+  const findings = data.findings || [];
+  const blobs = data.dangling_blobs || [];
+  const historyEvents = data.history_events || [];
+  const discoveredForks = data.discovered_forks || [];
+  const remoteEventsCount = historyEvents.length + discoveredForks.length;
+
+  const tmEntries = buildTimeMachineEntries(data);
+
+  document.getElementById("statCommits").textContent = String(danglingCommits.length);
+  document.getElementById("statBranchCommits").textContent = String(branchCommits.length);
+  document.getElementById("statSecrets").textContent = String(findings.length);
+  document.getElementById("statSecrets").style.color = findings.length > 0 ? "var(--rose)" : "var(--neon-green)";
+  document.getElementById("statTotalObjects").textContent = String(tmEntries.length);
+
+  document.getElementById("navBadgeScore").textContent = `${score}`;
+  document.getElementById("navBadgeCommits").textContent = String(danglingCommits.length + branchCommits.length);
+  const navFindingsBadge = document.getElementById("navBadgeFindings");
+  navFindingsBadge.textContent = String(findings.length);
+  navFindingsBadge.classList.toggle("alert", findings.length > 0);
+  document.getElementById("navBadgeTimeMachine").textContent = String(tmEntries.length);
+  document.getElementById("navBadgeBlobs").textContent = String(blobs.length);
+
+  document.getElementById("subCountDangling").textContent = String(danglingCommits.length);
+  document.getElementById("subCountBranch").textContent = String(branchCommits.length);
+  document.getElementById("subCountRemote").textContent = String(remoteEventsCount);
+
+  // Deductions
+  const dedList = document.getElementById("deductionsList");
+  const deductions = scoreObj.deductions || [];
+  if (!deductions.length) {
+    dedList.innerHTML = `<div style="color:var(--neon-green);font-size:13px;" class="ltr-mono">[OK] 0 hygiene deductions — repository history is clean!</div>`;
+  } else {
+    dedList.innerHTML = deductions
+      .map(
+        (d) => `<div style="padding:8px 10px;border-radius:8px;background:rgba(255,42,109,0.09);border:1px solid rgba(255,42,109,0.3);font-size:12.5px;color:#ffd0df;">
+          <strong class="ltr-mono">[-${d.points ?? ""} pts]</strong> ${escapeHtml(d.reason || d.category || "")}
+        </div>`
+      )
+      .join("");
+  }
+
+  // Overview Latest Commits
+  const overviewCommits = danglingCommits.length ? danglingCommits.slice(0, 5) : branchCommits.slice(0, 5);
+  const ovBox = document.getElementById("overviewRecentCommits");
+  if (!overviewCommits.length) {
+    ovBox.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">No commits found in repository.</div>`;
+  } else {
+    const targetSub = danglingCommits.length ? "dangling" : "branch";
+    ovBox.innerHTML = overviewCommits
+      .map(
+        (c) => `<div class="commit-item-card" onclick="jumpToCommit('${escapeHtml(c.commit_hash)}', '${targetSub}')">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+            <span style="font-weight:700;color:#ffffff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.message || "(no message)")}</span>
+            <span class="code-chip">${escapeHtml((c.commit_hash || "").slice(0, 8))}</span>
+          </div>
+          <div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;" class="ltr-mono">
+            ${escapeHtml(c.author || "Unknown")} • ${escapeHtml((c.date || "").slice(0, 19))}
+          </div>
+        </div>`
+      )
+      .join("");
+  }
+
+  activeCommitObj = null;
+  if (danglingCommits.length > 0) {
+    switchCommitSubtab("dangling");
+  } else {
+    switchCommitSubtab("branch");
+  }
+
+  renderRemoteEventsAndForks(historyEvents, discoveredForks);
+  filterFindings();
+  filterTimeMachine();
+  renderDetachedBlobs(blobs);
+  renderRemediation(data.remediation || {});
+}
+
+/* ---- View 2: Commit & File-Tree Explorer ---- */
+function switchCommitSubtab(tab) {
+  activeCommitSubtab = tab;
+  document.getElementById("segBtnDangling").classList.toggle("active", tab === "dangling");
+  document.getElementById("segBtnBranch").classList.toggle("active", tab === "branch");
+  document.getElementById("segBtnRemote").classList.toggle("active", tab === "remote");
+
+  const split = document.getElementById("subpanelCommitsSplit");
+  const remote = document.getElementById("subpanelRemote");
+  if (tab === "remote") {
+    split.style.display = "none";
+    remote.style.display = "block";
+  } else {
+    split.style.display = "grid";
+    remote.style.display = "none";
+    renderCommitsList();
+  }
+}
+
+function getActiveCommitsArray() {
+  if (!currentScanData) return [];
+  return activeCommitSubtab === "dangling"
+    ? currentScanData.dangling_commits || []
+    : currentScanData.branch_commits || [];
+}
+
+function renderCommitsList() {
+  const container = document.getElementById("commitsListContainer");
+  if (!container) return;
+  if (!currentScanData) {
+    container.innerHTML = `<div class="card" style="text-align:center;color:var(--text-muted);padding:32px;">Paste a GitHub URL above to scan commits.</div>`;
+    return;
+  }
+
+  const q = ((document.getElementById("commitFilterInput") || {}).value || "").trim().toLowerCase();
+  const sourceList = getActiveCommitsArray();
+  const filtered = sourceList.filter((c) => {
+    if (!q) return true;
+    return (
+      (c.commit_hash || "").toLowerCase().includes(q) ||
+      (c.message || "").toLowerCase().includes(q) ||
+      (c.author || "").toLowerCase().includes(q) ||
+      (c.changed_files || []).some((f) => f.toLowerCase().includes(q))
+    );
+  });
+
+  if (!filtered.length) {
+    if (activeCommitSubtab === "dangling" && (currentScanData.branch_commits || []).length > 0 && !q) {
+      const totalBranch = (currentScanData.branch_commits || []).length;
+      container.innerHTML = `<div class="card" style="text-align:center;padding:26px;">
+        <div style="color:var(--neon-green);font-weight:800;margin-bottom:6px;">✓ 0 Force-Pushed Ghost Commits Exposed</div>
+        <div style="color:var(--text-secondary);font-size:12.5px;margin-bottom:14px;">GitHub did not expose un-GC'd dangling commits on this repo, and <strong>${totalBranch}</strong> repository commits are mirrored and ready for inspection.</div>
+        <button class="btn btn-primary btn-sm" onclick="switchCommitSubtab('branch')">Browse All ${totalBranch} Repo Commits →</button>
+      </div>`;
+      return;
+    }
+    container.innerHTML = `<div class="card" style="text-align:center;color:var(--text-muted);padding:28px;">No matching commits found.</div>`;
+    return;
+  }
+
+  container.innerHTML = filtered
+    .map((c) => {
+      const isAct = activeCommitObj && activeCommitObj.commit_hash === c.commit_hash;
+      const badgeTone = c.is_dangling ? "badge-critical" : "badge-medium";
+      const badgeLabel = c.is_dangling ? "GHOST" : "COMMIT";
+      const aiBadge = c.is_ai_agent
+        ? `<span class="badge badge-high" style="margin-inline-start:4px;">AI: ${escapeHtml(c.ai_agent_name || "Agent")}</span>`
+        : "";
+      return `<div class="commit-item-card ${isAct ? "active" : ""}" onclick="selectCommit('${escapeHtml(c.commit_hash)}')">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+          <span class="badge ${badgeTone}">${badgeLabel}</span>
+          ${aiBadge}
+          <span class="code-chip" style="margin-inline-start:auto;">${escapeHtml(c.commit_hash.slice(0, 8))}</span>
+        </div>
+        <div style="font-weight:700;color:#ffffff;margin-top:7px;font-size:13px;">${escapeHtml(c.message || "(no commit message)")}</div>
+        <div style="font-size:11.5px;color:var(--text-muted);margin-top:5px;" class="ltr-mono">
+          ${escapeHtml(c.author || "Unknown")} • ${escapeHtml((c.date || "").slice(0, 16))} • ${(c.changed_files || []).length} files
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  if (!activeCommitObj && filtered.length > 0) {
+    selectCommit(filtered[0].commit_hash);
+  }
+}
+
+function jumpToCommit(sha, subtab) {
+  switchView("commits");
+  switchCommitSubtab(subtab || "branch");
+  selectCommit(sha);
+}
+
+async function selectCommit(sha) {
+  if (!currentScanData) return;
+  const all = [...(currentScanData.dangling_commits || []), ...(currentScanData.branch_commits || [])];
+  const found = all.find((c) => c.commit_hash === sha || c.commit_hash.startsWith(sha));
+  if (!found) return;
+
+  activeCommitObj = found;
+  activePreviewedFile = null;
+  renderCommitsList();
+
+  document.getElementById("commitInspectorEmpty").style.display = "none";
+  document.getElementById("commitInspectorContent").style.display = "flex";
+
+  document.getElementById("inspCommitTitle").textContent = found.message || "(no commit message)";
+  document.getElementById("inspCommitMeta").textContent = `${found.author || "Unknown"} • ${found.date || ""}`;
+  document.getElementById("inspCommitShaChip").textContent = found.commit_hash.slice(0, 12);
+
+  // Render or fetch Unified Diff on-demand
+  const diffViewer = document.getElementById("inspDiffViewer");
+  const rawDiff = found.redacted_diff || "";
+  if (rawDiff) {
+    renderDiffLines(diffViewer, rawDiff);
+  } else {
+    diffViewer.innerHTML = `<div class="diff-line" style="color:var(--cyan-bright);">Loading commit diff from GitHub mirror...</div>`;
+    try {
+      const includeRaw = Boolean((document.getElementById("includeRawToggle") || {}).checked);
+      const resp = await apiFetch("/api/commit/diff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repo_path: activeRepoTarget,
+          commit_hash: found.commit_hash,
+          include_raw: includeRaw,
+        }),
+      });
+      const dj = await resp.json();
+      if (resp.ok && dj.diff !== undefined) {
+        found.redacted_diff = dj.diff;
+        if (activeCommitObj && activeCommitObj.commit_hash === found.commit_hash) {
+          renderDiffLines(diffViewer, dj.diff || "(Empty diff — merge or metadata commit)");
+        }
+      } else {
+        diffViewer.innerHTML = `<div class="diff-line term-err">${escapeHtml(dj.error || "Could not load diff")}</div>`;
+      }
+    } catch (e) {
+      diffViewer.innerHTML = `<div class="diff-line term-err">${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  loadCommitFileTree(found.commit_hash);
+}
+
+function renderDiffLines(container, diffText) {
+  if (!container) return;
+  const lines = String(diffText || "").split("\n");
+  if (!lines.length || (lines.length === 1 && !lines[0])) {
+    container.innerHTML = `<div class="diff-line" style="color:var(--text-muted);">(No diff changes in this commit)</div>`;
+    return;
+  }
+  container.innerHTML = lines
+    .slice(0, 900)
+    .map((line) => {
+      let cls = "diff-line";
+      if (line.startsWith("+") && !line.startsWith("+++")) cls += " diff-add";
+      else if (line.startsWith("-") && !line.startsWith("---")) cls += " diff-del";
+      else if (line.startsWith("@@") || line.startsWith("diff --git")) cls += " diff-hunk";
+      return `<div class="${cls}">${escapeHtml(line)}</div>`;
+    })
+    .join("");
+}
+
+function switchInspectorMode(mode) {
+  document.getElementById("inspTabDiff").classList.toggle("active", mode === "diff");
+  document.getElementById("inspTabFiles").classList.toggle("active", mode === "files");
+  document.getElementById("inspDiffBody").style.display = mode === "diff" ? "block" : "none";
+  document.getElementById("inspFilesBody").style.display = mode === "files" ? "block" : "none";
+}
+
+async function loadCommitFileTree(commitSha) {
+  const treeBox = document.getElementById("inspFilesTreeList");
+  const codeBox = document.getElementById("inspFilePreviewCode");
+  const nameChip = document.getElementById("inspPreviewFileName");
+  const btnSave = document.getElementById("btnSaveThisFileAs");
+  const btnCopy = document.getElementById("btnCopyThisFile");
+
+  if (!treeBox) return;
+  treeBox.innerHTML = `<div style="color:var(--cyan-bright);font-size:12px;padding:8px;" class="ltr-mono">Loading tree...</div>`;
+  nameChip.textContent = "Select a file";
+  btnSave.style.display = "none";
+  btnCopy.style.display = "none";
+  codeBox.innerHTML = `<div class="diff-line" style="color:var(--text-muted);">Select any file on the left to inspect its full snapshot at commit ${escapeHtml(commitSha.slice(0, 8))}.</div>`;
+
+  try {
+    const resp = await apiFetch("/api/commit/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo_path: activeRepoTarget, commit_hash: commitSha }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || "Tree load failed");
+    const files = data.files || [];
+    if (!files.length) {
+      treeBox.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:8px;">(Empty commit tree)</div>`;
+      return;
+    }
+    treeBox.innerHTML = files
+      .map((f, idx) => {
+        const star = f.is_changed ? `<span style="color:var(--neon-green);margin-right:4px;">●</span>` : `📄 `;
+        return `<button class="tree-file-btn" id="treeFileBtn_${idx}" onclick="previewCommitFile('${escapeHtml(commitSha)}', ${idx})" data-filepath="${escapeHtml(f.path)}" title="${escapeHtml(f.path)} (${f.size || 0} B)">
+          ${star}${escapeHtml(f.path)}
+        </button>`;
+      })
+      .join("");
+  } catch (err) {
+    treeBox.innerHTML = `<div style="color:var(--rose);font-size:12px;padding:8px;">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function previewCommitFile(commitSha, btnIdx) {
+  const btn = document.getElementById(`treeFileBtn_${btnIdx}`);
+  if (!btn) return;
+  const filePath = btn.getAttribute("data-filepath");
+  document.querySelectorAll(".tree-file-btn").forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+
+  const codeBox = document.getElementById("inspFilePreviewCode");
+  const nameChip = document.getElementById("inspPreviewFileName");
+  const btnSave = document.getElementById("btnSaveThisFileAs");
+  const btnCopy = document.getElementById("btnCopyThisFile");
+
+  nameChip.textContent = filePath;
+  codeBox.innerHTML = `<div class="diff-line" style="color:var(--cyan-bright);">Reading ${escapeHtml(filePath)}...</div>`;
+
+  try {
+    const includeRaw = Boolean((document.getElementById("includeRawToggle") || {}).checked);
+    const resp = await apiFetch("/api/commit/file-preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo_path: activeRepoTarget,
+        commit_hash: commitSha,
+        file_path: filePath,
+        include_raw: includeRaw,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || "Preview failed");
+
+    activePreviewedFile = {
+      commitHash: commitSha,
+      filePath,
+      content: data.content || "",
+    };
+    btnSave.style.display = "inline-flex";
+    btnCopy.style.display = "inline-flex";
+
+    const lines = String(data.content || "").split("\n");
+    codeBox.innerHTML = lines
+      .slice(0, 1200)
+      .map((ln, i) => `<div class="diff-line"><span style="color:#476288;margin-right:10px;user-select:none;">${String(i + 1).padStart(4, " ")}</span>${escapeHtml(ln)}</div>`)
+      .join("");
+  } catch (err) {
+    codeBox.innerHTML = `<div class="diff-line term-err">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function copyPreviewedFile() {
+  if (!activePreviewedFile) return;
+  await writeClipboardTextSafe(activePreviewedFile.content);
+  showToast(`✓ Copied ${activePreviewedFile.filePath}`);
+}
+
+async function savePreviewedFileAs() {
+  if (!activePreviewedFile) return;
+  const baseName = activePreviewedFile.filePath.split("/").pop() || "recovered_file.txt";
+  await saveTextArtifact(baseName, activePreviewedFile.content);
+}
+
+async function copyActiveCommitSha() {
+  if (!activeCommitObj) return;
+  await writeClipboardTextSafe(activeCommitObj.commit_hash);
+  showToast(`✓ Copied SHA: ${activeCommitObj.commit_hash.slice(0, 12)}`);
+}
+
+async function exportActiveCommitPatch() {
+  if (!activeCommitObj) return;
+  const sha = activeCommitObj.commit_hash;
+  const diff = activeCommitObj.redacted_diff || "";
+  const header = `From ${sha} Mon Sep 17 00:00:00 2001\nFrom: ${activeCommitObj.author || "Unknown"}\nDate: ${activeCommitObj.date || ""}\nSubject: [PATCH] ${activeCommitObj.message || ""}\n\n`;
+  await saveTextArtifact(`commit_${sha.slice(0, 8)}.patch`, header + diff);
+}
+
+function renderRemoteEventsAndForks(events, forks) {
+  const evBox = document.getElementById("historyEventsList");
+  const fkBox = document.getElementById("forksAuditList");
+
+  if (!events.length) {
+    evBox.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">No Push / Force-Push overwrite events recorded in GitHub's recent Events feed.</div>`;
+  } else {
+    evBox.innerHTML = events
+      .map(
+        (ev) => `<div style="padding:10px 12px;border-radius:9px;background:var(--bg-card);border:1px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="badge ${ev.event_type === "force_push" ? "badge-critical" : "badge-medium"}">${escapeHtml(ev.event_type)}</span>
+            <span class="ltr-mono" style="font-size:11px;color:var(--text-muted);">${escapeHtml((ev.created_at || "").slice(0, 19))}</span>
+          </div>
+          <div style="font-size:12.5px;margin-top:6px;color:#ffffff;">${escapeHtml(ev.description || "")}</div>
+          <div style="font-size:11.5px;color:var(--cyan-bright);margin-top:4px;" class="ltr-mono">Actor: @${escapeHtml(ev.actor || "unknown")} ${ev.before_sha ? "• Before: " + escapeHtml(ev.before_sha.slice(0, 10)) : ""}</div>
+        </div>`
+      )
+      .join("");
+  }
+
+  if (!forks.length) {
+    fkBox.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">No public forks found on this GitHub repository.</div>`;
+  } else {
+    fkBox.innerHTML = forks
+      .map((fk) => {
+        const forkUrl = fk.html_url || `https://github.com/${fk.full_name}`;
+        return `<div style="padding:10px 12px;border-radius:9px;background:var(--bg-card);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;color:#ffffff;" class="ltr-mono">${escapeHtml(fk.full_name)}</div>
+            <div style="font-size:11.5px;color:var(--text-muted);" class="ltr-mono">Branch: ${escapeHtml(fk.default_branch || "main")} • Pushed: ${escapeHtml((fk.pushed_at || "").slice(0, 10))}</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-primary btn-sm" onclick="loadSampleGitHubUrl('${escapeHtml(forkUrl)}')">Scan Fork</button>
+            <button class="btn btn-secondary btn-sm" onclick="openExternalUrl('${escapeHtml(forkUrl)}')">GitHub ↗</button>
+          </div>
+        </div>`;
+      })
+      .join("");
+  }
+}
+
+/* ---- View 3: Secrets & AI Triage ---- */
+function filterFindings() {
+  const tbody = document.getElementById("findingsTableBody");
+  if (!tbody || !currentScanData) return;
+
+  const q = ((document.getElementById("findingsFilter") || {}).value || "").trim().toLowerCase();
+  const sev = ((document.getElementById("severityFilter") || {}).value || "ALL").toUpperCase();
+  const findings = (currentScanData.findings || []).filter((f) => {
+    const fSev = String(f.triage_severity || f.severity_estimate || "HIGH").toUpperCase();
+    if (sev !== "ALL" && fSev !== sev) return false;
+    if (!q) return true;
+    const sha = f.commit_hash || f.blob_hash || "";
+    return (
+      (f.rule_name || "").toLowerCase().includes(q) ||
+      (f.file_path || "").toLowerCase().includes(q) ||
+      (f.masked_value || "").toLowerCase().includes(q) ||
+      sha.toLowerCase().includes(q)
+    );
+  });
+
+  if (!findings.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--neon-green);padding:32px;" class="ltr-mono">[CLEAN] 0 matching secret exposures detected.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = findings
+    .map((f, idx) => {
+      const fSev = String(f.triage_severity || f.severity_estimate || "High");
+      const sevCls =
+        fSev.toLowerCase() === "critical"
+          ? "badge-critical"
+          : fSev.toLowerCase() === "high"
+          ? "badge-high"
+          : fSev.toLowerCase() === "medium"
+          ? "badge-medium"
+          : "badge-low";
+      const sha = f.commit_hash || f.blob_hash || "";
+      const verdict = f.is_false_positive
+        ? "Likely False Positive"
+        : `${fSev} Risk (${f.triage_risk_score ?? "8.0"}/10)`;
+      return `<tr>
+        <td class="ltr-mono" style="color:var(--text-muted);">${escapeHtml(f.finding_id || "#" + (idx + 1))}</td>
+        <td><span class="badge ${sevCls}">${escapeHtml(fSev)}</span></td>
+        <td style="font-weight:700;color:#ffffff;">${escapeHtml(f.rule_name)}</td>
+        <td><span class="code-chip" style="color:#ff94b4;border-color:rgba(255,42,109,0.35);">${escapeHtml(f.masked_value)}</span></td>
+        <td class="ltr-mono" style="font-size:12px;">${escapeHtml(f.file_path || "blob")}:${f.line_number || 1} @ ${escapeHtml(sha.slice(0, 8))}</td>
+        <td class="ltr-mono">${Number(f.entropy || 0).toFixed(2)}</td>
+        <td style="font-size:12px;color:var(--text-secondary);">${escapeHtml(verdict)}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="inspectFinding('${escapeHtml(f.finding_id || "")}', ${idx})">Inspect</button>
+          </div>
+        </td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function inspectFinding(findingId, fallbackIdx) {
+  if (!currentScanData) return;
+  const findings = currentScanData.findings || [];
+  const f = findings.find((x) => x.finding_id === findingId) || findings[fallbackIdx];
+  if (!f) return;
+
+  const sha = f.commit_hash || f.blob_hash || "";
+  const fSev = String(f.triage_severity || f.severity_estimate || "High");
+
+  activeModalContext = {
+    type: "finding",
+    finding: f,
+    copyText: f.diff_hunk || f.context_line || f.masked_value || "",
+  };
+
+  document.getElementById("modalTitle").textContent = f.rule_name || "Secret Finding";
+  document.getElementById("modalSubtitle").textContent = `${f.file_path || "detached_blob"}:${f.line_number || 1} • SHA: ${sha}`;
+  document.getElementById("modalTriageMeta").style.display = "block";
+  document.getElementById("modalSeverityBadge").innerHTML = `<span class="badge badge-critical">${escapeHtml(fSev)}</span>`;
+  document.getElementById("modalEntropyVal").textContent = `${Number(f.entropy || 0).toFixed(2)} bits/char`;
+  document.getElementById("modalExplanation").textContent =
+    f.triage_explanation || "Detected credential pattern in repository object database.";
+  document.getElementById("modalAction").textContent =
+    f.triage_action || "Rotate this credential immediately and purge GitHub commit history.";
+  document.getElementById("modalLivenessRow").style.display = "none";
+
+  renderDiffLines(document.getElementById("modalCodeView"), f.diff_hunk || f.context_line || f.masked_value);
+
+  document.getElementById("modalVerifyBtn").style.display = "inline-flex";
+  document.getElementById("modalCopyBtn").style.display = "inline-flex";
+  document.getElementById("modalRecoverBtn").style.display = f.file_path || f.blob_hash ? "inline-flex" : "none";
+  document.getElementById("detailModal").classList.add("active");
+}
+
+async function verifyActiveModalKey() {
+  if (!activeModalContext || activeModalContext.type !== "finding") return;
+  const f = activeModalContext.finding;
+  const row = document.getElementById("modalLivenessRow");
+  const badge = document.getElementById("modalLivenessBadge");
+  const details = document.getElementById("modalLivenessDetails");
+  row.style.display = "block";
+  badge.textContent = "Probing vendor endpoint passively...";
+  details.textContent = "";
+
+  try {
+    const resp = await apiFetch("/api/verify/key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo_path: activeRepoTarget,
+        finding_id: f.finding_id,
+        rule_name: f.rule_name,
+      }),
+    });
+    const res = await resp.json();
+    if (!resp.ok || res.error) throw new Error(res.error || "Verification error");
+    const st = res.status || "UNVERIFIABLE";
+    badge.style.color = st === "ACTIVE" ? "var(--rose)" : st === "REVOKED" ? "var(--neon-green)" : "var(--amber)";
+    badge.textContent = `[${st}] (${res.provider || "Provider"})`;
+    details.textContent = res.details || "";
+  } catch (err) {
+    badge.style.color = "var(--amber)";
+    badge.textContent = "[UNVERIFIABLE]";
+    details.textContent = err.message;
+  }
+}
+
+/* ---- View 4: .env & Config Time-Machine ---- */
+function classifyConfigCategory(filePath) {
+  const lower = String(filePath || "").toLowerCase();
+  const base = lower.split("/").pop() || "";
+  if (base.startsWith(".env") || lower.endsWith(".env") || lower.includes(".env.")) return "env";
+  if (/\.(pem|key|p12|pfx|jks|keystore|asc)$/.test(lower) || base.includes("id_rsa") || base.includes("id_ed25519")) return "key";
+  if (lower.endsWith(".tfstate") || lower.endsWith(".tfvars")) return "terraform";
+  if (/(secret|credential|token|passwd|htpasswd|netrc|npmrc|pypirc|dockercfg|kubeconfig)/.test(lower)) return "credential";
+  if (/\.(yml|yaml|toml|ini|conf|cfg)$/.test(lower) || /(config|settings)\.(json|js|ts|py)$/.test(lower)) return "config";
+  return null;
+}
+
+function buildTimeMachineEntries(data) {
+  if (!data) return [];
+  const entries = [];
+  const seen = new Set();
+
+  // 1. Deleted & sensitive config files discovered by backend forensics (ghost + git rm parent_sha)
+  (data.deleted_config_files || []).forEach((cf) => {
+    const key = `${cf.commit_hash || cf.blob_hash}:${cf.file_path}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    entries.push({
+      filePath: cf.file_path,
+      category: cf.file_type || classifyConfigCategory(cf.file_path) || "config",
+      originType: cf.blob_hash && !cf.commit_hash ? "blob" : "file",
+      recoverCommitSha: cf.commit_hash || "",
+      blobHash: cf.blob_hash || "",
+      displaySha: cf.commit_hash || cf.blob_hash || "",
+      author: cf.author || "Unknown",
+      date: (cf.date || "").slice(0, 16),
+      note: "Exhumed Config Snapshot",
+    });
+  });
+
+  // 2. Branch commits touching sensitive config files
+  (data.branch_commits || []).forEach((c) => {
+    (c.changed_files || []).forEach((fp) => {
+      const cat = classifyConfigCategory(fp);
+      if (!cat) return;
+      const key = `${c.commit_hash}:${fp}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      entries.push({
+        filePath: fp,
+        category: cat,
+        originType: "file",
+        recoverCommitSha: c.commit_hash,
+        blobHash: "",
+        displaySha: c.commit_hash,
+        author: c.author || "Unknown",
+        date: (c.date || "").slice(0, 16),
+        note: "Historical Commit Snapshot",
+      });
+    });
+  });
+
+  // 3. Detached Blobs
+  (data.dangling_blobs || []).forEach((b) => {
+    const key = `blob:${b.blob_hash}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    entries.push({
+      filePath: b.associated_path || `detached_blob_${b.blob_hash.slice(0, 8)}.txt`,
+      category: classifyConfigCategory(b.associated_path || "") || "credential",
+      originType: "blob",
+      recoverCommitSha: "",
+      blobHash: b.blob_hash,
+      displaySha: b.blob_hash,
+      author: "Detached Git Blob",
+      date: `${b.size || 0} bytes`,
+      note: "Unlinked Blob",
+    });
+  });
+
+  return entries;
+}
+
+function filterTimeMachine() {
+  const tbody = document.getElementById("timeMachineTableBody");
+  if (!tbody || !currentScanData) return;
+
+  cachedTimeMachineEntries = buildTimeMachineEntries(currentScanData);
+  const q = ((document.getElementById("timeMachineFilter") || {}).value || "").trim().toLowerCase();
+  const catFilter = (document.getElementById("timeMachineTypeFilter") || {}).value || "ALL";
+
+  const filtered = cachedTimeMachineEntries.filter((e) => {
+    if (catFilter !== "ALL" && e.category !== catFilter) return false;
+    if (!q) return true;
+    return e.filePath.toLowerCase().includes(q) || (e.displaySha || "").toLowerCase().includes(q);
+  });
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;">No matching .env or sensitive configuration snapshots found in this repository.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered
+    .map((e) => {
+      const realIdx = cachedTimeMachineEntries.indexOf(e);
+      const badgeCls = e.category === "env" || e.category === "key" ? "badge-critical" : "badge-medium";
+      return `<tr>
+        <td class="ltr-mono" style="font-weight:700;color:#ffffff;">${escapeHtml(e.filePath)}</td>
+        <td><span class="badge ${badgeCls}">${escapeHtml(e.category.toUpperCase())}</span></td>
+        <td class="ltr-mono"><span class="code-chip">${escapeHtml((e.displaySha || "").slice(0, 10))}</span> <span style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(e.note)}</span></td>
+        <td class="ltr-mono" style="font-size:12px;color:var(--text-secondary);">${escapeHtml(e.author)} • ${escapeHtml(e.date)}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="previewTimeMachineEntry(${realIdx})">Preview</button>
+            <button class="btn btn-emerald btn-sm" onclick="downloadTimeMachineEntry(${realIdx})">Save File</button>
+          </div>
+        </td>
+      </tr>`;
+    })
+    .join("");
+}
+
+async function fetchTimeMachineContent(entry) {
+  const includeRaw = Boolean((document.getElementById("includeRawToggle") || {}).checked);
+  const payload =
+    entry.originType === "blob"
+      ? { repo_path: activeRepoTarget, object_type: "blob", blob_hash: entry.blobHash, include_raw: includeRaw }
+      : {
+          repo_path: activeRepoTarget,
+          object_type: "file",
+          commit_hash: entry.recoverCommitSha,
+          file_path: entry.filePath,
+          include_raw: includeRaw,
+        };
+  const resp = await apiFetch("/api/recover/file", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const res = await resp.json();
+  if (!resp.ok || res.error) throw new Error(res.error || "Could not recover snapshot");
+  return res;
+}
+
+async function previewTimeMachineEntry(idx) {
+  const entry = cachedTimeMachineEntries[idx];
+  if (!entry) return;
+  try {
+    const res = await fetchTimeMachineContent(entry);
+    activeModalContext = {
+      type: "file",
+      filename: res.filename || entry.filePath.split("/").pop() || "recovered.env",
+      content: res.content || "",
+      copyText: res.content || "",
+    };
+    document.getElementById("modalTitle").textContent = entry.filePath;
+    document.getElementById("modalSubtitle").textContent = `${entry.note} • ${res.is_redacted ? "Strict Redaction Active" : "Raw Unmasked"}`;
+    document.getElementById("modalTriageMeta").style.display = "none";
+    renderDiffLines(document.getElementById("modalCodeView"), res.content || "(empty file)");
+    document.getElementById("modalVerifyBtn").style.display = "none";
+    document.getElementById("modalCopyBtn").style.display = "inline-flex";
+    document.getElementById("modalRecoverBtn").style.display = "inline-flex";
+    document.getElementById("detailModal").classList.add("active");
+  } catch (err) {
+    showToast(`✗ ${err.message}`);
+  }
+}
+
+async function downloadTimeMachineEntry(idx) {
+  const entry = cachedTimeMachineEntries[idx];
+  if (!entry) return;
+  try {
+    const res = await fetchTimeMachineContent(entry);
+    await saveTextArtifact(res.filename || entry.filePath.split("/").pop() || "recovered_config.txt", res.content || "");
+  } catch (err) {
+    showToast(`✗ ${err.message}`);
+  }
+}
+
+/* ---- View 5: Deep Search & Detached Blobs ---- */
+async function runDeepSearch() {
+  const q = ((document.getElementById("deepSearchInput") || {}).value || "").trim();
+  const box = document.getElementById("deepSearchResults");
+  if (!box) return;
+  if (!currentScanData || !activeRepoTarget) {
+    showToast(t("invalidGhUrl"));
+    return;
+  }
+  if (!q) return;
+
+  box.style.display = "flex";
+  box.innerHTML = `<div style="color:var(--cyan-bright);font-size:12.5px;" class="ltr-mono">Searching across all commits, diffs, and blobs...</div>`;
+
+  try {
+    const resp = await apiFetch("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo_path: activeRepoTarget, query: q }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || "Search error");
+    const matches = data.matches || [];
+    if (!matches.length) {
+      box.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">0 matches found for "${escapeHtml(q)}".</div>`;
+      return;
+    }
+    box.innerHTML = matches
+      .map((m) => {
+        const sub = m.is_dangling ? "dangling" : "branch";
+        const clickHandler =
+          m.kind === "commit"
+            ? `jumpToCommit('${escapeHtml(m.hash)}', '${sub}')`
+            : m.kind === "blob"
+            ? `inspectDetachedBlob('${escapeHtml(m.hash)}')`
+            : `inspectFinding('${escapeHtml(m.finding_id || "")}', 0)`;
+        return `<div class="commit-item-card" onclick="${clickHandler}">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="badge badge-medium">${escapeHtml((m.kind || "match").toUpperCase())}</span>
+            <span class="code-chip">${escapeHtml((m.hash || "").slice(0, 10))}</span>
+          </div>
+          <div style="font-weight:700;color:#ffffff;margin-top:5px;">${escapeHtml(m.title || "")}</div>
+          <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;" class="ltr-mono">${escapeHtml(m.subtitle || "")}</div>
+          <div style="font-size:12px;color:var(--neon-green);margin-top:4px;" class="ltr-mono">${escapeHtml(m.snippet || "")}</div>
+        </div>`;
+      })
+      .join("");
+  } catch (err) {
+    box.innerHTML = `<div class="term-err">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderDetachedBlobs(blobs) {
+  const pill = document.getElementById("blobsCountPill");
+  const grid = document.getElementById("danglingBlobsList");
+  if (pill) pill.textContent = `${blobs.length} blobs`;
+  if (!grid) return;
+
+  if (!blobs.length) {
+    grid.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">0 detached unlinked blobs in remote packfiles.</div>`;
+    return;
+  }
+
+  grid.innerHTML = blobs
+    .map(
+      (b) => `<div class="card" style="display:flex;flex-direction:column;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="code-chip">${escapeHtml(b.blob_hash.slice(0, 12))}</span>
+            <span style="font-size:11.5px;color:var(--text-muted);" class="ltr-mono">${b.size || 0} B</span>
+          </div>
+          <pre style="margin-top:8px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-secondary);white-space:pre-wrap;max-height:90px;overflow:hidden;" class="ltr-mono">${escapeHtml((b.redacted_content || "").slice(0, 220))}</pre>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-secondary btn-sm" onclick="inspectDetachedBlob('${escapeHtml(b.blob_hash)}')">Inspect</button>
+        </div>
+      </div>`
+    )
+    .join("");
+}
+
+async function inspectDetachedBlob(blobSha) {
+  try {
+    const includeRaw = Boolean((document.getElementById("includeRawToggle") || {}).checked);
+    const resp = await apiFetch("/api/recover/file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo_path: activeRepoTarget,
+        object_type: "blob",
+        blob_hash: blobSha,
+        include_raw: includeRaw,
+      }),
+    });
+    const res = await resp.json();
+    if (!resp.ok || res.error) throw new Error(res.error || "Blob fetch failed");
+    activeModalContext = {
+      type: "file",
+      filename: res.filename || `blob_${blobSha.slice(0, 10)}.txt`,
+      content: res.content || "",
+      copyText: res.content || "",
+    };
+    document.getElementById("modalTitle").textContent = `Detached Blob ${blobSha.slice(0, 12)}`;
+    document.getElementById("modalSubtitle").textContent = res.is_redacted ? "Strict Redaction Active" : "Raw Unmasked Blob";
+    document.getElementById("modalTriageMeta").style.display = "none";
+    renderDiffLines(document.getElementById("modalCodeView"), res.content || "");
+    document.getElementById("modalVerifyBtn").style.display = "none";
+    document.getElementById("modalCopyBtn").style.display = "inline-flex";
+    document.getElementById("modalRecoverBtn").style.display = "inline-flex";
+    document.getElementById("detailModal").classList.add("active");
+  } catch (err) {
+    showToast(`✗ ${err.message}`);
+  }
+}
+
+/* ---- View 6: GitHub History Purge & Remediation ---- */
+function renderRemediation(rem) {
+  if (rem.rotation_warning) {
+    document.getElementById("remediationRotationWarning").textContent = rem.rotation_warning;
+  }
+  const stepsBox = document.getElementById("remediationStepsList");
+  const steps = rem.steps || [];
+  if (stepsBox) {
+    stepsBox.innerHTML = steps
+      .map(
+        (s, i) => `<div style="padding:11px 14px;margin-bottom:8px;border-radius:9px;background:var(--bg-card);border:1px solid var(--border);font-size:13px;">
+          <div style="font-weight:800;color:var(--neon-green);margin-bottom:3px;">Step ${s.order || i + 1}: ${escapeHtml(s.title || "")}</div>
+          <div style="color:var(--text-secondary);font-size:12.5px;">${escapeHtml(s.description || "")}</div>
+        </div>`
+      )
+      .join("");
+  }
+  document.getElementById("remediationBashScript").textContent = rem.bash_script || "# No Bash script generated";
+  document.getElementById("remediationPSScript").textContent = rem.powershell_script || "# No PowerShell script generated";
+  document.getElementById("remediationSupportTicket").textContent =
+    rem.github_support_ticket ||
+    `Subject: Urgent Request to Purge Cached Commit SHAs on ${activeGithubHtmlUrl || "Repository"}\n\nHello GitHub Support,\n\nWe recently performed a history rewrite (git filter-repo + force push) on ${activeGithubHtmlUrl || "<owner/repo>"} to excise sensitive data. Please purge all unreachable/cached commit views and pull-request refs on GitHub's servers.\n\nThank you.`;
+}
+
+function switchScriptTab(lang) {
+  activeScriptLang = lang;
+  document.getElementById("btnScriptBash").classList.toggle("active", lang === "bash");
+  document.getElementById("btnScriptPS").classList.toggle("active", lang === "ps");
+  document.getElementById("bashScriptContainer").style.display = lang === "bash" ? "block" : "none";
+  document.getElementById("psScriptContainer").style.display = lang === "ps" ? "block" : "none";
+}
+
+async function copyActiveScript() {
+  const txt =
+    activeScriptLang === "bash"
+      ? document.getElementById("remediationBashScript").textContent
+      : document.getElementById("remediationPSScript").textContent;
+  await writeClipboardTextSafe(txt);
+  showToast("✓ Remediation script copied to clipboard");
+}
+
+async function saveActiveScriptAs() {
+  const isBash = activeScriptLang === "bash";
+  const txt = isBash
+    ? document.getElementById("remediationBashScript").textContent
+    : document.getElementById("remediationPSScript").textContent;
+  await saveTextArtifact(isBash ? "purge_github_history.sh" : "purge_github_history.ps1", txt);
+}
+
+async function copySupportTicket() {
+  const txt = document.getElementById("remediationSupportTicket").textContent;
+  await writeClipboardTextSafe(txt);
+  showToast("✓ GitHub Support purge ticket copied");
+}
+
+/* ---- Modal Helpers & Artifact Saving ---- */
+function closeModal() {
+  document.getElementById("detailModal").classList.remove("active");
+}
+
+async function copyModalContent() {
+  if (!activeModalContext) return;
+  await writeClipboardTextSafe(activeModalContext.copyText || "");
+  showToast("✓ Copied to clipboard");
+}
+
+async function recoverFromActiveModal() {
+  if (!activeModalContext) return;
+  if (activeModalContext.type === "file") {
+    await saveTextArtifact(activeModalContext.filename || "artifact.txt", activeModalContext.content || "");
+    return;
+  }
+  if (activeModalContext.type === "finding") {
+    const f = activeModalContext.finding;
+    const includeRaw = Boolean((document.getElementById("includeRawToggle") || {}).checked);
+    try {
+      const resp = await apiFetch("/api/recover/file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repo_path: activeRepoTarget,
+          object_type: f.blob_hash && !f.commit_hash ? "blob" : "file",
+          commit_hash: f.commit_hash || "",
+          blob_hash: f.blob_hash || "",
+          file_path: f.file_path || "",
+          include_raw: includeRaw,
+        }),
+      });
+      const res = await resp.json();
+      if (!resp.ok || res.error) throw new Error(res.error || "Export failed");
+      await saveTextArtifact(res.filename || "finding_artifact.txt", res.content || "");
+    } catch (err) {
+      showToast(`✗ ${err.message}`);
+    }
+  }
+}
+
+async function saveTextArtifact(defaultFilename, content) {
+  if (window.unforceDesktop && typeof window.unforceDesktop.saveFileDialog === "function") {
+    const res = await window.unforceDesktop.saveFileDialog({
+      defaultPath: defaultFilename,
+      content: String(content ?? ""),
+      encoding: "utf8",
+    });
+    if (res && res.saved) {
+      showToast(`✓ Saved: ${res.filePath}`);
+    }
+    return;
+  }
+  const blob = new Blob([String(content ?? "")], { type: "text/plain;charset=utf-8" });
+  triggerBrowserDownload(blob, defaultFilename);
+  showToast(`✓ Downloaded ${defaultFilename}`);
+}
+
+function triggerBrowserDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+/* ---- Top Toolbar Exports (ZIP Bundle, JSON, MD, SARIF) ---- */
+async function downloadReport(fmt) {
+  if (!currentScanData || !activeRepoTarget) {
+    showToast(t("invalidGhUrl"));
+    return;
+  }
+  try {
+    const qRepo = encodeURIComponent(activeRepoTarget);
+    const resp = await apiFetch(`/api/download/report?repo_path=${qRepo}&format=${encodeURIComponent(fmt)}`);
+    if (!resp.ok) {
+      const errJson = await resp.json().catch(() => ({}));
+      throw new Error(errJson.error || `HTTP ${resp.status}`);
+    }
+    const text = await resp.text();
+    const ext = fmt === "markdown" ? "md" : fmt === "sarif" ? "sarif" : "json";
+    await saveTextArtifact(`unforce_audit_report.${ext}`, text);
+  } catch (err) {
+    showToast(`✗ ${err.message}`);
+  }
+}
+
+function exportSARIF() {
+  return downloadReport("sarif");
+}
+
+async function downloadRecoveryBundle() {
+  if (!currentScanData || !activeRepoTarget) {
+    showToast(t("invalidGhUrl"));
+    return;
+  }
+  try {
+    const includeRaw = Boolean((document.getElementById("includeRawToggle") || {}).checked);
+    const qRepo = encodeURIComponent(activeRepoTarget);
+    const resp = await apiFetch(`/api/download/bundle?repo_path=${qRepo}&include_raw=${includeRaw ? "true" : "false"}`);
+    if (!resp.ok) {
+      const errJson = await resp.json().catch(() => ({}));
+      throw new Error(errJson.error || `HTTP ${resp.status}`);
+    }
+    const arrayBuf = await resp.arrayBuffer();
+    const defaultName = "unforce_recovery_bundle.zip";
+
+    if (window.unforceDesktop && typeof window.unforceDesktop.saveFileDialog === "function") {
+      const bytes = new Uint8Array(arrayBuf);
+      let binary = "";
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const b64 = btoa(binary);
+      const saved = await window.unforceDesktop.saveFileDialog({
+        defaultPath: defaultName,
+        content: b64,
+        encoding: "base64",
+      });
+      if (saved && saved.saved) showToast(`✓ Saved ZIP Bundle: ${saved.filePath}`);
+      return;
+    }
+    triggerBrowserDownload(new Blob([arrayBuf], { type: "application/zip" }), defaultName);
+    showToast(`✓ Downloaded ${defaultName}`);
+  } catch (err) {
+    showToast(`✗ ${err.message}`);
+  }
+}
+
+/* ---- Settings & Ephemeral In-Memory Credentials ---- */
+function openSettingsModal() {
+  document.getElementById("settingsModal").classList.add("active");
+  updateAISettingsUI();
+  refreshGHStatusUI();
+}
+function closeSettingsModal() {
+  document.getElementById("settingsModal").classList.remove("active");
+}
+
+function updateAISettingsUI() {
+  const prov = (document.getElementById("aiProviderSelect") || {}).value || "heuristic";
+  const labelMap = {
+    heuristic: "AI: Heuristic",
+    auto: "AI: Auto",
+    gemini: "AI: Gemini",
+    openai: "AI: OpenAI",
+    anthropic: "AI: Claude",
+    ollama: "AI: Ollama",
+    none: "AI: Off",
+  };
+  document.getElementById("aiStatusText").textContent = labelMap[prov] || "AI: Heuristic";
+  const needsKey = ["gemini", "openai", "anthropic", "auto"].includes(prov);
+  const hasKey = Boolean(ephemeralSession.aiKey);
+  document.getElementById("aiKeyInputRow").style.display = needsKey && !hasKey ? "flex" : "none";
+  document.getElementById("aiKeyConfiguredRow").style.display = hasKey ? "flex" : "none";
+}
+
+function saveAIKey() {
+  const val = (document.getElementById("aiApiKeyInput").value || "").trim();
+  if (!val) return;
+  ephemeralSession.aiKey = val;
+  document.getElementById("aiApiKeyInput").value = "";
+  updateAISettingsUI();
+  showToast("✓ AI API Key held strictly in-memory");
+}
+
+function clearAIKey() {
+  ephemeralSession.aiKey = "";
+  updateAISettingsUI();
+}
+
+function saveGHToken() {
+  const val = (document.getElementById("githubTokenInput").value || "").trim();
+  if (!val) return;
+  ephemeralSession.ghToken = val;
+  document.getElementById("githubTokenInput").value = "";
+  refreshGHStatusUI();
+  showToast("✓ GitHub Token held strictly in-memory");
+}
+
+function clearGHToken() {
+  ephemeralSession.ghToken = "";
+  refreshGHStatusUI();
+}
+
+function refreshGHStatusUI() {
+  const inRow = document.getElementById("ghTokenInputRow");
+  const okRow = document.getElementById("ghTokenConfiguredRow");
+  const autoNote = document.getElementById("ghSystemAuthNotice");
+  const ghText = document.getElementById("ghStatusText");
+  const ghDot = document.getElementById("ghDot");
+  const hasCustom = Boolean(ephemeralSession.ghToken);
+
+  inRow.style.display = hasCustom ? "none" : "flex";
+  okRow.style.display = hasCustom ? "flex" : "none";
+  autoNote.style.display = ephemeralSession.ghAutoDetected ? "block" : "none";
+
+  if (hasCustom) {
+    ghText.textContent = "GH: Custom PAT";
+    ghDot.className = "dot dot-green";
+  } else if (ephemeralSession.ghAutoDetected) {
+    ghText.textContent = "GH: Auto-Auth";
+    ghDot.className = "dot dot-green";
+  } else {
+    ghText.textContent = "GH: Public";
+    ghDot.className = "dot dot-cyan";
+  }
+}
+
+function toggleRawRecoveryMode(enabled) {
+  showToast(enabled ? "⚠ Raw unredacted file export enabled" : "✓ Strict Redaction Active");
+}
+
+/* ---- Command Palette (Ctrl+K) ---- */
+function getPaletteCommands() {
+  return [
+    { label: "📋 Paste GitHub URL & Scan Now", action: () => pasteAndScanGitHub() },
+    { label: "📊 Jump to Command HUD & Hygiene Score", action: () => switchView("overview") },
+    { label: "🌿 Jump to Commit & File-Tree Explorer", action: () => switchView("commits") },
+    { label: "🔑 Jump to Discovered Secrets & AI Triage", action: () => switchView("findings") },
+    { label: "⏱ Jump to .env & Config Time-Machine", action: () => switchView("timemachine") },
+    { label: "🔍 Jump to Deep Search & Detached Blobs", action: () => switchView("searchblobs") },
+    { label: "🛡 Jump to GitHub History Purge Playbook", action: () => switchView("remediation") },
+    { label: "📦 Export Full Recovery Bundle (.ZIP)", action: () => downloadRecoveryBundle() },
+    { label: "🌐 Switch Language (עברית / English)", action: () => toggleLanguage() },
+    { label: "⚙ Open Settings & Credentials", action: () => openSettingsModal() },
+  ];
+}
+
+function openCmdPalette() {
+  cmdSelectedIndex = 0;
+  const modal = document.getElementById("cmdPaletteModal");
+  const input = document.getElementById("cmdPaletteInput");
+  modal.classList.add("active");
+  input.value = "";
+  renderCmdPaletteItems();
+  setTimeout(() => input.focus(), 30);
+}
+
+function closeCmdPalette() {
+  document.getElementById("cmdPaletteModal").classList.remove("active");
+}
+
+function renderCmdPaletteItems() {
+  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
+  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
+  const list = document.getElementById("cmdPaletteList");
+  if (!items.length) {
+    list.innerHTML = `<div style="padding:12px;color:var(--text-muted);text-align:center;">No matching commands</div>`;
+    return;
+  }
+  if (cmdSelectedIndex >= items.length) cmdSelectedIndex = 0;
+  list.innerHTML = items
+    .map(
+      (item, idx) => `<button class="cmd-item ${idx === cmdSelectedIndex ? "selected" : ""}" onclick="runPaletteCommand(${idx})">
+        <span>${escapeHtml(item.label)}</span>
+      </button>`
+    )
+    .join("");
+}
+
+function runPaletteCommand(idx) {
+  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
+  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
+  closeCmdPalette();
+  if (items[idx]) items[idx].action();
+}
+
+function handleCmdPaletteKey(e) {
+  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
+  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
+  if (e.key === "Escape") {
+    closeCmdPalette();
+  } else if (e.key === "ArrowDown") {
+    e.preventDefault();
+    cmdSelectedIndex = (cmdSelectedIndex + 1) % Math.max(items.length, 1);
+    renderCmdPaletteItems();
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    cmdSelectedIndex = (cmdSelectedIndex - 1 + Math.max(items.length, 1)) % Math.max(items.length, 1);
+    renderCmdPaletteItems();
+  } else if (e.key === "Enter" && items.length) {
+    e.preventDefault();
+    runPaletteCommand(cmdSelectedIndex);
+  }
+}
+
+/* ---- Boot Initialization ---- */
+function applyEmbeddedLogo() {
+  const uri = window.UNFORCE_LOGO_DATA_URI;
+  if (!uri) return;
+  const tbImg = document.getElementById("titlebarLogoImg");
+  const tbSvg = document.getElementById("titlebarFallbackSvg");
+  if (tbImg) {
+    tbImg.src = uri;
+    tbImg.style.display = "inline-block";
+    if (tbSvg) tbSvg.style.display = "none";
+  }
+  const sbImg = document.getElementById("sidebarLogoImg");
+  const sbSvg = document.getElementById("sidebarFallbackSvg");
+  if (sbImg) {
+    sbImg.src = uri;
+    sbImg.style.display = "block";
+    if (sbSvg) sbSvg.style.display = "none";
+  }
+}
+
+async function initBackendTelemetry() {
+  try {
+    const resp = await apiFetch("/api/system/info");
+    if (!resp.ok) return;
+    const info = await resp.json();
+    const gitText = document.getElementById("gitHealthText");
+    if (gitText && info.git_version) {
+      gitText.textContent = info.git_version.replace("git version ", "GIT ");
+    }
+    if (info.version) {
+      document.getElementById("titlebarVerBadge").textContent = `v${info.version}`;
+      document.getElementById("footerVersionText").textContent = `v${info.version}`;
+    }
+    ephemeralSession.ghAutoDetected = Boolean(info.github_auth_auto);
+    refreshGHStatusUI();
+    if (info.github_auth_auto) {
+      logTerminal("AUTH", "Git Credential Manager detected -> Private & Public GitHub repos enabled automatically.", "ok");
+    }
+  } catch (_) {}
+}
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    openCmdPalette();
+  } else if (e.key === "Escape") {
+    closeModal();
+    closeSettingsModal();
+    closeCmdPalette();
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (!window.unforceDesktop || !window.unforceDesktop.isElectron) {
+    const winControls = document.querySelector(".titlebar-controls");
+    if (winControls) winControls.style.display = "none";
+  }
+  applyEmbeddedLogo();
+  applyLanguage();
+
+  const params = new URLSearchParams(window.location.search);
+  const initialRepo = params.get("repo");
+  if (initialRepo && parseGitHubRepoInput(initialRepo)) {
+    const input = document.getElementById("repoPathInput");
+    input.value = parseGitHubRepoInput(initialRepo).cleanUrl;
+    updateTargetTypeBadge();
+    setTimeout(() => startScan(), 60);
+  }
+
+  initBackendTelemetry();
+});
+
+</script>
+</body>
+</html>
