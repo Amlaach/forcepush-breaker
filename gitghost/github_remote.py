@@ -514,3 +514,262 @@ class GitHubAPIForensicsClient:
             accumulated_bytes = 0
 
             for f_item in data.get("files") or []:
+                if not isinstance(f_item, dict):
+                    continue
+                fname = str(f_item.get("filename") or "")
+                if fname:
+                    changed_files.append(fname)
+                patch = f_item.get("patch")
+                if isinstance(patch, str) and patch:
+                    patch_bytes = len(patch.encode("utf-8", errors="replace"))
+                    if accumulated_bytes + patch_bytes <= max_text_bytes:
+                        diff_chunks.append(
+                            f"diff --git a/{fname} b/{fname}\n--- a/{fname}\n+++ b/{fname}\n{patch}"
+                        )
+                        accumulated_bytes += patch_bytes
+
+            diff_text = "\n".join(diff_chunks)
+            ai_attribution = detect_ai_agent(
+                author=author_str,
+                message=message,
+                diff_content=diff_text,
+            )
+
+            return DanglingCommit(
+                commit_hash=full_sha,
+                author=author_str,
+                date=date_str,
+                message=message,
+                parents=parents,
+                changed_files=changed_files,
+                diff_content=diff_text,
+                is_dangling=True,
+                ai_agent=ai_attribution,
+            )
+        except Exception:
+            return None
+
+
+class SmartGitCloner:
+    """Performs smart mirror cloning of remote GitHub repositories and fetches orphaned SHAs."""
+
+    CLONE_TIMEOUT_SECONDS = 120
+    FETCH_TIMEOUT_SECONDS = 30
+
+    @classmethod
+    def acquire(
+        cls,
+        target: ParsedGitHubTarget,
+        github_token: Optional[str] = None,
+        clone_source_override: Optional[str] = None,
+        scan_forks: bool = True,
+        max_forks: int = 5,
+        on_phase: Optional[Callable[[str, int], None]] = None,
+    ) -> RemoteAcquisitionResult:
+        if not shutil.which("git"):
+            raise RuntimeError("Git executable was not found on the system PATH.")
+
+        explicit_token = (github_token or os.getenv("GITHUB_TOKEN") or "").strip() or None
+        resolved_token = explicit_token
+        if not resolved_token and not clone_source_override:
+            resolved_token = resolve_system_github_token()
+
+        api_client = GitHubAPIForensicsClient(github_token=resolved_token)
+
+        if on_phase:
+            on_phase(f"Querying GitHub API events & PRs for {target.full_name}...", 10)
+
+        history_events: List[HistoryOverwriteEvent] = []
+        candidate_shas: List[str] = []
+        warnings: List[str] = []
+        discovered_forks: List[ForkForensicsTarget] = []
+
+        if not clone_source_override:
+            history_events, candidate_shas, warnings = api_client.discover_history_overwrite_events(
+                target, scan_forks=scan_forks, max_forks=max_forks
+            )
+            if scan_forks:
+                discovered_forks = api_client.query_public_forks(target, limit=max_forks)
+
+        temp_dir = Path(tempfile.mkdtemp(prefix=f"gitghost_remote_{target.repo}_")).resolve()
+        effective_clone_url = clone_source_override or target.clone_url
+
+        try:
+            if on_phase:
+                on_phase(f"Cloning bare object mirror of {target.full_name}...", 25)
+
+            cls._run_git_with_auth(
+                ["clone", "--mirror", effective_clone_url, str(temp_dir)],
+                cwd=temp_dir.parent,
+                token=resolved_token,
+                timeout=cls.CLONE_TIMEOUT_SECONDS,
+            )
+
+            # Extended refs: fetch pull requests and tags
+            for ref_spec in ("+refs/pull/*:refs/pull/*", "+refs/tags/*:refs/tags/*"):
+                try:
+                    cls._run_git_with_auth(
+                        ["fetch", "origin", ref_spec],
+                        cwd=temp_dir,
+                        token=resolved_token,
+                        timeout=cls.FETCH_TIMEOUT_SECONDS,
+                        check=False,
+                    )
+                except Exception:
+                    pass
+
+            # Fetch branches from discovered public forks into refs/forks/<owner>/*
+            if discovered_forks and not clone_source_override:
+                if on_phase:
+                    on_phase(f"Auditing and fetching {len(discovered_forks)} public fork(s)...", 35)
+
+                for fork in discovered_forks[:max_forks]:
+                    try:
+                        cls._run_git_with_auth(
+                            ["fetch", fork.clone_url, f"+refs/heads/*:refs/forks/{fork.owner}/*"],
+                            cwd=temp_dir,
+                            token=resolved_token,
+                            timeout=cls.FETCH_TIMEOUT_SECONDS,
+                            check=False,
+                        )
+                    except Exception:
+                        pass
+
+            api_recovered_commits: List[DanglingCommit] = []
+            if candidate_shas:
+                if on_phase:
+                    on_phase(f"Exhuming {len(candidate_shas)} overwritten/orphaned commit(s)...", 40)
+
+                for sha in candidate_shas[:25]:
+                    exists_locally = cls._object_exists(temp_dir, sha)
+                    if not exists_locally:
+                        try:
+                            cls._run_git_with_auth(
+                                ["fetch", "origin", sha],
+                                cwd=temp_dir,
+                                token=resolved_token,
+                                timeout=cls.FETCH_TIMEOUT_SECONDS,
+                                check=False,
+                            )
+                        except Exception:
+                            pass
+                        exists_locally = cls._object_exists(temp_dir, sha)
+
+                    if not exists_locally:
+                        api_commit = api_client.fetch_orphan_commit_via_api(target, sha)
+                        if api_commit:
+                            api_recovered_commits.append(api_commit)
+
+            return RemoteAcquisitionResult(
+                target=target,
+                local_clone_path=temp_dir,
+                is_temporary=True,
+                history_events=history_events,
+                discovered_orphan_shas=candidate_shas,
+                api_recovered_commits=api_recovered_commits,
+                warnings=warnings,
+                discovered_forks=discovered_forks,
+            )
+        except Exception as exc:
+            cls.cleanup_workspace(temp_dir)
+            safe_err = sanitize_token_in_text(str(exc), resolved_token)
+            raise RuntimeError(f"Failed to acquire remote GitHub repository '{target.full_name}': {safe_err}") from None
+
+    @classmethod
+    def _object_exists(cls, repo_dir: Path, sha: str) -> bool:
+        try:
+            res = subprocess.run(
+                ["git", "cat-file", "-t", sha],
+                cwd=str(repo_dir),
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            return res.returncode == 0 and res.stdout.strip() == "commit"
+        except Exception:
+            return False
+
+    @classmethod
+    def _run_git_with_auth(
+        cls,
+        args: List[str],
+        cwd: Path,
+        token: Optional[str],
+        timeout: int,
+        check: bool = True,
+        disable_ssl_verify: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        cmd = ["git"]
+        if disable_ssl_verify or os.getenv("NODE_TLS_REJECT_UNAUTHORIZED") == "0":
+            cmd.extend(["-c", "http.sslVerify=false"])
+
+        if token:
+            # GitHub Git Smart HTTP requires Basic auth with x-access-token:<token>
+            b64_creds = base64.b64encode(f"x-access-token:{token.strip()}".encode("utf-8")).decode("ascii")
+            cmd.extend([
+                "-c", "credential.helper=",
+                "-c", "core.askPass=",
+                "-c", f"http.https://github.com/.extraHeader=Authorization: Basic {b64_creds}",
+            ])
+        else:
+            cmd.extend(["-c", "core.askPass="])
+
+        cmd.extend(args)
+
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        env["GCM_INTERACTIVE"] = "never"
+
+        try:
+            return subprocess.run(
+                cmd,
+                cwd=str(cwd),
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                check=check,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"Git operation timed out after {timeout}s.") from None
+        except subprocess.CalledProcessError as exc:
+            raw_msg = (exc.stderr or exc.stdout or str(exc)).strip()
+            if not disable_ssl_verify and (
+                "SSL certificate problem" in raw_msg or "certificate verify failed" in raw_msg.lower()
+            ):
+                return cls._run_git_with_auth(
+                    args=args,
+                    cwd=cwd,
+                    token=token,
+                    timeout=timeout,
+                    check=check,
+                    disable_ssl_verify=True,
+                )
+            safe_msg = sanitize_token_in_text(raw_msg, token)
+            if check:
+                raise RuntimeError(safe_msg) from None
+            return subprocess.CompletedProcess(cmd, exc.returncode, exc.stdout or "", safe_msg)
+
+    @classmethod
+    def cleanup_workspace(cls, workspace_path: Optional[Path | str]) -> None:
+        """Guarantees removal of temporary clone directories, handling Windows read-only packfiles."""
+        if not workspace_path:
+            return
+        path_obj = Path(workspace_path)
+        if not path_obj.exists():
+            return
+
+        def _handle_readonly(func, p, exc_info):
+            try:
+                os.chmod(p, stat.S_IWRITE)
+                func(p)
+            except Exception:
+                pass
+
+        try:
+            shutil.rmtree(path_obj, onerror=_handle_readonly)
+        except Exception:
+            shutil.rmtree(path_obj, ignore_errors=True)
