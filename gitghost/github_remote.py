@@ -200,6 +200,38 @@ class RemoteAcquisitionResult:
     discovered_forks: List[ForkForensicsTarget] = field(default_factory=list)
 
 
+def _fetch_json_resilient(req: urllib.request.Request, timeout: int, token: Optional[str] = None) -> Any:
+    """Executes an HTTP JSON request with corporate SSL proxy interception fallback and token safety."""
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as http_err:
+        if http_err.code == 404:
+            raise http_err
+        safe_msg = sanitize_token_in_text(str(http_err), token)
+        raise RuntimeError(f"API request failed with HTTP {http_err.code}: {safe_msg}") from None
+    except urllib.error.URLError as url_exc:
+        reason_str = str(getattr(url_exc, "reason", url_exc))
+        if "CERTIFICATE_VERIFY_FAILED" in reason_str or os.getenv("NODE_TLS_REJECT_UNAUTHORIZED") == "0":
+            try:
+                ctx = ssl._create_unverified_context()
+                with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+                    return json.loads(resp.read().decode("utf-8", errors="replace"))
+            except urllib.error.HTTPError as retry_http:
+                if retry_http.code == 404:
+                    raise retry_http
+                safe_msg = sanitize_token_in_text(str(retry_http), token)
+                raise RuntimeError(f"API request failed with HTTP {retry_http.code}: {safe_msg}") from None
+            except Exception as retry_exc:
+                safe_msg = sanitize_token_in_text(str(retry_exc), token)
+                raise RuntimeError(f"API request failed: {safe_msg}") from None
+        safe_msg = sanitize_token_in_text(str(url_exc), token)
+        raise RuntimeError(f"API request failed: {safe_msg}") from None
+    except Exception as exc:
+        safe_msg = sanitize_token_in_text(str(exc), token)
+        raise RuntimeError(f"API request failed: {safe_msg}") from None
+
+
 def sanitize_token_in_text(text: str, token: Optional[str] = None) -> str:
     """Strictly strips any GitHub token or Basic/Bearer credentials from logs and error strings."""
     if not text:
