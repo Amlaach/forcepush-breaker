@@ -87,7 +87,12 @@ window.UNFORCE_I18N = {
     detachedBlobsTitle: "עצמי Blobs מנותקים במסד הנתונים של Git",
     remTitle: "פרוטוקול ניקוי היסטוריית GitHub והסרת סודות לצמיתות",
     invalidGhUrl: "נא להדביק כתובת ריפו תקינה מ-GitHub (לדוגמה: https://github.com/owner/repo)",
-    clipboardEmpty: "לוח ההעתקה ריק — העתק כתובת ריפו מ-GitHub ונסה שוב"
+    clipboardEmpty: "לוח ההעתקה ריק — העתק כתובת ריפו או נתיב מקומי ונסה שוב",
+    gcPurgedBadge: "נמחק במטמון שרת (GC)",
+    gcPurgedTitle: "קומיט נמחק ממטמון השרת (Garbage Collection 404)",
+    gcPurgedDesc: "הקומיט זוהה ברישומי אירועי Force-Push אך נמחק ממטמון השרת (Cloud GC אחרי 30-90 יום). מומלץ לסרוק תיקייה מקומית של אחד ממפתחי הצוות לחילוץ האובייקט מ-reflog מקומי.",
+    scanLocalCloneBtn: "סרוק תיקייה מקומית של מפתח",
+    promptLocalPath: "הזן נתיב לתיקיית מאגר מקומית:"
   },
   en: {
     cmdPlaceholder: "Quick command or jump to view... (Ctrl+K)",
