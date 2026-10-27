@@ -432,6 +432,15 @@ body::before {
   flex-wrap: wrap;
 }
 
+/* Drag and Drop Zone Hover Feedback */
+.target-bar-row.drag-over {
+  border-color: var(--cyan-bright) !important;
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.4);
+}
+.repo-input-wrap.drag-over {
+  border-color: var(--neon-green) !important;
+}
+
 .target-bar-row {
   flex: 1;
   min-width: 340px;
@@ -480,6 +489,19 @@ body::before {
 .repo-input::placeholder {
   color: #4d6a92;
   font-weight: 400;
+}
+
+/* Browse Local Directory Button */
+#browseLocalBtn {
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  color: var(--cyan-bright);
+  font-weight: 600;
+  white-space: nowrap;
+}
+#browseLocalBtn:hover {
+  background: rgba(0, 229, 255, 0.18);
+  border-color: var(--cyan-bright);
 }
 
 .target-type-pill {
@@ -868,6 +890,57 @@ body::before {
 .kpi-sub {
   font-size: 11.5px;
   color: var(--text-muted);
+}
+
+/* Server GC Diagnostics (GC_PURGED_REMOTE) */
+.badge-gc-purged {
+  background: rgba(255, 170, 0, 0.15);
+  border: 1px solid rgba(255, 170, 0, 0.5);
+  color: #ffaa00;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.gc-diagnostic-card {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: rgba(255, 170, 0, 0.06);
+  border: 1px solid rgba(255, 170, 0, 0.35);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gc-diag-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffaa00;
+  font-weight: 700;
+  font-size: 13px;
+}
+.gc-diag-body {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.btn-outline-amber {
+  background: rgba(255, 170, 0, 0.1);
+  border: 1px solid rgba(255, 170, 0, 0.4);
+  color: #ffaa00;
+  font-weight: 600;
+  align-self: flex-start;
+  transition: all 0.2s ease;
+}
+.btn-outline-amber:hover {
+  background: rgba(255, 170, 0, 0.25);
+  border-color: #ffaa00;
 }
 
 /* Live Hacker Forensics Terminal */
@@ -1293,6 +1366,14 @@ tr:hover td {
   opacity: 1;
 }
 
+/* RTL Alignment for Local Repository and GC Alerts */
+[dir="rtl"] .gc-diag-header {
+  flex-direction: row;
+}
+[dir="rtl"] .btn-outline-amber {
+  align-self: flex-start;
+}
+
 </style>
 </head>
 <body>
@@ -1450,7 +1531,7 @@ tr:hover td {
       <!-- Top GitHub Repo URL Command Bar (ONLY Repo Selection Method) -->
       <header class="top-toolbar">
         <div class="toolbar-upper">
-          <div class="target-bar-row">
+          <div class="target-bar-row" title="גרור ושחרר תיקייה מקומית או הזן כתובת ריפו (GitHub / GitLab / Bitbucket)">
             <div class="repo-input-wrap">
               <span class="repo-input-icon" title="GitHub Repository URL">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
@@ -1470,6 +1551,11 @@ tr:hover td {
                 <span id="repoTargetBadgeText" data-i18n="githubTargetPill">GitHub Repo</span>
               </span>
             </div>
+
+            <button class="btn btn-secondary" style="height:40px;" id="browseLocalBtn" onclick="selectLocalFolder()" title="בחר תיקיית מאגר מקומית">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+              <span data-i18n="browseLocalBtn">בחר תיקייה</span>
+            </button>
 
             <button class="btn btn-paste" onclick="pasteGitHubUrlOnly()" title="הדבק כתובת מלוח ההעתקה">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -1749,6 +1835,13 @@ tr:hover td {
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                       <span data-i18n="tabFileTree">עץ קבצים מלא בקומיט</span>
                     </button>
+                    <button class="btn btn-secondary btn-sm" id="btnRestoreCommitBranch" onclick="restoreActiveCommitBranch()" title="שחזר קומיט לענף מקומי חדש">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
+                      <span data-i18n="btnRestoreBranch">שחזר לענף חדש</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btnCherryPickCommit" onclick="cherryPickActiveCommit()" title="Cherry-Pick לענף הנוכחי">
+                      <span data-i18n="btnCherryPick">Cherry-Pick</span>
+                    </button>
                     <button class="btn btn-secondary btn-sm" onclick="exportActiveCommitPatch()">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                       <span data-i18n="btnExportPatch">ייצא קובץ .patch</span>
@@ -1801,6 +1894,7 @@ tr:hover td {
                   GitHub Force-Push &amp; History Overwrite Events
                 </h3>
                 <div id="historyEventsList" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto;">
+                  <!-- Structured GC_PURGED_REMOTE diagnostic cards and overwrite timelines render dynamically here -->
                   <div style="color:var(--text-muted);font-size:13px;">No remote history overwrite events detected in recent GitHub Events window.</div>
                 </div>
               </div>
@@ -2155,7 +2249,15 @@ window.UNFORCE_I18N = {
     secRecent: "ריפואים שנסרקו לאחרונה",
     recentEmpty: "טרם נסרקו ריפואים מ-GitHub.",
     pasteBtn: "הדבק URL",
-    scanBtn: "סרוק ריפו מ-GitHub",
+    scanBtn: "סרוק מאגר",
+    browseLocalBtn: "בחר תיקייה",
+    localTargetPill: "מאגר מקומי",
+    gitlabTargetPill: "GitLab Repo",
+    bitbucketTargetPill: "Bitbucket Repo",
+    btnRestoreBranch: "שחזר לענף חדש",
+    btnCherryPick: "שחזר לענף נוכחי",
+    branchPrompt: "הזן שם לענף החדש לשחזור הקומיט:",
+    branchRestored: "הענף נוצר בהצלחה!",
     scanningBtn: "מבצע חקירה...",
     githubTargetPill: "GitHub Repo",
     bundleBtn: "חבילת שחזור (.ZIP)",
@@ -2218,7 +2320,12 @@ window.UNFORCE_I18N = {
     detachedBlobsTitle: "עצמי Blobs מנותקים במסד הנתונים של Git",
     remTitle: "פרוטוקול ניקוי היסטוריית GitHub והסרת סודות לצמיתות",
     invalidGhUrl: "נא להדביק כתובת ריפו תקינה מ-GitHub (לדוגמה: https://github.com/owner/repo)",
-    clipboardEmpty: "לוח ההעתקה ריק — העתק כתובת ריפו מ-GitHub ונסה שוב"
+    clipboardEmpty: "לוח ההעתקה ריק — העתק כתובת ריפו או נתיב מקומי ונסה שוב",
+    gcPurgedBadge: "נמחק במטמון שרת (GC)",
+    gcPurgedTitle: "קומיט נמחק ממטמון השרת (Garbage Collection 404)",
+    gcPurgedDesc: "הקומיט זוהה ברישומי אירועי Force-Push אך נמחק ממטמון השרת (Cloud GC אחרי 30-90 יום). מומלץ לסרוק תיקייה מקומית של אחד ממפתחי הצוות לחילוץ האובייקט מ-reflog מקומי.",
+    scanLocalCloneBtn: "סרוק תיקייה מקומית של מפתח",
+    promptLocalPath: "הזן נתיב לתיקיית מאגר מקומית:"
   },
   en: {
     cmdPlaceholder: "Quick command or jump to view... (Ctrl+K)",
@@ -2236,7 +2343,15 @@ window.UNFORCE_I18N = {
     secRecent: "Recent GitHub Targets",
     recentEmpty: "No GitHub repos scanned yet.",
     pasteBtn: "Paste URL",
-    scanBtn: "Scan GitHub Repo",
+    scanBtn: "Scan Repository",
+    browseLocalBtn: "Browse Local",
+    localTargetPill: "Local Repo",
+    gitlabTargetPill: "GitLab Repo",
+    bitbucketTargetPill: "Bitbucket Repo",
+    btnRestoreBranch: "Restore to Branch",
+    btnCherryPick: "Cherry-Pick",
+    branchPrompt: "Enter name for the new branch:",
+    branchRestored: "Branch successfully restored!",
     scanningBtn: "Scanning Target...",
     githubTargetPill: "GitHub Repo",
     bundleBtn: "Recovery Bundle (.ZIP)",
@@ -2299,7 +2414,12 @@ window.UNFORCE_I18N = {
     detachedBlobsTitle: "Detached Git Blobs",
     remTitle: "GitHub History Purge & Secret Excision Playbook",
     invalidGhUrl: "Please paste a valid GitHub repository URL (e.g. https://github.com/owner/repo)",
-    clipboardEmpty: "Clipboard is empty — copy a GitHub repository URL first"
+    clipboardEmpty: "Clipboard is empty — copy a repository URL or local path first",
+    gcPurgedBadge: "Server GC Purged",
+    gcPurgedTitle: "Commit Purged by Cloud Garbage Collection (404)",
+    gcPurgedDesc: "Commit was identified in force-push event logs but was purged from server cloud cache (HTTP 404, 30-90 day GC cycle). Scan a developer's local repository clone to exhume the object from the local reflog.",
+    scanLocalCloneBtn: "Scan Developer's Local Clone",
+    promptLocalPath: "Enter local Git repository directory path:"
   }
 };
 
@@ -2360,31 +2480,130 @@ async function apiFetch(endpoint, options = {}) {
   return fetch(`${base}${endpoint}`, options);
 }
 
-/* ---- GitHub URL Parsing & Validation (ONLY Allowed Target Method) ---- */
-function parseGitHubRepoInput(rawInput) {
+/* ---- Smart Target Parsing & Validation (Local Repositories, GitHub, GitLab, Bitbucket) ---- */
+function parseSmartTarget(rawInput) {
   const raw = String(rawInput || "").trim();
   if (!raw) return null;
-  if (/^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith("/") || raw.startsWith("\\") || raw.startsWith(".")) {
-    return null;
+
+  // Local filesystem directory detection
+  const isWindowsPath = /^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith("\\\\");
+  const isUnixPath = raw.startsWith("/") || raw.startsWith("~/");
+  const isRelative = raw === "." || raw === ".." || raw.startsWith("./") || raw.startsWith(".\\") || raw.startsWith("../") || raw.startsWith("..\\");
+
+  if (isWindowsPath || isUnixPath || isRelative) {
+    const parts = raw.replace(/\\/g, "/").split("/").filter(Boolean);
+    const slug = parts.length > 0 ? parts[parts.length - 1] : raw;
+    return {
+      type: "local",
+      platform: "local",
+      path: raw,
+      slug: slug,
+      cleanUrl: raw,
+    };
   }
-  let m = raw.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/i);
-  if (!m) {
-    m = raw.match(/^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i);
+
+  // GitLab
+  const mGitLab = raw.match(/^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*?)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/i) ||
+                  raw.match(/^git@gitlab\.com:([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*?)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i);
+  if (mGitLab) {
+    const group = mGitLab[1];
+    const repo = mGitLab[2].replace(/\.git$/i, "");
+    const slug = `${group}/${repo}`;
+    return {
+      type: "gitlab",
+      platform: "gitlab",
+      owner: group,
+      repo: repo,
+      slug: slug,
+      cleanUrl: `https://gitlab.com/${slug}`,
+    };
   }
-  if (!m) {
-    m = raw.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
+
+  // Bitbucket
+  const mBb = raw.match(/^(?:https?:\/\/)?(?:www\.)?bitbucket\.org\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/i) ||
+              raw.match(/^git@bitbucket\.org:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i);
+  if (mBb) {
+    const ws = mBb[1];
+    const repo = mBb[2].replace(/\.git$/i, "");
+    const slug = `${ws}/${repo}`;
+    return {
+      type: "bitbucket",
+      platform: "bitbucket",
+      owner: ws,
+      repo: repo,
+      slug: slug,
+      cleanUrl: `https://bitbucket.org/${slug}`,
+    };
   }
-  if (!m) return null;
-  const owner = m[1];
-  const repo = m[2].replace(/\.git$/i, "");
-  const reserved = ["settings", "orgs", "organizations", "users", "marketplace", "explore", "topics", "login"];
-  if (!owner || !repo || reserved.includes(owner.toLowerCase())) return null;
-  return {
-    owner,
-    repo,
-    slug: `${owner}/${repo}`,
-    cleanUrl: `https://github.com/${owner}/${repo}`,
-  };
+
+  // GitHub
+  let mGh = raw.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/i);
+  if (!mGh) {
+    mGh = raw.match(/^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i);
+  }
+  if (!mGh) {
+    mGh = raw.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
+  }
+  if (mGh) {
+    const owner = mGh[1];
+    const repo = mGh[2].replace(/\.git$/i, "");
+    const reserved = ["settings", "orgs", "organizations", "users", "marketplace", "explore", "topics", "login"];
+    if (owner && repo && !reserved.includes(owner.toLowerCase())) {
+      return {
+        type: "github",
+        platform: "github",
+        owner: owner,
+        repo: repo,
+        slug: `${owner}/${repo}`,
+        cleanUrl: `https://github.com/${owner}/${repo}`,
+      };
+    }
+  }
+
+  if (raw.length >= 2 && !raw.includes("http://") && !raw.includes("https://")) {
+    return {
+      type: "local",
+      platform: "local",
+      path: raw,
+      slug: raw,
+      cleanUrl: raw,
+    };
+  }
+
+  return null;
+}
+
+function parseGitHubRepoInput(rawInput) {
+  return parseSmartTarget(rawInput);
+}
+
+async function selectLocalFolder() {
+  if (window.unforceDesktop && typeof window.unforceDesktop.selectDirectoryDialog === "function") {
+    try {
+      const res = await window.unforceDesktop.selectDirectoryDialog();
+      if (res && !res.canceled && res.path) {
+        const input = document.getElementById("repoPathInput");
+        if (input) {
+          input.value = res.path;
+          updateTargetTypeBadge();
+          logTerminal("LOCAL", `Selected local repository: ${res.path}`, "ok");
+          startScan();
+        }
+      }
+    } catch (err) {
+      logTerminal("ERR", `Directory dialog error: ${err.message}`, "err");
+    }
+    return;
+  }
+  const fallback = prompt(t("promptLocalPath") || "Enter local Git repository directory path:", "");
+  if (fallback && fallback.trim()) {
+    const input = document.getElementById("repoPathInput");
+    if (input) {
+      input.value = fallback.trim();
+      updateTargetTypeBadge();
+      startScan();
+    }
+  }
 }
 
 function updateTargetTypeBadge() {
@@ -2392,11 +2611,25 @@ function updateTargetTypeBadge() {
   const badge = document.getElementById("repoTargetBadgeText");
   const pill = document.getElementById("repoTargetBadge");
   if (!input || !badge || !pill) return;
-  const parsed = parseGitHubRepoInput(input.value);
+  const parsed = parseSmartTarget(input.value);
   if (parsed) {
-    badge.textContent = parsed.slug;
-    pill.style.borderColor = "rgba(0, 255, 157, 0.5)";
-    pill.style.color = "var(--neon-green)";
+    if (parsed.type === "local") {
+      badge.textContent = `📁 ${parsed.slug}`;
+      pill.style.borderColor = "rgba(0, 229, 255, 0.5)";
+      pill.style.color = "var(--cyan-bright)";
+    } else if (parsed.type === "gitlab") {
+      badge.textContent = `🦊 ${parsed.slug}`;
+      pill.style.borderColor = "rgba(252, 109, 38, 0.6)";
+      pill.style.color = "#fc6d26";
+    } else if (parsed.type === "bitbucket") {
+      badge.textContent = `🔷 ${parsed.slug}`;
+      pill.style.borderColor = "rgba(38, 132, 255, 0.6)";
+      pill.style.color = "#2684ff";
+    } else {
+      badge.textContent = parsed.slug;
+      pill.style.borderColor = "rgba(0, 255, 157, 0.5)";
+      pill.style.color = "var(--neon-green)";
+    }
   } else {
     badge.textContent = t("githubTargetPill");
     pill.style.borderColor = "rgba(0, 229, 255, 0.35)";
@@ -3148,6 +3381,81 @@ async function copyActiveCommitSha() {
   showToast(`✓ Copied SHA: ${activeCommitObj.commit_hash.slice(0, 12)}`);
 }
 
+async function restoreCommitToNewBranch(commitHash) {
+  const repoInput = document.getElementById("repoPathInput");
+  const repoPath = repoInput ? repoInput.value.trim() : "";
+  const defaultBranch = `recovered/${commitHash.slice(0, 7)}`;
+  const branchName = prompt(t("branchPrompt") || "Enter name for the new branch:", defaultBranch);
+  if (!branchName || !branchName.trim()) return;
+
+  logTerminal("GIT", `Restoring commit ${commitHash.slice(0, 7)} to branch '${branchName.trim()}'...`, "cmd");
+  try {
+    const resp = await apiFetch("/api/git/restore-branch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo_path: repoPath,
+        commit_hash: commitHash,
+        branch_name: branchName.trim(),
+        checkout: false,
+      }),
+    });
+    const result = await resp.json();
+    if (result.success) {
+      logTerminal("OK", result.message || `Branch '${branchName}' created successfully!`, "ok");
+      alert(result.message || `${t("branchRestored")}: ${branchName}`);
+    } else {
+      logTerminal("ERR", result.error || "Branch restoration failed.", "err");
+      alert(`Error: ${result.error || "Failed to create branch."}`);
+    }
+  } catch (err) {
+    logTerminal("ERR", `Restore request failed: ${err.message}`, "err");
+    alert(`Error: ${err.message}`);
+  }
+}
+
+async function cherryPickCommitToCurrent(commitHash) {
+  const repoInput = document.getElementById("repoPathInput");
+  const repoPath = repoInput ? repoInput.value.trim() : "";
+  if (!confirm(`Cherry-pick commit ${commitHash.slice(0, 7)} onto current active branch?`)) return;
+
+  logTerminal("GIT", `Cherry-picking commit ${commitHash.slice(0, 7)}...`, "cmd");
+  try {
+    const resp = await apiFetch("/api/git/cherry-pick", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo_path: repoPath,
+        commit_hash: commitHash,
+        no_commit: false,
+      }),
+    });
+    const result = await resp.json();
+    if (result.success) {
+      logTerminal("OK", result.message || "Cherry-pick completed successfully!", "ok");
+      alert(result.message || "Cherry-pick completed successfully!");
+    } else {
+      logTerminal("ERR", result.error || "Cherry-pick failed.", "err");
+      alert(`Error: ${result.error || "Cherry-pick failed."}`);
+    }
+  } catch (err) {
+    logTerminal("ERR", `Cherry-pick request failed: ${err.message}`, "err");
+    alert(`Error: ${err.message}`);
+  }
+}
+
+function cherryPickActiveCommit() {
+  if (activeCommitObj && activeCommitObj.commit_hash) {
+    cherryPickCommitToCurrent(activeCommitObj.commit_hash);
+  }
+}
+
+function restoreActiveCommitBranch() {
+  if (activeCommitObj && activeCommitObj.commit_hash) {
+    restoreCommitToNewBranch(activeCommitObj.commit_hash);
+  }
+}
+
 async function exportActiveCommitPatch() {
   if (!activeCommitObj) return;
   const sha = activeCommitObj.commit_hash;
@@ -3164,16 +3472,31 @@ function renderRemoteEventsAndForks(events, forks) {
     evBox.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">No Push / Force-Push overwrite events recorded in GitHub's recent Events feed.</div>`;
   } else {
     evBox.innerHTML = events
-      .map(
-        (ev) => `<div style="padding:10px 12px;border-radius:9px;background:var(--bg-card);border:1px solid var(--border);">
+      .map((ev) => {
+        const isGcPurged = ev.gc_purged || ev.status === "GC_PURGED_REMOTE";
+        const gcBadge = isGcPurged ? `<span class="badge-gc-purged" title="${t("gcPurgedDesc")}">⚠ GC_PURGED_REMOTE</span>` : "";
+        const gcDiag = isGcPurged ? `
+          <div class="gc-diagnostic-card">
+            <div class="gc-diag-header">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              <span>${t("gcPurgedTitle")}</span>
+            </div>
+            <p class="gc-diag-body">${escapeHtml(ev.diagnostic_message || t("gcPurgedDesc"))}</p>
+            <button class="btn btn-sm btn-outline-amber" onclick="selectLocalFolder()">${t("scanLocalCloneBtn")}</button>
+          </div>` : "";
+        return `<div style="padding:10px 12px;border-radius:9px;background:var(--bg-card);border:1px solid var(--border);">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span class="badge ${ev.event_type === "force_push" ? "badge-critical" : "badge-medium"}">${escapeHtml(ev.event_type)}</span>
+            <div>
+              <span class="badge ${ev.event_type === "force_push" ? "badge-critical" : "badge-medium"}">${escapeHtml(ev.event_type)}</span>
+              ${gcBadge}
+            </div>
             <span class="ltr-mono" style="font-size:11px;color:var(--text-muted);">${escapeHtml((ev.created_at || "").slice(0, 19))}</span>
           </div>
           <div style="font-size:12.5px;margin-top:6px;color:#ffffff;">${escapeHtml(ev.description || "")}</div>
           <div style="font-size:11.5px;color:var(--cyan-bright);margin-top:4px;" class="ltr-mono">Actor: @${escapeHtml(ev.actor || "unknown")} ${ev.before_sha ? "• Before: " + escapeHtml(ev.before_sha.slice(0, 10)) : ""}</div>
-        </div>`
-      )
+          ${gcDiag}
+        </div>`;
+      })
       .join("");
   }
 
@@ -3997,6 +4320,38 @@ async function initBackendTelemetry() {
   } catch (_) {}
 }
 
+function initDragAndDrop() {
+  const row = document.querySelector(".target-bar-row");
+  window.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (row) row.classList.add("drag-over");
+  });
+  window.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (row && e.relatedTarget === null) row.classList.remove("drag-over");
+  });
+  window.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (row) row.classList.remove("drag-over");
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      const filePath = file.path || file.name;
+      if (filePath) {
+        const input = document.getElementById("repoPathInput");
+        if (input) {
+          input.value = filePath;
+          updateTargetTypeBadge();
+          logTerminal("DROP", `Local repository dropped: ${filePath}`, "ok");
+          startScan();
+        }
+      }
+    }
+  });
+}
+
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
     e.preventDefault();
@@ -4015,6 +4370,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   applyEmbeddedLogo();
   applyLanguage();
+  initDragAndDrop();
 
   const params = new URLSearchParams(window.location.search);
   const initialRepo = params.get("repo");

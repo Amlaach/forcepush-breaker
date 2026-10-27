@@ -16,6 +16,7 @@ import shutil
 import ssl
 import stat
 import subprocess
+import sys
 import tempfile
 import urllib.error
 import urllib.request
@@ -243,27 +244,32 @@ def sanitize_token_in_text(text: str, token: Optional[str] = None) -> str:
     sanitized = text
     if token and token.strip():
         clean_tok = token.strip()
-        sanitized = sanitized.replace(clean_tok, "[REDACTED_GITHUB_TOKEN]")
+        redact_tag = "[REDACTED_GITHUB_TOKEN]" if clean_tok.startswith("gh") or ("github" in text.lower() and not ("gitlab" in text.lower() or "bitbucket" in text.lower())) else "[REDACTED_TOKEN]"
+        sanitized = sanitized.replace(clean_tok, redact_tag)
         b64_basic = base64.b64encode(f"x-access-token:{clean_tok}".encode("utf-8")).decode("ascii")
-        sanitized = sanitized.replace(b64_basic, "[REDACTED_GITHUB_TOKEN]")
+        sanitized = sanitized.replace(b64_basic, redact_tag)
+
+    def _replace_url_cred(m):
+        proto, cred, domain = m.group(1), m.group(2), m.group(3)
+        tag = "[REDACTED_GITHUB_TOKEN]" if "github" in domain.lower() else "[REDACTED_TOKEN]"
+        return f"{proto}{tag}@{domain}"
 
     sanitized = re.sub(
         r"(https?://)([^@\s/]+)@(github\.com|gitlab\.com|bitbucket\.org)",
-        r"\1[REDACTED_TOKEN]@\3",
+        _replace_url_cred,
         sanitized,
     )
     sanitized = re.sub(
         r"(?i)(authorization:\s*(?:bearer|token|basic)\s+)([^\s\"']+)",
-        r"\1[REDACTED_TOKEN]",
+        lambda m: f"{m.group(1)}{m.group(2)}" if "REDACTED" in m.group(2) else f"{m.group(1)}[REDACTED_TOKEN]",
         sanitized,
     )
     sanitized = re.sub(
         r"(?i)(private-token:\s*)([^\s\"']+)",
-        r"\1[REDACTED_TOKEN]",
+        lambda m: f"{m.group(1)}{m.group(2)}" if "REDACTED" in m.group(2) else f"{m.group(1)}[REDACTED_TOKEN]",
         sanitized,
     )
     return sanitized
-
 
 def parse_bitbucket_url(target: str) -> Optional[ParsedRemoteTarget]:
     raw = (target or "").strip()

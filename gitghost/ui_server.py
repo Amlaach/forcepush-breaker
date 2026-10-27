@@ -85,7 +85,7 @@ atexit.register(_cleanup_all_workspaces)
 
 
 def _cache_pipeline_result(pipeline_res: Any, raw_target: str) -> None:
-    from gitghost.github_remote import parse_github_url, parse_remote_url, is_remote_target
+    from gitghost.github_remote import parse_github_url, parse_remote_url, parse_remote_url, is_remote_target
 
     keys = {pipeline_res.repo_path, raw_target, "__latest__"}
     if getattr(pipeline_res, "remote_url", None):
@@ -541,7 +541,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
         self._send_json(self._serialize_pipeline_result(pipeline_res))
 
     def _serialize_pipeline_result(self, pipeline_res: Any) -> dict:
-        from gitghost.github_remote import parse_github_url
+        from gitghost.github_remote import parse_github_url, parse_remote_url
 
         findings_payload = []
         for f in pipeline_res.findings:
@@ -1353,7 +1353,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._send_error(400, f"Failed to install pre-push hook: {hook_path}")
 
     def _handle_verify_key(self, data: dict):
-        from gitghost.github_remote import parse_github_url
+        from gitghost.github_remote import parse_github_url, parse_remote_url
         from gitghost.liveness import SafeKeyLivenessChecker
 
         finding_id = str(data.get("finding_id") or "").strip()
