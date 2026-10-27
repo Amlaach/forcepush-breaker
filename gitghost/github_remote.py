@@ -467,6 +467,37 @@ class GitLabAPIForensicsClient:
         except Exception as exc:
             warnings.append(sanitize_token_in_text(str(exc), self._token))
 
+        mrs_url = f"{target.api_repo_url}/merge_requests?state=closed&per_page=30"
+        try:
+            req = urllib.request.Request(mrs_url, headers=self._build_headers(), method="GET")
+            raw_mrs = _fetch_json_resilient(req, timeout=self.timeout, token=self._token)
+            if isinstance(raw_mrs, list):
+                for mr in raw_mrs:
+                    if not isinstance(mr, dict) or mr.get("merged_at"):
+                        continue
+                    mr_iid = mr.get("iid", "?")
+                    sha = str(mr.get("sha") or "").strip()
+                    author = (mr.get("author") or {}).get("username", "unknown")
+                    closed_at = str(mr.get("closed_at") or mr.get("updated_at") or "")
+                    if sha and sha != zero_sha:
+                        events.append(
+                            HistoryOverwriteEvent(
+                                event_id=f"gl-MR-{mr_iid}",
+                                event_type="closed_pr_orphan",
+                                ref=f"refs/merge-requests/{mr_iid}/head",
+                                before_sha=sha,
+                                after_sha=None,
+                                actor=author,
+                                created_at=closed_at,
+                                description=f"GitLab closed unmerged MR !{mr_iid} head commit {sha[:10]}",
+                            )
+                        )
+                        if sha not in seen_shas:
+                            seen_shas.add(sha)
+                            candidate_shas.append(sha)
+        except Exception as exc:
+            warnings.append(sanitize_token_in_text(str(exc), self._token))
+
         return events, candidate_shas, warnings
 
 
