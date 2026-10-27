@@ -653,6 +653,76 @@ class BitbucketAPIForensicsClient:
 
         return events, candidate_shas, warnings
 
+    def fetch_commit_or_check_gc(
+        self,
+        target: ParsedRemoteTarget,
+        commit_sha: str,
+        max_text_bytes: int = 10 * 1024 * 1024,
+    ) -> Tuple[Optional[DanglingCommit], bool]:
+        sha = (commit_sha or "").strip()
+        if not sha:
+            return None, False
+
+        commit_url = f"{target.api_repo_url}/commit/{sha}"
+        diff_url = f"{target.api_repo_url}/diff/{sha}"
+        try:
+            req = urllib.request.Request(commit_url, headers=self._build_headers(), method="GET")
+            data = _fetch_json_resilient(req, timeout=self.timeout, token=self._token)
+            if not isinstance(data, dict):
+                return None, False
+
+            full_sha = str(data.get("hash") or sha)
+            author_obj = data.get("author") or {}
+            raw_author = author_obj.get("raw") or "Unknown"
+            date_str = str(data.get("date") or "")
+            message = str(data.get("message") or "")
+            parents = [str(p.get("hash")) for p in (data.get("parents") or []) if isinstance(p, dict) and p.get("hash")]
+
+            diff_text = ""
+            changed_files: List[str] = []
+            try:
+                diff_req = urllib.request.Request(diff_url, headers=self._build_headers(), method="GET")
+                with urllib.request.urlopen(diff_req, timeout=self.timeout) as diff_resp:
+                    raw_diff_bytes = diff_resp.read(max_text_bytes)
+                    diff_text = raw_diff_bytes.decode("utf-8", errors="replace")
+                    for m in re.finditer(r"^diff --git a/.*? b/(.+)$", diff_text, re.MULTILINE):
+                        changed_files.append(m.group(1).strip())
+            except Exception:
+                pass
+
+            ai_attribution = detect_ai_agent(
+                author=raw_author,
+                message=message,
+                diff_content=diff_text,
+            )
+
+            return DanglingCommit(
+                commit_hash=full_sha,
+                author=raw_author,
+                date=date_str,
+                message=message,
+                parents=parents,
+                changed_files=changed_files,
+                diff_content=diff_text,
+                is_dangling=True,
+                ai_agent=ai_attribution,
+            ), False
+        except urllib.error.HTTPError as h_err:
+            if h_err.code == 404:
+                return None, True
+            return None, False
+        except Exception:
+            return None, False
+
+    def fetch_orphan_commit_via_api(
+        self,
+        target: ParsedRemoteTarget,
+        commit_sha: str,
+        max_text_bytes: int = 10 * 1024 * 1024,
+    ) -> Optional[DanglingCommit]:
+        commit, _ = self.fetch_commit_or_check_gc(target, commit_sha, max_text_bytes)
+        return commit
+
 
 class GitHubAPIForensicsClient:
     """Queries GitHub REST API for history overwrite events, force-pushes, and orphaned commits.
