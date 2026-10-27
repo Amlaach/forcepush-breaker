@@ -54,25 +54,35 @@ _SSH_BITBUCKET_RE = re.compile(
     re.IGNORECASE,
 )
 
-_CACHED_SYS_GH_TOKEN: Optional[str] = None
-_SYS_GH_TOKEN_PROBED: bool = False
+_CACHED_REMOTE_TOKENS: Dict[str, str] = {}
+_PROBED_REMOTE_HOSTS: Set[str] = set()
 
 
-def resolve_system_github_token() -> Optional[str]:
-    """Safely probes Git Credential Manager in-memory for an existing github.com token.
+def resolve_system_remote_token(host: str = "github.com") -> Optional[str]:
+    """Safely probes Git Credential Manager in-memory for an existing token for the specified host.
 
     Never writes to disk and never blocks on interactive prompts (`GIT_TERMINAL_PROMPT=0`).
-    Allows seamless scanning of private GitHub repositories the user already has access to.
     """
-    global _CACHED_SYS_GH_TOKEN, _SYS_GH_TOKEN_PROBED
-    env_tok = (os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
-    if env_tok:
-        return env_tok
+    clean_host = host.lower().strip()
+    if "github" in clean_host:
+        env_tok = (os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
+        if env_tok:
+            return env_tok
+    elif "gitlab" in clean_host:
+        env_tok = (os.getenv("GITLAB_TOKEN") or os.getenv("GL_TOKEN") or "").strip()
+        if env_tok:
+            return env_tok
+    elif "bitbucket" in clean_host:
+        env_tok = (os.getenv("BITBUCKET_TOKEN") or "").strip()
+        if env_tok:
+            return env_tok
 
-    if _SYS_GH_TOKEN_PROBED:
-        return _CACHED_SYS_GH_TOKEN
+    if clean_host in _CACHED_REMOTE_TOKENS:
+        return _CACHED_REMOTE_TOKENS[clean_host]
+    if clean_host in _PROBED_REMOTE_HOSTS:
+        return None
 
-    _SYS_GH_TOKEN_PROBED = True
+    _PROBED_REMOTE_HOSTS.add(clean_host)
     if not shutil.which("git"):
         return None
 
@@ -80,10 +90,13 @@ def resolve_system_github_token() -> Optional[str]:
     env["GIT_TERMINAL_PROMPT"] = "0"
     env["GCM_INTERACTIVE"] = "never"
 
+    CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    flags = CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
     try:
         res = subprocess.run(
             ["git", "credential", "fill"],
-            input="protocol=https\nhost=github.com\n\n",
+            input=f"protocol=https\nhost={clean_host}\n\n",
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -91,17 +104,26 @@ def resolve_system_github_token() -> Optional[str]:
             env=env,
             timeout=3,
             check=False,
+            creationflags=flags,
         )
         if res.returncode == 0 and res.stdout:
             for line in res.stdout.splitlines():
                 if line.startswith("password="):
                     pw = line.split("=", 1)[1].strip()
                     if pw:
-                        _CACHED_SYS_GH_TOKEN = pw
+                        _CACHED_REMOTE_TOKENS[clean_host] = pw
                         return pw
     except Exception:
         pass
     return None
+
+
+def resolve_system_github_token() -> Optional[str]:
+    return resolve_system_remote_token("github.com")
+
+
+def resolve_system_gitlab_token() -> Optional[str]:
+    return resolve_system_remote_token("gitlab.com")
 
 
 @dataclass(frozen=True)
