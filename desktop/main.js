@@ -373,16 +373,27 @@ function ensureOfficialShortcut() {
       if (isSmokeTest) {
         const url = await daemonBoot;
         const title = win.getTitle();
-        const hasDom = await win.webContents.executeJavaScript(
-          "Boolean(document.getElementById('repoPathInput') && window.unforceDesktop && window.unforceDesktop.isElectron)"
-        );
-        if (hasDom && url) {
-          process.stdout.write(`SMOKE_TEST_OK title=${JSON.stringify(title)} url=${url}\n`);
+        const testResult = await win.webContents.executeJavaScript(`(() => {
+          const checks = {
+            hasRepoInput: Boolean(document.getElementById('repoPathInput')),
+            hasDesktopBridge: Boolean(window.unforceDesktop && window.unforceDesktop.isElectron),
+            hasWinClose: typeof window.winClose === 'function',
+            hasWinMaximize: typeof window.winMaximize === 'function',
+            hasWinMinimize: typeof window.winMinimize === 'function',
+            hasPasteBtn: typeof window.pasteGitHubUrlOnly === 'function',
+            hasBrowseBtn: typeof window.selectLocalFolder === 'function',
+            hasScanBtn: typeof window.startScan === 'function',
+          };
+          const failed = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
+          return { ok: failed.length === 0, failed, checks };
+        })()`);
+        if (testResult && testResult.ok && url) {
+          process.stdout.write(`SMOKE_TEST_OK title=${JSON.stringify(title)} url=${url} checks=${JSON.stringify(testResult.checks)}\n`);
           isQuitting = true;
           stopBackendDaemon();
           app.exit(0);
         } else {
-          process.stderr.write("SMOKE_TEST_FAILED: DOM or backend bridge missing\n");
+          process.stderr.write(`SMOKE_TEST_FAILED: ${JSON.stringify(testResult)}\n`);
           isQuitting = true;
           stopBackendDaemon();
           app.exit(1);

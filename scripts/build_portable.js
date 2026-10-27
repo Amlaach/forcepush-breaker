@@ -6,6 +6,7 @@ const root = path.resolve(__dirname, "..");
 const nsiScript = path.join(root, "scripts", "package_portable.nsi");
 const releaseDir = path.join(root, "release");
 const desktopDist = path.join(root, "desktop", "dist");
+const winUnpacked = path.join(desktopDist, "win-unpacked");
 
 if (!fs.existsSync(releaseDir)) fs.mkdirSync(releaseDir, { recursive: true });
 
@@ -36,7 +37,10 @@ try {
 }
 
 console.log(`[build_portable] Compiling portable package with ${makensisCmd}...`);
-execSync(`${makensisCmd} "${nsiScript}"`, { cwd: path.join(root, "scripts"), stdio: "inherit" });
+execSync(`${makensisCmd} "/DSOURCE_DIR=${winUnpacked}" "${nsiScript}"`, {
+  cwd: path.join(root, "scripts"),
+  stdio: "inherit",
+});
 
 const builtExe = path.join(releaseDir, "UnForce-Portable.exe");
 if (fs.existsSync(builtExe)) {

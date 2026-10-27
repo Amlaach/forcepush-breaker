@@ -52,7 +52,7 @@ function returnToLanding() {
 /* ---- In-App Version Update System (Instant GitHub Release Detection & Safe SSL) ---- */
 async function checkAppVersion(isManual = false) {
   try {
-    logEvent("INFO", "updater", "Checking for updates on GitHub (v0.8.0)...");
+    logEvent("INFO", "updater", "Checking for updates on GitHub (v0.8.1)...");
     const res = await apiFetch("/api/version/check");
     if (!res.ok) {
       if (isManual) showToast("שגיאה בבדיקת עדכונים: " + res.statusText);
@@ -73,9 +73,9 @@ async function checkAppVersion(isManual = false) {
       const btn = document.getElementById("updateAvailableBtn");
       if (btn) btn.style.display = "none";
       if (isManual) {
-        showToast(currentLang === "he" ? "המערכת מעודכנת לגירסה העדכנית (v0.8.0)" : "Software is up to date (v0.8.0)");
+        showToast(currentLang === "he" ? "המערכת מעודכנת לגירסה העדכנית (v0.8.1)" : "Software is up to date (v0.8.1)");
       }
-      logEvent("INFO", "updater", "Software is up to date (v0.8.0).");
+      logEvent("INFO", "updater", "Software is up to date (v0.8.1).");
     }
   } catch (err) {
     logEvent("ERROR", "updater", "Update check failed: " + err.message);
@@ -87,7 +87,7 @@ function openUpdateModal() {
   if (!latestReleaseInfo) {
     latestReleaseInfo = {
       latest_version: "0.7.2",
-      release_name: "UnForce v0.8.0",
+      release_name: "UnForce v0.8.1",
       release_notes: "Latest stable release for UnForce Forensics Studio.",
       html_url: "https://github.com/Amlaach/forcepush-breaker/releases",
       assets: []
@@ -675,7 +675,17 @@ function applyLanguage() {
 
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.getAttribute("data-i18n");
-    if (key) el.textContent = t(key);
+    if (!key) return;
+    const translation = t(key);
+    if (!translation) return;
+    if (el.children.length === 0) {
+      el.textContent = translation;
+    } else {
+      const childSpan = el.querySelector("span[data-i18n]") || el.querySelector("span");
+      if (childSpan) {
+        childSpan.textContent = translation;
+      }
+    }
   });
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     const key = el.getAttribute("data-i18n-placeholder");
@@ -1842,11 +1852,20 @@ function renderRemediation(rem) {
       )
       .join("");
   }
-  document.getElementById("remediationBashScript").textContent = rem.bash_script || "# No Bash script generated";
-  document.getElementById("remediationPSScript").textContent = rem.powershell_script || "# No PowerShell script generated";
-  document.getElementById("remediationSupportTicket").textContent =
-    rem.github_support_ticket ||
-    `Subject: Urgent Request to Purge Cached Commit SHAs on ${activeGithubHtmlUrl || "Repository"}\n\nHello GitHub Support,\n\nWe recently performed a history rewrite (git filter-repo + force push) on ${activeGithubHtmlUrl || "<owner/repo>"} to excise sensitive data. Please purge all unreachable/cached commit views and pull-request refs on GitHub's servers.\n\nThank you.`;
+  const bashEl = document.getElementById("remediationBashScript") || document.getElementById("remediationScriptView");
+  if (bashEl) {
+    bashEl.textContent = rem.bash_script || rem.powershell_script || "# No Bash script generated";
+  }
+  const psEl = document.getElementById("remediationPSScript");
+  if (psEl) {
+    psEl.textContent = rem.powershell_script || "# No PowerShell script generated";
+  }
+  const ticketEl = document.getElementById("remediationSupportTicket") || document.getElementById("supportTicketView");
+  if (ticketEl) {
+    ticketEl.textContent =
+      rem.github_support_ticket ||
+      `Subject: Urgent Request to Purge Cached Commit SHAs on ${activeGithubHtmlUrl || "Repository"}\n\nHello GitHub Support,\n\nWe recently performed a history rewrite (git filter-repo + force push) on ${activeGithubHtmlUrl || "<owner/repo>"} to excise sensitive data. Please purge all unreachable/cached commit views and pull-request refs on GitHub's servers.\n\nThank you.`;
+  }
 }
 
 function switchScriptTab(lang) {
@@ -2095,92 +2114,46 @@ function toggleRawRecoveryMode(enabled) {
   showToast(enabled ? "Raw unredacted file export enabled" : "Strict Redaction Active", enabled ? "warn" : "success");
 }
 
-/* ---- Command Palette (Ctrl+K) ---- */
-function getPaletteCommands() {
-  return [
-    {
-      label: "Paste Repository URL & Scan",
-      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
-      action: () => pasteAndScanGitHub()
-    },
-    {
-      label: "Jump to Command HUD & Hygiene Score",
-      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>',
-      action: () => switchView("overview")
-    },
-    {
-      label: "Jump to Commit & File-Tree Explorer",
-      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>',
-      action: () => switchView("commits")
-    },
-    {
-      label: "Jump to Discovered Secrets & AI Triage",
-      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg>',
-      action: () => switchView("findings")
-    },
-    {
-      label: "Jump to .env & Config Time-Machine",
-      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
-      action: () => switchView("timemachine")
-    },
-    {
-      label: "Jump to Deep Search & Detached Blobs",
-      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
-      action: () => switchView("searchblobs")
-    },
-    {
-      label: "Jump to GitHub History Purge Playbook",
-      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>',
-      action: () => switchView("remediation")
-    },
-    {
-      label: "Export Full Recovery Bundle (.ZIP)",
-      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
-      action: () => downloadRecoveryBundle()
-    },
-    {
-      label: "Switch Language (עברית / English)",
-      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>',
-      action: () => toggleLanguage()
-    },
-    {
-      label: "Open Settings & Credentials",
-      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>',
-      action: () => openSettingsModal()
-    },
-  ];
-}
+/* ---- Command Palette Safe Stubs (Disabled by design) ---- */
+function getPaletteCommands() { return []; }
+function openCmdPalette() {}
+function closeCmdPalette() {}
+function renderCmdPaletteItems() {}
+function runPaletteCommand() {}
 
-
-
-
-
-
-  if (cmdSelectedIndex >= items.length) cmdSelectedIndex = 0;
-  list.innerHTML = items
-    .map(
-      (item, idx) => `<button class="cmd-item ${idx === cmdSelectedIndex ? "selected" : ""}" onclick="runPaletteCommand(${idx})">
-        <span class="cmd-item-icon">${item.iconSvg || ""}</span>
-        <span>${escapeHtml(item.label)}</span>
-      </button>`
-    )
-    .join("");
-}
-
-
-
- else if (e.key === "ArrowDown") {
-    e.preventDefault();
-    cmdSelectedIndex = (cmdSelectedIndex + 1) % Math.max(items.length, 1);
-    renderCmdPaletteItems();
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    cmdSelectedIndex = (cmdSelectedIndex - 1 + Math.max(items.length, 1)) % Math.max(items.length, 1);
-    renderCmdPaletteItems();
-  } else if (e.key === "Enter" && items.length) {
-    e.preventDefault();
-    runPaletteCommand(cmdSelectedIndex);
+/* ---- Inspector & View Navigation Handlers ---- */
+function switchInspectorSubtab(subtab) {
+  const diffBtn = document.getElementById("tabBtnDiff");
+  const treeBtn = document.getElementById("tabBtnTree");
+  const diffPane = document.getElementById("inspDiffPane");
+  const treePane = document.getElementById("inspTreePane");
+  if (subtab === "diff") {
+    if (diffBtn) diffBtn.classList.add("active");
+    if (treeBtn) treeBtn.classList.remove("active");
+    if (diffPane) diffPane.classList.add("active");
+    if (treePane) treePane.classList.remove("active");
+  } else {
+    if (diffBtn) diffBtn.classList.remove("active");
+    if (treeBtn) treeBtn.classList.add("active");
+    if (diffPane) diffPane.classList.remove("active");
+    if (treePane) treePane.classList.add("active");
   }
+}
+
+function renderTimeMachineTable() {
+  return filterTimeMachine();
+}
+
+function executeDeepSearch() {
+  return runDeepSearch();
+}
+
+function restoreActiveCommitToBranch() {
+  return restoreActiveCommitBranch();
+}
+
+function copyFilterRepoCommands() {
+  return copyActiveScript();
 }
 
 /* ---- Boot Initialization ---- */
@@ -2213,8 +2186,10 @@ async function initBackendTelemetry() {
       gitText.textContent = info.git_version.replace("git version ", "GIT ");
     }
     if (info.version) {
-      document.getElementById("titlebarVerBadge").textContent = `v${info.version}`;
-      document.getElementById("footerVersionText").textContent = `v${info.version}`;
+      const tbVer = document.getElementById("titlebarVerBadge");
+      if (tbVer) tbVer.textContent = `v${info.version}`;
+      const ftVer = document.getElementById("footerVersionText");
+      if (ftVer) ftVer.textContent = `v${info.version}`;
     }
     ephemeralSession.ghAutoDetected = Boolean(info.github_auth_auto);
     refreshGHStatusUI();
@@ -2284,6 +2259,22 @@ document.addEventListener("DOMContentLoaded", () => {
     updateTargetTypeBadge();
     setTimeout(() => startScan(), 60);
   }
+
+  // Bulletproof click event listeners for titlebar controls
+  const btnClose = document.getElementById("btnWinClose") || document.querySelector(".win-btn.win-close");
+  if (btnClose) btnClose.addEventListener("click", winClose);
+  const btnMax = document.getElementById("btnWinMaximize");
+  if (btnMax) btnMax.addEventListener("click", winMaximize);
+  const btnMin = document.getElementById("btnWinMinimize");
+  if (btnMin) btnMin.addEventListener("click", winMinimize);
+
+  // Bulletproof click event listeners for landing actions
+  const btnPaste = document.querySelector(".btn-paste");
+  if (btnPaste) btnPaste.addEventListener("click", pasteGitHubUrlOnly);
+  const btnBrowse = document.getElementById("browseLocalBtn");
+  if (btnBrowse) btnBrowse.addEventListener("click", selectLocalFolder);
+  const btnScan = document.getElementById("scanBtn");
+  if (btnScan) btnScan.addEventListener("click", startScan);
 
   initBackendTelemetry();
   setUiState("landing");

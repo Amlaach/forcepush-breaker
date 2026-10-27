@@ -22,6 +22,10 @@ BrandingText "UnForce Forensics Studio"
 !define APP_SUBDIR "UnForce Studio"
 !define MAIN_EXE "UnForce.exe"
 
+!ifndef SOURCE_DIR
+  !define SOURCE_DIR "..\desktop\dist\win-unpacked"
+!endif
+
 Section
   ; Fast path: If already unpacked, launch immediately without showing extraction UI
   IfFileExists "$EXEDIR\${APP_SUBDIR}\${MAIN_EXE}" launch_existing
@@ -32,7 +36,7 @@ Section
   CreateDirectory "$EXEDIR\${APP_SUBDIR}"
   SetOutPath "$EXEDIR\${APP_SUBDIR}"
 
-  File /r "..\desktop\dist\win-unpacked\*.*"
+  File /r /x "*.tmp" "${SOURCE_DIR}\*.*"
 
   ; Create root directory shortcut
   CreateShortCut "$EXEDIR\${APP_NAME}.lnk" "$EXEDIR\${APP_SUBDIR}\${MAIN_EXE}" "" "$EXEDIR\${APP_SUBDIR}\${MAIN_EXE}" 0 "" "" "UnForce - Git Forensics & Commit Recovery Studio"

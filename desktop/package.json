@@ -1,7 +1,7 @@
 {
   "name": "unforce-desktop",
   "productName": "UnForce",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "UnForce (ForcePush-Breaker) — Cyber-Forensics Chromium Desktop Studio for GitHub Commit Recovery & Secret Hunting",
   "author": "UnForce / GitGhost Security Team <security@gitghost.io>",
   "license": "MIT",

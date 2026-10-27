@@ -257,7 +257,12 @@ body::before {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
   transition: background 0.12s ease, color 0.12s ease;
+}
+.win-btn * {
+  pointer-events: none !important;
 }
 .win-btn:hover {
   background: rgba(255, 255, 255, 0.08);
@@ -1524,4 +1529,18 @@ body.state-workspace #workspaceView {
   -webkit-app-region: no-drag !important;
   order: 3 !important;
   margin-inline-end: 8px;
+}
+
+/* Explicit clickability rules for Chromium desktop frameless window */
+.titlebar-controls,
+.titlebar-controls.titlebar-left,
+.titlebar-actions,
+.titlebar-actions.titlebar-right,
+.titlebar-icon-btn,
+.landing-action-buttons,
+.btn,
+.btn-paste,
+.recent-repo-btn {
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
 }
