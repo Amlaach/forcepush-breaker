@@ -232,6 +232,18 @@ ipcMain.handle("unforce:write-clipboard", (_event, text) => {
   }
 });
 
+ipcMain.handle("unforce:select-directory", async () => {
+  if (!mainWindow) return { canceled: true, path: "" };
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Select Local Git Repository Folder",
+    properties: ["openDirectory"],
+  });
+  if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+    return { canceled: true, path: "" };
+  }
+  return { canceled: false, path: result.filePaths[0] };
+});
+
 ipcMain.handle("unforce:save-file", async (_event, opts) => {
   if (!mainWindow || !opts) return { saved: false };
   const defaultPath = opts.defaultPath || "recovered_artifact.txt";
