@@ -1803,6 +1803,38 @@ async function initBackendTelemetry() {
   } catch (_) {}
 }
 
+function initDragAndDrop() {
+  const row = document.querySelector(".target-bar-row");
+  window.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (row) row.classList.add("drag-over");
+  });
+  window.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (row && e.relatedTarget === null) row.classList.remove("drag-over");
+  });
+  window.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (row) row.classList.remove("drag-over");
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      const filePath = file.path || file.name;
+      if (filePath) {
+        const input = document.getElementById("repoPathInput");
+        if (input) {
+          input.value = filePath;
+          updateTargetTypeBadge();
+          logTerminal("DROP", `Local repository dropped: ${filePath}`, "ok");
+          startScan();
+        }
+      }
+    }
+  });
+}
+
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
     e.preventDefault();
@@ -1821,6 +1853,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   applyEmbeddedLogo();
   applyLanguage();
+  initDragAndDrop();
 
   const params = new URLSearchParams(window.location.search);
   const initialRepo = params.get("repo");
