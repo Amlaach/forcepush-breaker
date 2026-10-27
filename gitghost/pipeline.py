@@ -18,9 +18,11 @@ from gitghost.git_forensics import ForensicsScanResult, GitForensics, detect_ai_
 from gitghost.github_remote import (
     ForkForensicsTarget,
     HistoryOverwriteEvent,
+    ParsedRemoteTarget,
     RemoteAcquisitionResult,
     SmartGitCloner,
     parse_github_url,
+    parse_remote_url,
 )
 from gitghost.redactor import RedactionResult, SecretFinding, SecretRedactor
 from gitghost.remediation import RemediationGenerator, RemediationPlan
@@ -140,20 +142,20 @@ def run_scan_pipeline(
     GitHub API force-push/overwrite discovery, public fork auditing, and guaranteed temporary directory cleanup).
     """
     raw_target = str(repo_path).strip() or "."
-    gh_target = parse_github_url(raw_target)
+    remote_target = parse_remote_url(raw_target)
     remote_acq: Optional[RemoteAcquisitionResult] = None
 
     try:
-        if gh_target is not None:
+        if remote_target is not None:
             remote_acq = SmartGitCloner.acquire(
-                target=gh_target,
+                target=remote_target,
                 github_token=github_token,
                 clone_source_override=clone_source_override,
                 scan_forks=scan_forks,
                 on_phase=on_phase,
             )
             working_repo_path = remote_acq.local_clone_path
-            display_repo_label = gh_target.clone_url
+            display_repo_label = remote_target.clone_url
 
         else:
             working_repo_path = Path(raw_target).resolve()
