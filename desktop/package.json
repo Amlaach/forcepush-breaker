@@ -13,10 +13,10 @@
   "scripts": {
     "start": "electron .",
     "smoke": "electron . --smoke-test",
-    "dist:win": "electron-builder --win nsis portable -c.publish=never",
-    "dist:mac": "electron-builder --mac dmg zip -c.publish=never",
-    "dist:linux": "electron-builder --linux AppImage deb -c.publish=never",
-    "dist": "electron-builder -c.publish=never"
+    "dist:win": "electron-builder --win nsis portable --publish never",
+    "dist:mac": "electron-builder --mac dmg zip --publish never",
+    "dist:linux": "electron-builder --linux AppImage deb --publish never",
+    "dist": "electron-builder --publish never"
   },
   "devDependencies": {
     "electron": "^33.4.0",
