@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from gitghost import __version__
 from gitghost.redactor import SecretRedactor
 from gitghost.remediation import RemediationGenerator
 from gitghost.git_forensics import ForensicsScanResult
@@ -51,7 +52,7 @@ class TestDesktopStudioWorkflows:
     def test_system_info_and_bilingual_ui(self, studio_server: str):
         with urllib.request.urlopen(f"{studio_server}/api/system/info", timeout=15) as resp:
             info = json.loads(resp.read().decode("utf-8"))
-            assert info["version"] == "0.7.2"
+            assert info["version"] == __version__
             assert info["git_available"] is True
             assert "git" in info["git_version"].lower()
 
