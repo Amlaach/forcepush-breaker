@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("unforceDesktop", {
   getBackendUrl: () => ipcRenderer.invoke("unforce:get-backend-url"),
   readClipboard: () => ipcRenderer.invoke("unforce:read-clipboard"),
   writeClipboard: (text) => ipcRenderer.invoke("unforce:write-clipboard", text),
+  selectDirectoryDialog: () => ipcRenderer.invoke("unforce:select-directory"),
   saveFileDialog: (options) => ipcRenderer.invoke("unforce:save-file", options),
   openExternal: (url) => ipcRenderer.invoke("unforce:open-external", url),
   getAppInfo: () => ipcRenderer.invoke("unforce:app-info"),
