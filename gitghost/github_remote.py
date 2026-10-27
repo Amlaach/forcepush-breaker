@@ -1154,9 +1154,9 @@ class SmartGitCloner:
         explicit_token = (github_token or os.getenv("GITHUB_TOKEN") or "").strip() or None
         resolved_token = explicit_token
         if not resolved_token and not clone_source_override:
-            resolved_token = resolve_system_github_token()
+            resolved_token = resolve_system_remote_token(target.host)
 
-        api_client = GitHubAPIForensicsClient(github_token=resolved_token)
+        api_client = get_forensics_client_for_target(target, token=resolved_token)
 
         if on_phase:
             on_phase(f"Querying GitHub API events & PRs for {target.full_name}...", 10)
@@ -1239,9 +1239,23 @@ class SmartGitCloner:
                         exists_locally = cls._object_exists(temp_dir, sha)
 
                     if not exists_locally:
-                        api_commit = api_client.fetch_orphan_commit_via_api(target, sha)
+                        api_commit, is_404 = api_client.fetch_commit_or_check_gc(target, sha)
                         if api_commit:
                             api_recovered_commits.append(api_commit)
+                        elif is_404:
+                            diag = (
+                                f"Commit {sha[:10]} was identified in remote {target.platform.capitalize()} force-push event logs, "
+                                f"but was purged from cloud object storage (HTTP 404, typical 30-90 day GC cycle). "
+                                f"Scan a developer's local repository clone to exhume the object from local reflog / dangling objects."
+                            )
+                            for ev in history_events:
+                                if ev.before_sha == sha:
+                                    ev.status = "GC_PURGED_REMOTE"
+                                    ev.gc_purged = True
+                                    ev.diagnostic_message = diag
+                            warnings.append(
+                                f"[GC_PURGED_REMOTE] Commit {sha[:10]} purged from {target.platform.capitalize()} server cache. Recommend scanning local developer clone."
+                            )
 
             return RemoteAcquisitionResult(
                 target=target,
