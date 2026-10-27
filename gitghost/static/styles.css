@@ -83,16 +83,16 @@ body::before {
 /* =================================================================== */
 .desktop-titlebar {
   position: relative;
-  z-index: 100;
+  z-index: 2500 !important;
   height: 36px;
   background: #040812;
   border-bottom: 1px solid #132746;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-inline: 12px 0;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 12px 0 0 !important;
   -webkit-app-region: drag;
-  direction: ltr;
+  direction: ltr !important;
 }
 
 .titlebar-brand {
@@ -1390,12 +1390,15 @@ body.state-workspace #workspaceView {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(2, 5, 12, 0.75);
+  background: rgba(2, 5, 12, 0.78);
   backdrop-filter: blur(5px);
-  display: flex;
+  display: none !important;
   align-items: center;
   justify-content: center;
   padding: 20px;
+}
+.modal-overlay.active {
+  display: flex !important;
 }
 
 .modal-box {
@@ -1495,4 +1498,30 @@ body.state-workspace #workspaceView {
   justify-content: center;
   flex-shrink: 0;
   color: var(--cyan);
+}
+
+
+/* Strictly Left-Aligned Window Controls (macOS / Left-RTL convention) */
+.titlebar-controls.titlebar-left {
+  display: flex !important;
+  height: 100% !important;
+  align-items: center !important;
+  -webkit-app-region: no-drag !important;
+  order: 1 !important;
+}
+.titlebar-brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  -webkit-app-region: drag !important;
+  order: 2 !important;
+  cursor: default;
+}
+.titlebar-actions.titlebar-right {
+  display: flex !important;
+  height: 100% !important;
+  align-items: center !important;
+  -webkit-app-region: no-drag !important;
+  order: 3 !important;
+  margin-inline-end: 8px;
 }

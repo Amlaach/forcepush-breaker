@@ -13,7 +13,7 @@ from gitghost._proc import install_windowless_subprocess_patch
 
 install_windowless_subprocess_patch()
 
-__version__ = "0.7.2"
+__version__ = "0.8.0"
 __author__ = "ForcePush-Breaker Security Team"
 __license__ = "MIT"
 

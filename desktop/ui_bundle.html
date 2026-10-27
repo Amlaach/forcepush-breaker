@@ -90,16 +90,16 @@ body::before {
 /* =================================================================== */
 .desktop-titlebar {
   position: relative;
-  z-index: 100;
+  z-index: 2500 !important;
   height: 36px;
   background: #040812;
   border-bottom: 1px solid #132746;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-inline: 12px 0;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 12px 0 0 !important;
   -webkit-app-region: drag;
-  direction: ltr;
+  direction: ltr !important;
 }
 
 .titlebar-brand {
@@ -1397,12 +1397,15 @@ body.state-workspace #workspaceView {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(2, 5, 12, 0.75);
+  background: rgba(2, 5, 12, 0.78);
   backdrop-filter: blur(5px);
-  display: flex;
+  display: none !important;
   align-items: center;
   justify-content: center;
   padding: 20px;
+}
+.modal-overlay.active {
+  display: flex !important;
 }
 
 .modal-box {
@@ -1504,12 +1507,50 @@ body.state-workspace #workspaceView {
   color: var(--cyan);
 }
 
+
+/* Strictly Left-Aligned Window Controls (macOS / Left-RTL convention) */
+.titlebar-controls.titlebar-left {
+  display: flex !important;
+  height: 100% !important;
+  align-items: center !important;
+  -webkit-app-region: no-drag !important;
+  order: 1 !important;
+}
+.titlebar-brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  -webkit-app-region: drag !important;
+  order: 2 !important;
+  cursor: default;
+}
+.titlebar-actions.titlebar-right {
+  display: flex !important;
+  height: 100% !important;
+  align-items: center !important;
+  -webkit-app-region: no-drag !important;
+  order: 3 !important;
+  margin-inline-end: 8px;
+}
+
 </style>
 </head>
 <body class="state-landing">
 
-  <!-- Custom Frameless Desktop Titlebar -->
+  <!-- Custom Frameless Desktop Titlebar (Window Controls Strictly on LEFT) -->
   <div id="desktopTitlebar" class="desktop-titlebar">
+    <div class="titlebar-controls titlebar-left">
+      <button class="win-btn win-close" onclick="winClose()" title="סגור חלון" aria-label="Close">
+        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1.4"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="currentColor" stroke-width="1.4"/></svg>
+      </button>
+      <button class="win-btn" onclick="winMaximize()" title="הגדל / שחזר" aria-label="Maximize">
+        <svg width="11" height="11" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+      <button class="win-btn" onclick="winMinimize()" title="מזער חלון" aria-label="Minimize">
+        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+    </div>
+
     <div class="titlebar-brand">
       <img id="titlebarLogoImg" class="titlebar-logo-img" alt="" style="display:none;">
       <svg id="titlebarFallbackSvg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.2">
@@ -1518,36 +1559,22 @@ body.state-workspace #workspaceView {
       </svg>
       <span class="brand-title-text">UNFORCE</span>
       <span class="brand-divider">//</span>
-      <span class="brand-sub-text">FORCEPUSH-BREAKER</span>
-      <span id="titlebarVerBadge" class="titlebar-badge">v0.7.2</span>
+      <span class="brand-sub-text" data-i18n="brandSub">אולפן שחזור קומיטים וסודות Git</span>
+      <span id="titlebarVerBadge" class="titlebar-badge">v0.8.0</span>
     </div>
 
-    <div class="titlebar-center">
-      <!-- Update Available Pill Button (Shown instantly when newer GitHub release detected) -->
+    <div class="titlebar-actions titlebar-right">
       <button id="updateAvailableBtn" class="update-pulse-btn" onclick="openUpdateModal()" style="display:none;" title="עדכון גרסה זמין מ-GitHub">
         <span class="pulse-indicator"></span>
         <span data-i18n="updateAvailable">עדכון זמין: v</span>
-        <span id="updateVerBadge">0.7.2</span>
+        <span id="updateVerBadge">0.8.0</span>
         <span data-i18n="updateClick"> — לחץ לעדכון</span>
       </button>
 
-      
-    </div>
-
-    <div class="titlebar-controls">
       <button class="titlebar-icon-btn" onclick="openLogsConsole()" title="יומן פעילות ופורנזיקה">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         <span data-i18n="navLogs">לוגים</span>
         <span id="titlebarLogsBadge" class="badge-mini">0</span>
-      </button>
-      <button class="win-btn" onclick="winMinimize()" title="Minimize">
-        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.3"/></svg>
-      </button>
-      <button class="win-btn" onclick="winMaximize()" title="Maximize">
-        <svg width="11" height="11" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
-      </button>
-      <button class="win-btn win-close" onclick="winClose()" title="Close">
-        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1.4"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="currentColor" stroke-width="1.4"/></svg>
       </button>
     </div>
   </div>
@@ -1580,7 +1607,7 @@ body.state-workspace #workspaceView {
             type="text"
             id="repoPathInput"
             class="landing-input ltr-mono"
-            placeholder="https://github.com/owner/repo"
+            placeholder="https://github.com/owner/repo או נתיב תיקייה מקומית" data-i18n-placeholder="landingInputPlaceholder"
             spellcheck="false"
             autocomplete="off"
             oninput="updateTargetTypeBadge()"
@@ -1588,7 +1615,7 @@ body.state-workspace #workspaceView {
             autofocus
           >
           <span id="repoTargetBadge" class="target-type-pill">
-            <span id="repoTargetBadgeText" data-i18n="githubTargetPill">GitHub Repo</span>
+            <span id="repoTargetBadgeText" data-i18n="githubTargetPill"><span id="repoTargetBadgeText" data-i18n="githubTargetPill">מאגר GitHub</span></span>
           </span>
         </div>
 
@@ -1623,7 +1650,7 @@ body.state-workspace #workspaceView {
     <footer class="landing-footer">
       <div class="footer-telemetry">
         <span class="dot dot-green"></span>
-        <span class="ltr-mono">ENGINE ONLINE v0.7.2</span>
+        <span class="ltr-mono"><span data-i18n="engineOnline">מנוע שחזור פעיל v0.8.0</span></span>
       </div>
       <div class="footer-actions">
         <button class="text-link-btn" onclick="openLogsConsole()">
@@ -1710,11 +1737,11 @@ body.state-workspace #workspaceView {
 
         <button class="btn btn-purple btn-sm" onclick="downloadRecoveryBundle()" title="חבילת שחזור מלאה (.ZIP)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span data-i18n="bundleBtn">ZIP שחזור</span>
+          <span data-i18n="bundleBtn"><span data-i18n="bundleBtn">חבילת שחזור (.ZIP)</span></span>
         </button>
 
-        <button class="btn btn-secondary btn-sm" onclick="downloadReport('json')" title="Export JSON">JSON</button>
-        <button class="btn btn-secondary btn-sm" onclick="exportSARIF()" title="Export SARIF 2.1.0">SARIF</button>
+        <button class="btn btn-secondary btn-sm" onclick="downloadReport('json')" title="Export JSON"><span data-i18n="exportJson">ייצוא JSON</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="exportSARIF()" title="Export SARIF 2.1.0"><span data-i18n="exportSarif">ייצוא SARIF</span></button>
 
         <button class="btn btn-secondary btn-sm" onclick="openSettingsModal()" title="Settings">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -1725,7 +1752,7 @@ body.state-workspace #workspaceView {
     <!-- Sleek High-Tech Progress Bar (Visible while scanning) -->
     <div id="scanProgressContainer" class="scan-progress-box" style="display:none;">
       <div class="progress-info-row">
-        <span id="progressStatusText" class="ltr-mono">Acquiring GitHub bare mirror...</span>
+        <span id="progressStatusText" class="ltr-mono"><span data-i18n="acquiringMirror">מוריד מראה חשופה (Bare Mirror) מ-GitHub...</span></span>
         <span id="progressPctText" class="ltr-mono">0%</span>
       </div>
       <div class="scan-progress-track">
@@ -1874,7 +1901,7 @@ body.state-workspace #workspaceView {
                 </div>
 
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                  <button class="btn btn-secondary btn-sm" onclick="exportActiveCommitPatch()" data-i18n="btnExportPatch">Export .patch</button>
+                  <button class="btn btn-secondary btn-sm" onclick="exportActiveCommitPatch()" data-i18n="btnExportPatch"><span data-i18n="btnExportPatch">ייצא קובץ Patch</span></button>
                   <button class="btn btn-secondary btn-sm" id="btnInspOpenGH" onclick="openActiveCommitOnGitHub()" data-i18n="btnOpenCommitGH">GitHub ↗</button>
                   <button class="btn btn-secondary btn-sm" id="btnInspCherryPick" onclick="cherryPickActiveCommit()" data-i18n="btnCherryPick">שחזר לענף נוכחי</button>
                   <button class="btn btn-primary btn-sm" id="btnInspRestoreBranch" onclick="restoreActiveCommitToBranch()" data-i18n="btnRestoreBranch">שחזר לענף חדש</button>
@@ -1883,7 +1910,7 @@ body.state-workspace #workspaceView {
 
               <!-- Inspector Inner Tabs: Diff vs File Tree -->
               <div class="inspector-subtabs">
-                <button class="subtab-btn active" id="tabBtnDiff" onclick="switchInspectorSubtab('diff')" data-i18n="tabDiffView">Unified Diff</button>
+                <button class="subtab-btn active" id="tabBtnDiff" onclick="switchInspectorSubtab('diff')" data-i18n="tabDiffView"><span data-i18n="tabDiffView">השוואת שינויים (Diff)</span></button>
                 <button class="subtab-btn" id="tabBtnTree" onclick="switchInspectorSubtab('tree')">
                   <span data-i18n="tabFileTree">עץ קבצים</span> (<span id="inspFileCount">0</span>)
                 </button>
@@ -1898,13 +1925,13 @@ body.state-workspace #workspaceView {
                   <div id="inspTreeList" class="tree-list"></div>
                   <div class="tree-preview">
                     <div class="tree-preview-header">
-                      <span id="treePreviewFilePath" class="ltr-mono" style="font-size:12px;color:var(--cyan-bright);font-weight:700;">No file selected</span>
+                      <span id="treePreviewFilePath" class="ltr-mono" style="font-size:12px;color:var(--cyan-bright);font-weight:700;"><span data-i18n="noFileSelected">לא נבחר קובץ</span></span>
                       <div style="display:flex;gap:6px;">
-                        <button class="btn btn-secondary btn-sm" id="btnSaveThisFile" onclick="savePreviewedFileAs()" data-i18n="btnSaveFile">Save File</button>
-                        <button class="btn btn-secondary btn-sm" id="btnCopyThisFile" onclick="copyPreviewedFile()" data-i18n="btnCopyFile">Copy Content</button>
+                        <button class="btn btn-secondary btn-sm" id="btnSaveThisFile" onclick="savePreviewedFileAs()" data-i18n="btnSaveFile"><span data-i18n="btnSaveFile">שמור קובץ</span></button>
+                        <button class="btn btn-secondary btn-sm" id="btnCopyThisFile" onclick="copyPreviewedFile()" data-i18n="btnCopyFile"><span data-i18n="btnCopyFile">העתק תוכן</span></button>
                       </div>
                     </div>
-                    <div id="treePreviewContent" class="code-view" style="flex:1;">Select a file to inspect content</div>
+                    <div id="treePreviewContent" class="code-view" style="flex:1;"><span data-i18n="selectFileInspect">בחר קובץ מעץ הקבצים כדי לצפות בתוכנו</span></div>
                   </div>
                 </div>
               </div>
@@ -2186,24 +2213,24 @@ body.state-workspace #workspaceView {
       <div class="modal-header">
         <div style="display:flex;align-items:center;gap:10px;">
           <span id="modalSevBadge" class="badge"></span>
-          <h3 id="modalTitle" style="font-size:15px;font-weight:800;">Finding Details</h3>
+          <h3 id="modalTitle" style="font-size:15px;font-weight:800;"><span data-i18n="modalFindingTitle">פרטי ממצא אבטחה</span></h3>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="closeModal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;">RULE / TYPE:</span><div id="modalRule" class="ltr-mono" style="font-size:12.5px;color:var(--cyan-bright);font-weight:700;"></div></div>
-          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;">LOCATION:</span><div id="modalLocation" class="ltr-mono" style="font-size:12.5px;"></div></div>
-          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;">ENTROPY:</span><div id="modalEntropy" class="ltr-mono" style="font-size:12.5px;"></div></div>
-          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;">LIVENESS VERDICT:</span><div id="modalLiveness" class="ltr-mono" style="font-size:12.5px;font-weight:700;"></div></div>
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;"><span data-i18n="lblRuleType">כלל זיהוי / סוג:</span></span><div id="modalRule" class="ltr-mono" style="font-size:12.5px;color:var(--cyan-bright);font-weight:700;"></div></div>
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;"><span data-i18n="lblLocation">מיקום בקוד:</span></span><div id="modalLocation" class="ltr-mono" style="font-size:12.5px;"></div></div>
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;"><span data-i18n="lblEntropy">רמת אנטרופיה:</span></span><div id="modalEntropy" class="ltr-mono" style="font-size:12.5px;"></div></div>
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;"><span data-i18n="lblLivenessVerdict">אימות מול שירות חי:</span></span><div id="modalLiveness" class="ltr-mono" style="font-size:12.5px;font-weight:700;"></div></div>
         </div>
         <div id="modalCodeView" class="code-view"></div>
       </div>
       <div class="modal-footer">
-        <button id="modalVerifyBtn" class="btn btn-secondary" style="display:none;" onclick="verifyActiveModalKey()">Verify Key Liveness</button>
-        <button id="modalCopyBtn" class="btn btn-secondary" style="display:none;" onclick="copyModalContent()">Copy Content</button>
-        <button id="modalRecoverBtn" class="btn btn-primary" style="display:none;" onclick="recoverFromActiveModal()">Save / Export Artifact...</button>
-        <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+        <button id="modalVerifyBtn" class="btn btn-secondary" style="display:none;" onclick="verifyActiveModalKey()"><span data-i18n="btnVerifyLiveness">בדוק תקינות מפתח מול שרת חי</span></button>
+        <button id="modalCopyBtn" class="btn btn-secondary" style="display:none;" onclick="copyModalContent()"><span data-i18n="btnCopyFile">העתק תוכן</span></button>
+        <button id="modalRecoverBtn" class="btn btn-primary" style="display:none;" onclick="recoverFromActiveModal()"><span data-i18n="btnExportArtifact">שמור / ייצא קובץ...</span></button>
+        <button class="btn btn-secondary" onclick="closeModal()"><span data-i18n="btnClose">סגור</span></button>
       </div>
     </div>
   </div>
@@ -2219,35 +2246,35 @@ body.state-workspace #workspaceView {
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:16px;">
         <div>
-          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:6px;">AI Context Triage Engine</label>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:6px;"><span data-i18n="lblAiEngine">מנוע AI לניתוח הקשר וסינון רעשים</span></label>
           <select id="aiProviderSelect" class="select-field" style="width:100%;" onchange="updateAISettingsUI()">
-            <option value="heuristic" selected>Heuristic Rule-Engine (Instant / Zero-Latency)</option>
-            <option value="auto">Auto-Detect Configured LLM</option>
+            <option value="heuristic" selected><span data-i18n="lblHeuristicEngine">מנוע חוקים יוריסטי מקומי (מיידי / ללא השהייה)</span></option>
+            <option value="auto"><span data-i18n="lblAutoDetectLlm">זיהוי אוטומטי של מודל שפה מוגדר</span></option>
             <option value="gemini">Google Gemini</option>
             <option value="openai">OpenAI GPT-4o</option>
             <option value="anthropic">Anthropic Claude</option>
             <option value="ollama">Local Ollama (http://127.0.0.1:11434)</option>
-            <option value="none">Disabled</option>
+            <option value="none"><span data-i18n="lblDisabled">מושבת</span></option>
           </select>
           <div id="aiKeyInputRow" style="display:none;margin-top:8px;gap:6px;">
             <input type="password" id="aiApiKeyInput" class="input-field ltr-mono" style="flex:1;" placeholder="API Key (held strictly in-memory)" autocomplete="off">
-            <button class="btn btn-secondary" onclick="saveAIKey()">Save Key</button>
+            <button class="btn btn-secondary" onclick="saveAIKey()"><span data-i18n="btnSaveKey">שמור מפתח</span></button>
           </div>
           <div id="aiKeyConfiguredRow" style="display:none;margin-top:8px;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.35);border-radius:8px;">
             <span style="font-size:12px;color:var(--neon-green);font-weight:700;">[OK] AI Key Active (In-Memory)</span>
-            <button class="btn btn-secondary btn-sm" onclick="clearAIKey()">Clear</button>
+            <button class="btn btn-secondary btn-sm" onclick="clearAIKey()"><span data-i18n="btnClear">נקה</span></button>
           </div>
         </div>
 
         <div>
-          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:4px;">GitHub Personal Access Token (Optional)</label>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:4px;"><span data-i18n="lblGhToken">טוקן גישה אישי ל-GitHub (אופציונלי לקצב בקשות מוגדל)</span></label>
           <div id="ghTokenInputRow" style="display:flex;gap:6px;">
             <input type="password" id="githubTokenInput" class="input-field ltr-mono" style="flex:1;" placeholder="ghp_... (held strictly in-memory)" autocomplete="off">
-            <button class="btn btn-secondary" onclick="saveGHToken()">Save Token</button>
+            <button class="btn btn-secondary" onclick="saveGHToken()"><span data-i18n="btnSaveToken">שמור טוקן</span></button>
           </div>
           <div id="ghTokenConfiguredRow" style="display:none;margin-top:8px;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.35);border-radius:8px;">
             <span style="font-size:12px;color:var(--neon-green);font-weight:700;">[OK] Custom GitHub Token Active (In-Memory)</span>
-            <button class="btn btn-secondary btn-sm" onclick="clearGHToken()">Clear</button>
+            <button class="btn btn-secondary btn-sm" onclick="clearGHToken()"><span data-i18n="btnClear">נקה</span></button>
           </div>
         </div>
 
@@ -2261,11 +2288,11 @@ body.state-workspace #workspaceView {
         <div style="display:flex;flex-direction:column;gap:8px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
             <input type="checkbox" id="scanForksToggle" checked>
-            <span>Audit Public Forks for Divergent / Overwritten Commits</span>
+            <span><span data-i18n="lblAuditForks">סרוק Fork-ים ציבוריים לאיתור קומיטים שנדרסו</span></span>
           </label>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
             <input type="checkbox" id="includeRawToggle" onchange="toggleRawRecoveryMode(this.checked)">
-            <span>Allow Unredacted (Raw) File Recovery <span style="color:var(--amber);font-size:11.5px;">(exports unmasked original secrets)</span></span>
+            <span>Allow Unredacted (Raw) File Recovery <span style="color:var(--amber);font-size:11.5px;"><span data-i18n="lblExportsUnmasked">(ייצוא סודות מקוריים ללא מיסוך כוכביות)</span></span></span>
           </label>
         </div>
       </div>
@@ -2273,35 +2300,17 @@ body.state-workspace #workspaceView {
         <button class="btn btn-secondary btn-sm" onclick="checkAppVersion(true)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-inline-end:5px;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg><span data-i18n="updateCheckNow">בדוק עדכונים כעת</span>
         </button>
-        <button class="btn btn-primary" onclick="closeSettingsModal()">Done</button>
+        <button class="btn btn-primary" onclick="closeSettingsModal()"><span data-i18n="btnDone">סיום ואישור</span></button>
       </div>
     </div>
   </div>
 
-  <!-- =============================================================== -->
-  <!-- MODAL: COMMAND PALETTE (Ctrl+K)                                 -->
-  <!-- =============================================================== -->
-  <div id="cmdPaletteModal" class="modal-overlay" onclick="if(event.target===this) closeCmdPalette()">
-    <div class="modal-box" style="max-width:560px;">
-      <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-        <input
-          type="text"
-          id="cmdPaletteInput"
-          class="input-field"
-          style="width:100%;font-size:14px;"
-          placeholder="פקודה מהירה או ניווט..."
-          oninput="renderCmdPaletteItems()"
-          onkeydown="handleCmdPaletteKey(event)"
-        >
-      </div>
-      <div id="cmdPaletteList" style="max-height:340px;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:4px;"></div>
-    </div>
-  </div>
+
 
   <!-- Toast Notification -->
   <div id="toast" class="toast">
     <span id="toastIcon" class="toast-icon"></span>
-    <span id="toastMessage">Ready</span>
+    <span id="toastMessage"><span data-i18n="toastReady">מוכן לפעולה</span></span>
   </div>
 
   <script>
@@ -2312,6 +2321,50 @@ window.UNFORCE_LOGO_DATA_URI = "data:image/webp;base64,UklGRvQRAABXRUJQVlA4WAoAA
 /* Bilingual Cyber-Forensics Dictionary (Hebrew RTL default + English LTR) */
 window.UNFORCE_I18N = {
   he: {
+    brandSub: "אולפן שחזור קומיטים וסודות Git",
+    githubTargetPill: "מאגר GitHub",
+    localTargetPill: "מאגר מקומי",
+    gitlabTargetPill: "מאגר GitLab",
+    bitbucketTargetPill: "מאגר Bitbucket",
+    engineOnline: "מנוע שחזור פעיל v0.8.0",
+    acquiringMirror: "מוריד מראה חשופה (Bare Mirror) מ-GitHub...",
+    exportJson: "ייצוא JSON",
+    exportSarif: "ייצוא SARIF",
+    noFileSelected: "לא נבחר קובץ",
+    selectFileInspect: "בחר קובץ מעץ הקבצים כדי לצפות בתוכנו",
+    modalFindingTitle: "פרטי ממצא אבטחה",
+    lblRuleType: "כלל זיהוי / סוג:",
+    lblLocation: "מיקום בקוד:",
+    lblEntropy: "רמת אנטרופיה:",
+    lblLivenessVerdict: "אימות מול שרת חי:",
+    btnVerifyLiveness: "בדוק תקינות מפתח מול שרת חי",
+    btnExportArtifact: "שמור / ייצא קובץ...",
+    btnClose: "סגור",
+    btnDone: "סיום ואישור",
+    lblAiEngine: "מנוע AI לניתוח הקשר וסינון רעשים",
+    lblHeuristicEngine: "מנוע חוקים יוריסטי מקומי (מיידי / ללא השהייה)",
+    lblAutoDetectLlm: "זיהוי אוטומטי של מודל שפה מוגדר",
+    lblDisabled: "מושבת",
+    btnSaveKey: "שמור מפתח",
+    btnClear: "נקה",
+    lblGhToken: "טוקן גישה אישי ל-GitHub (אופציונלי לקצב בקשות מוגדל)",
+    btnSaveToken: "שמור טוקן",
+    lblEntropySensitivity: "רגישות אנטרופיית שאנון:",
+    lblAuditForks: "סרוק Fork-ים ציבוריים לאיתור קומיטים שנדרסו",
+    lblAllowUnredacted: "אפשר שחזור קבצים גולמיים ללא הסוואה (Raw)",
+    lblExportsUnmasked: "(ייצוא סודות מקוריים ללא מיסוך כוכביות)",
+    thCommit: "קומיט (SHA)",
+    thAuthor: "מחבר",
+    thDate: "תאריך",
+    thMessage: "הודעת קומיט",
+    thFiles: "קבצים שהשתנו",
+    subtabAllCommits: "כל הקומיטים בריפו",
+    noCommitsFound: "לא נמצאו קומיטים בריפו זה",
+    noFindingsFound: "לא אותרו סודות או דליפות במאגר",
+    connectingTarget: "מתחבר למאגר:",
+    probingLiveness: "בודק תקינות מפתח מול שרת הספק...",
+    unverifiableVerdict: "לא ניתן לאימות אוטומטי",
+    activeKeyInMemory: "מפתח שמור בבטחה בזיכרון התוכנה בלבד",
     cmdPlaceholder: "חיפוש פקודה... (Ctrl+K)",
     brandSub: "פורנזיקת GitHub, שחזור קומיטים וציד סודות",
     secQuickStart: "סריקת GitHub מהירה",
@@ -2599,7 +2652,7 @@ function returnToLanding() {
 /* ---- In-App Version Update System (Instant GitHub Release Detection & Safe SSL) ---- */
 async function checkAppVersion(isManual = false) {
   try {
-    logEvent("INFO", "updater", "Checking for updates on GitHub (v0.7.2)...");
+    logEvent("INFO", "updater", "Checking for updates on GitHub (v0.8.0)...");
     const res = await apiFetch("/api/version/check");
     if (!res.ok) {
       if (isManual) showToast("שגיאה בבדיקת עדכונים: " + res.statusText);
@@ -2620,9 +2673,9 @@ async function checkAppVersion(isManual = false) {
       const btn = document.getElementById("updateAvailableBtn");
       if (btn) btn.style.display = "none";
       if (isManual) {
-        showToast(currentLang === "he" ? "המערכת מעודכנת לגירסה העדכנית (v0.7.2)" : "Software is up to date (v0.7.2)");
+        showToast(currentLang === "he" ? "המערכת מעודכנת לגירסה העדכנית (v0.8.0)" : "Software is up to date (v0.8.0)");
       }
-      logEvent("INFO", "updater", "Software is up to date (v0.7.2).");
+      logEvent("INFO", "updater", "Software is up to date (v0.8.0).");
     }
   } catch (err) {
     logEvent("ERROR", "updater", "Update check failed: " + err.message);
@@ -2634,7 +2687,7 @@ function openUpdateModal() {
   if (!latestReleaseInfo) {
     latestReleaseInfo = {
       latest_version: "0.7.2",
-      release_name: "UnForce v0.7.2",
+      release_name: "UnForce v0.8.0",
       release_notes: "Latest stable release for UnForce Forensics Studio.",
       html_url: "https://github.com/Amlaach/forcepush-breaker/releases",
       assets: []
@@ -2690,9 +2743,9 @@ async function downloadLatestRelease() {
     showToast(currentLang === "he" ? `העדכון נשמר ב: ${data.saved_path}` : `Update saved to: ${data.saved_path}`);
     logEvent("INFO", "updater", `Update binary saved to: ${data.saved_path}`);
   } catch (err) {
-    if (progText) progText.textContent = "Download error: " + err.message;
+    if (progText) progText.textContent = "שגיאה בהורדת קובץ: " + err.message;
     showToast("שגיאה בהורדת עדכון: " + err.message);
-    logEvent("ERROR", "updater", "Download error: " + err.message);
+    logEvent("ERROR", "updater", "שגיאה בהורדת קובץ: " + err.message);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -3340,7 +3393,7 @@ async function startScan() {
     progBox.classList.add("active");
   }
   if (progFill) progFill.style.width = "6%";
-  if (progTxt) progTxt.textContent = `Connecting to target: ${parsed.slug}...`;
+  if (progTxt) progTxt.textContent = `${t("connectingTarget") || "מתחבר למאגר:"} ${parsed.slug}...`;
   if (progPct) progPct.textContent = "6%";
 
   seenPhaseLogs.clear();
@@ -4057,7 +4110,7 @@ async function verifyActiveModalKey() {
   const badge = document.getElementById("modalLivenessBadge");
   const details = document.getElementById("modalLivenessDetails");
   row.style.display = "block";
-  badge.textContent = "Probing vendor endpoint passively...";
+  badge.textContent = "בודק תקינות מפתח מול שרת הספק...";
   details.textContent = "";
 
   try {
@@ -4078,7 +4131,7 @@ async function verifyActiveModalKey() {
     details.textContent = res.details || "";
   } catch (err) {
     badge.style.color = "var(--amber)";
-    badge.textContent = "[UNVERIFIABLE]";
+    badge.textContent = "[לא ניתן לאימות]";
     details.textContent = err.message;
   }
 }
@@ -4359,7 +4412,7 @@ async function inspectDetachedBlob(blobSha) {
       content: res.content || "",
       copyText: res.content || "",
     };
-    document.getElementById("modalTitle").textContent = `Detached Blob ${blobSha.slice(0, 12)}`;
+    document.getElementById("modalTitle").textContent = `אובייקט Git מנותק (Blob) ${blobSha.slice(0, 12)}`;
     document.getElementById("modalSubtitle").textContent = res.is_redacted ? "Strict Redaction Active" : "Raw Unmasked Blob";
     document.getElementById("modalTriageMeta").style.display = "none";
     renderDiffLines(document.getElementById("modalCodeView"), res.content || "");
@@ -4698,28 +4751,11 @@ function getPaletteCommands() {
   ];
 }
 
-function openCmdPalette() {
-  cmdSelectedIndex = 0;
-  const modal = document.getElementById("cmdPaletteModal");
-  const input = document.getElementById("cmdPaletteInput");
-  modal.classList.add("active");
-  input.value = "";
-  renderCmdPaletteItems();
-  setTimeout(() => input.focus(), 30);
-}
 
-function closeCmdPalette() {
-  document.getElementById("cmdPaletteModal").classList.remove("active");
-}
 
-function renderCmdPaletteItems() {
-  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
-  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
-  const list = document.getElementById("cmdPaletteList");
-  if (!items.length) {
-    list.innerHTML = `<div style="padding:12px;color:var(--text-muted);text-align:center;">No matching commands</div>`;
-    return;
-  }
+
+
+
   if (cmdSelectedIndex >= items.length) cmdSelectedIndex = 0;
   list.innerHTML = items
     .map(
@@ -4731,19 +4767,9 @@ function renderCmdPaletteItems() {
     .join("");
 }
 
-function runPaletteCommand(idx) {
-  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
-  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
-  closeCmdPalette();
-  if (items[idx]) items[idx].action();
-}
 
-function handleCmdPaletteKey(e) {
-  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
-  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
-  if (e.key === "Escape") {
-    closeCmdPalette();
-  } else if (e.key === "ArrowDown") {
+
+ else if (e.key === "ArrowDown") {
     e.preventDefault();
     cmdSelectedIndex = (cmdSelectedIndex + 1) % Math.max(items.length, 1);
     renderCmdPaletteItems();
@@ -4833,7 +4859,7 @@ function initDragAndDrop() {
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
     e.preventDefault();
-    openCmdPalette();
+    // cmdPalette removed
   } else if (e.key === "Escape") {
     closeModal();
     closeSettingsModal();

@@ -52,7 +52,7 @@ function returnToLanding() {
 /* ---- In-App Version Update System (Instant GitHub Release Detection & Safe SSL) ---- */
 async function checkAppVersion(isManual = false) {
   try {
-    logEvent("INFO", "updater", "Checking for updates on GitHub (v0.7.2)...");
+    logEvent("INFO", "updater", "Checking for updates on GitHub (v0.8.0)...");
     const res = await apiFetch("/api/version/check");
     if (!res.ok) {
       if (isManual) showToast("שגיאה בבדיקת עדכונים: " + res.statusText);
@@ -73,9 +73,9 @@ async function checkAppVersion(isManual = false) {
       const btn = document.getElementById("updateAvailableBtn");
       if (btn) btn.style.display = "none";
       if (isManual) {
-        showToast(currentLang === "he" ? "המערכת מעודכנת לגירסה העדכנית (v0.7.2)" : "Software is up to date (v0.7.2)");
+        showToast(currentLang === "he" ? "המערכת מעודכנת לגירסה העדכנית (v0.8.0)" : "Software is up to date (v0.8.0)");
       }
-      logEvent("INFO", "updater", "Software is up to date (v0.7.2).");
+      logEvent("INFO", "updater", "Software is up to date (v0.8.0).");
     }
   } catch (err) {
     logEvent("ERROR", "updater", "Update check failed: " + err.message);
@@ -87,7 +87,7 @@ function openUpdateModal() {
   if (!latestReleaseInfo) {
     latestReleaseInfo = {
       latest_version: "0.7.2",
-      release_name: "UnForce v0.7.2",
+      release_name: "UnForce v0.8.0",
       release_notes: "Latest stable release for UnForce Forensics Studio.",
       html_url: "https://github.com/Amlaach/forcepush-breaker/releases",
       assets: []
@@ -143,9 +143,9 @@ async function downloadLatestRelease() {
     showToast(currentLang === "he" ? `העדכון נשמר ב: ${data.saved_path}` : `Update saved to: ${data.saved_path}`);
     logEvent("INFO", "updater", `Update binary saved to: ${data.saved_path}`);
   } catch (err) {
-    if (progText) progText.textContent = "Download error: " + err.message;
+    if (progText) progText.textContent = "שגיאה בהורדת קובץ: " + err.message;
     showToast("שגיאה בהורדת עדכון: " + err.message);
-    logEvent("ERROR", "updater", "Download error: " + err.message);
+    logEvent("ERROR", "updater", "שגיאה בהורדת קובץ: " + err.message);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -793,7 +793,7 @@ async function startScan() {
     progBox.classList.add("active");
   }
   if (progFill) progFill.style.width = "6%";
-  if (progTxt) progTxt.textContent = `Connecting to target: ${parsed.slug}...`;
+  if (progTxt) progTxt.textContent = `${t("connectingTarget") || "מתחבר למאגר:"} ${parsed.slug}...`;
   if (progPct) progPct.textContent = "6%";
 
   seenPhaseLogs.clear();
@@ -1510,7 +1510,7 @@ async function verifyActiveModalKey() {
   const badge = document.getElementById("modalLivenessBadge");
   const details = document.getElementById("modalLivenessDetails");
   row.style.display = "block";
-  badge.textContent = "Probing vendor endpoint passively...";
+  badge.textContent = "בודק תקינות מפתח מול שרת הספק...";
   details.textContent = "";
 
   try {
@@ -1531,7 +1531,7 @@ async function verifyActiveModalKey() {
     details.textContent = res.details || "";
   } catch (err) {
     badge.style.color = "var(--amber)";
-    badge.textContent = "[UNVERIFIABLE]";
+    badge.textContent = "[לא ניתן לאימות]";
     details.textContent = err.message;
   }
 }
@@ -1812,7 +1812,7 @@ async function inspectDetachedBlob(blobSha) {
       content: res.content || "",
       copyText: res.content || "",
     };
-    document.getElementById("modalTitle").textContent = `Detached Blob ${blobSha.slice(0, 12)}`;
+    document.getElementById("modalTitle").textContent = `אובייקט Git מנותק (Blob) ${blobSha.slice(0, 12)}`;
     document.getElementById("modalSubtitle").textContent = res.is_redacted ? "Strict Redaction Active" : "Raw Unmasked Blob";
     document.getElementById("modalTriageMeta").style.display = "none";
     renderDiffLines(document.getElementById("modalCodeView"), res.content || "");
@@ -2151,28 +2151,11 @@ function getPaletteCommands() {
   ];
 }
 
-function openCmdPalette() {
-  cmdSelectedIndex = 0;
-  const modal = document.getElementById("cmdPaletteModal");
-  const input = document.getElementById("cmdPaletteInput");
-  modal.classList.add("active");
-  input.value = "";
-  renderCmdPaletteItems();
-  setTimeout(() => input.focus(), 30);
-}
 
-function closeCmdPalette() {
-  document.getElementById("cmdPaletteModal").classList.remove("active");
-}
 
-function renderCmdPaletteItems() {
-  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
-  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
-  const list = document.getElementById("cmdPaletteList");
-  if (!items.length) {
-    list.innerHTML = `<div style="padding:12px;color:var(--text-muted);text-align:center;">No matching commands</div>`;
-    return;
-  }
+
+
+
   if (cmdSelectedIndex >= items.length) cmdSelectedIndex = 0;
   list.innerHTML = items
     .map(
@@ -2184,19 +2167,9 @@ function renderCmdPaletteItems() {
     .join("");
 }
 
-function runPaletteCommand(idx) {
-  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
-  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
-  closeCmdPalette();
-  if (items[idx]) items[idx].action();
-}
 
-function handleCmdPaletteKey(e) {
-  const q = (document.getElementById("cmdPaletteInput").value || "").trim().toLowerCase();
-  const items = getPaletteCommands().filter((c) => !q || c.label.toLowerCase().includes(q));
-  if (e.key === "Escape") {
-    closeCmdPalette();
-  } else if (e.key === "ArrowDown") {
+
+ else if (e.key === "ArrowDown") {
     e.preventDefault();
     cmdSelectedIndex = (cmdSelectedIndex + 1) % Math.max(items.length, 1);
     renderCmdPaletteItems();
@@ -2286,7 +2259,7 @@ function initDragAndDrop() {
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
     e.preventDefault();
-    openCmdPalette();
+    // cmdPalette removed
   } else if (e.key === "Escape") {
     closeModal();
     closeSettingsModal();

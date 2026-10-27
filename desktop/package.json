@@ -1,7 +1,7 @@
 {
   "name": "unforce-desktop",
   "productName": "UnForce",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "UnForce (ForcePush-Breaker) — Cyber-Forensics Chromium Desktop Studio for GitHub Commit Recovery & Secret Hunting",
   "author": "UnForce / GitGhost Security Team <security@gitghost.io>",
   "license": "MIT",
@@ -13,7 +13,7 @@
   "scripts": {
     "start": "electron .",
     "smoke": "electron . --smoke-test",
-    "dist:win": "electron-builder --win dir --publish never",
+    "dist:win": "electron-builder --win dir --publish never && node ../scripts/build_portable.js",
     "dist:mac": "electron-builder --mac dmg zip --publish never",
     "dist:linux": "electron-builder --linux AppImage deb --publish never",
     "dist": "electron-builder --publish never"
