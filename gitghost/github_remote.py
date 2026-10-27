@@ -126,6 +126,10 @@ def resolve_system_gitlab_token() -> Optional[str]:
     return resolve_system_remote_token("gitlab.com")
 
 
+def resolve_system_bitbucket_token() -> Optional[str]:
+    return resolve_system_remote_token("bitbucket.org")
+
+
 @dataclass(frozen=True)
 class ParsedRemoteTarget:
     owner: str
