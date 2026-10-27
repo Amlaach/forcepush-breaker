@@ -92,10 +92,10 @@ def generate_from_source(source_image_path: Path, root: Path) -> None:
     logo_512_path = repo_assets / "logo.png"
     logo_512.save(logo_512_path, format="PNG", optimize=True)
 
-    # 2. Desktop Window & Linux/macOS Icon (256x256)
-    icon_256 = render_rounded(256)
-    icon_256_path = desktop_assets / "icon.png"
-    icon_256.save(icon_256_path, format="PNG", optimize=True)
+    # 2. Desktop Window & Linux/macOS Icon (512x512 required for macOS dmg packaging)
+    icon_512 = render_rounded(512)
+    icon_512_path = desktop_assets / "icon.png"
+    icon_512.save(icon_512_path, format="PNG", optimize=True)
 
     # 3. Multi-Resolution Windows .exe ICO (256, 128, 64, 48, 32, 16)
     ico_sizes = [256, 128, 64, 48, 32, 16]

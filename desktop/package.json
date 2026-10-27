@@ -5,14 +5,18 @@
   "description": "UnForce (ForcePush-Breaker) — Cyber-Forensics Chromium Desktop Studio for GitHub Commit Recovery & Secret Hunting",
   "author": "UnForce / GitGhost Security Team <security@gitghost.io>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Amlaach/forcepush-breaker.git"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "smoke": "electron . --smoke-test",
-    "dist:win": "electron-builder --win nsis portable",
-    "dist:mac": "electron-builder --mac dmg zip",
-    "dist:linux": "electron-builder --linux AppImage deb",
-    "dist": "electron-builder"
+    "dist:win": "electron-builder --win nsis portable -c.publish=never",
+    "dist:mac": "electron-builder --mac dmg zip -c.publish=never",
+    "dist:linux": "electron-builder --linux AppImage deb -c.publish=never",
+    "dist": "electron-builder -c.publish=never"
   },
   "devDependencies": {
     "electron": "^33.4.0",
