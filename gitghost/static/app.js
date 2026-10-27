@@ -150,6 +150,35 @@ function parseGitHubRepoInput(rawInput) {
   return parseSmartTarget(rawInput);
 }
 
+async function selectLocalFolder() {
+  if (window.unforceDesktop && typeof window.unforceDesktop.selectDirectoryDialog === "function") {
+    try {
+      const res = await window.unforceDesktop.selectDirectoryDialog();
+      if (res && !res.canceled && res.path) {
+        const input = document.getElementById("repoPathInput");
+        if (input) {
+          input.value = res.path;
+          updateTargetTypeBadge();
+          logTerminal("LOCAL", `Selected local repository: ${res.path}`, "ok");
+          startScan();
+        }
+      }
+    } catch (err) {
+      logTerminal("ERR", `Directory dialog error: ${err.message}`, "err");
+    }
+    return;
+  }
+  const fallback = prompt(t("promptLocalPath") || "Enter local Git repository directory path:", "");
+  if (fallback && fallback.trim()) {
+    const input = document.getElementById("repoPathInput");
+    if (input) {
+      input.value = fallback.trim();
+      updateTargetTypeBadge();
+      startScan();
+    }
+  }
+}
+
 function updateTargetTypeBadge() {
   const input = document.getElementById("repoPathInput");
   const badge = document.getElementById("repoTargetBadgeText");
