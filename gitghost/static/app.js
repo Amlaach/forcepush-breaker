@@ -155,11 +155,25 @@ function updateTargetTypeBadge() {
   const badge = document.getElementById("repoTargetBadgeText");
   const pill = document.getElementById("repoTargetBadge");
   if (!input || !badge || !pill) return;
-  const parsed = parseGitHubRepoInput(input.value);
+  const parsed = parseSmartTarget(input.value);
   if (parsed) {
-    badge.textContent = parsed.slug;
-    pill.style.borderColor = "rgba(0, 255, 157, 0.5)";
-    pill.style.color = "var(--neon-green)";
+    if (parsed.type === "local") {
+      badge.textContent = `📁 ${parsed.slug}`;
+      pill.style.borderColor = "rgba(0, 229, 255, 0.5)";
+      pill.style.color = "var(--cyan-bright)";
+    } else if (parsed.type === "gitlab") {
+      badge.textContent = `🦊 ${parsed.slug}`;
+      pill.style.borderColor = "rgba(252, 109, 38, 0.6)";
+      pill.style.color = "#fc6d26";
+    } else if (parsed.type === "bitbucket") {
+      badge.textContent = `🔷 ${parsed.slug}`;
+      pill.style.borderColor = "rgba(38, 132, 255, 0.6)";
+      pill.style.color = "#2684ff";
+    } else {
+      badge.textContent = parsed.slug;
+      pill.style.borderColor = "rgba(0, 255, 157, 0.5)";
+      pill.style.color = "var(--neon-green)";
+    }
   } else {
     badge.textContent = t("githubTargetPill");
     pill.style.borderColor = "rgba(0, 229, 255, 0.35)";
