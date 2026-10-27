@@ -425,6 +425,15 @@ body::before {
   flex-wrap: wrap;
 }
 
+/* Drag and Drop Zone Hover Feedback */
+.target-bar-row.drag-over {
+  border-color: var(--cyan-bright) !important;
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.4);
+}
+.repo-input-wrap.drag-over {
+  border-color: var(--neon-green) !important;
+}
+
 .target-bar-row {
   flex: 1;
   min-width: 340px;
