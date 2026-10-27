@@ -987,6 +987,42 @@ async function restoreCommitToNewBranch(commitHash) {
   }
 }
 
+async function cherryPickCommitToCurrent(commitHash) {
+  const repoInput = document.getElementById("repoPathInput");
+  const repoPath = repoInput ? repoInput.value.trim() : "";
+  if (!confirm(`Cherry-pick commit ${commitHash.slice(0, 7)} onto current active branch?`)) return;
+
+  logTerminal("GIT", `Cherry-picking commit ${commitHash.slice(0, 7)}...`, "cmd");
+  try {
+    const resp = await apiFetch("/api/git/cherry-pick", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo_path: repoPath,
+        commit_hash: commitHash,
+        no_commit: false,
+      }),
+    });
+    const result = await resp.json();
+    if (result.success) {
+      logTerminal("OK", result.message || "Cherry-pick completed successfully!", "ok");
+      alert(result.message || "Cherry-pick completed successfully!");
+    } else {
+      logTerminal("ERR", result.error || "Cherry-pick failed.", "err");
+      alert(`Error: ${result.error || "Cherry-pick failed."}`);
+    }
+  } catch (err) {
+    logTerminal("ERR", `Cherry-pick request failed: ${err.message}`, "err");
+    alert(`Error: ${err.message}`);
+  }
+}
+
+function cherryPickActiveCommit() {
+  if (activeCommitObj && activeCommitObj.commit_hash) {
+    cherryPickCommitToCurrent(activeCommitObj.commit_hash);
+  }
+}
+
 function restoreActiveCommitBranch() {
   if (activeCommitObj && activeCommitObj.commit_hash) {
     restoreCommitToNewBranch(activeCommitObj.commit_hash);
