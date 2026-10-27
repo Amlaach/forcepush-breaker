@@ -173,6 +173,14 @@ def scan_cmd(
         _render_config_time_machine(pipeline_res.scan_result.deleted_config_files)
     if pipeline_res.is_remote:
         _render_forks_panel(pipeline_res.discovered_forks, pipeline_res.history_events)
+
+        gc_events = [e for e in pipeline_res.history_events if getattr(e, "gc_purged", False) or getattr(e, "status", "") == "GC_PURGED_REMOTE"]
+        if gc_events:
+            diag_lines = []
+            for ev in gc_events:
+                diag_lines.append(f"• Commit [bold cyan]{ev.before_sha[:10]}[/bold cyan] ({ev.ref}): Detected in force-push logs but purged from cloud server cache (HTTP 404).")
+            diag_lines.append("\n[bold green]Remediation Tip:[/bold green] Scan a local developer clone of this repository to recover the commit from reflog.")
+            console.print(Panel("\n".join(diag_lines), title="[bold yellow]Server GC Diagnostics (GC_PURGED_REMOTE)[/bold yellow]", border_style="yellow"))
     _render_score_panel(pipeline_res.hygiene)
     _render_remediation_panel(pipeline_res.remediation)
 
