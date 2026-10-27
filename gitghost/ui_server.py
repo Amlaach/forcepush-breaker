@@ -610,6 +610,9 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
                 "actor": ev.actor,
                 "created_at": ev.created_at,
                 "description": ev.description,
+                "status": getattr(ev, "status", "detected"),
+                "gc_purged": getattr(ev, "gc_purged", False),
+                "diagnostic_message": getattr(ev, "diagnostic_message", None),
             }
             for ev in pipeline_res.history_events
         ]
@@ -707,8 +710,11 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
         gh_parsed = parse_github_url(pipeline_res.remote_url or pipeline_res.repo_path)
         gh_html_url = gh_parsed.html_url if gh_parsed else ""
 
+        remote_target = parse_remote_url(pipeline_res.repo_path)
         return {
             "repo_path": pipeline_res.repo_path,
+            "is_remote": getattr(pipeline_res, "is_remote", False),
+            "remote_platform": remote_target.platform if remote_target else ("remote" if getattr(pipeline_res, "is_remote", False) else "local"),
             "is_remote": pipeline_res.is_remote,
             "remote_url": pipeline_res.remote_url,
             "github_html_url": gh_html_url,
