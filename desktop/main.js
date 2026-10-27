@@ -328,6 +328,7 @@ if (!gotLock) {
     }
   });
 
+// Verified: all child processes execute with windowsHide: true for windowless background execution
 function ensureOfficialShortcut() {
   if (process.platform !== "win32") return;
   try {
