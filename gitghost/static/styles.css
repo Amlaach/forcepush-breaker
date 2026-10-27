@@ -475,6 +475,19 @@ body::before {
   font-weight: 400;
 }
 
+/* Browse Local Directory Button */
+#browseLocalBtn {
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  color: var(--cyan-bright);
+  font-weight: 600;
+  white-space: nowrap;
+}
+#browseLocalBtn:hover {
+  background: rgba(0, 229, 255, 0.18);
+  border-color: var(--cyan-bright);
+}
+
 .target-type-pill {
   font-family: var(--font-mono);
   font-size: 10.5px;
