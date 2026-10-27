@@ -86,7 +86,7 @@ def main_callback(
 
 @app.command(name="scan")
 def scan_cmd(
-    path: str = typer.Argument(".", help="Local repository path or remote GitHub URL (https://github.com/owner/repo)."),
+    path: str = typer.Argument(".", help="Local repository directory or remote URL (GitHub, GitLab, Bitbucket)."),
     ai_provider: str = typer.Option("auto", "--ai-provider", "-p", help="AI provider: auto, gemini, openai, anthropic, ollama, heuristic, none."),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="Custom model name."),
     github_token: Optional[str] = typer.Option(None, "--github-token", envvar="GITHUB_TOKEN", help="GitHub token for remote API & private clone (in-memory only)."),
