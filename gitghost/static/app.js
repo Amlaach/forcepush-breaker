@@ -1045,16 +1045,31 @@ function renderRemoteEventsAndForks(events, forks) {
     evBox.innerHTML = `<div style="color:var(--text-muted);font-size:13px;">No Push / Force-Push overwrite events recorded in GitHub's recent Events feed.</div>`;
   } else {
     evBox.innerHTML = events
-      .map(
-        (ev) => `<div style="padding:10px 12px;border-radius:9px;background:var(--bg-card);border:1px solid var(--border);">
+      .map((ev) => {
+        const isGcPurged = ev.gc_purged || ev.status === "GC_PURGED_REMOTE";
+        const gcBadge = isGcPurged ? `<span class="badge-gc-purged" title="${t("gcPurgedDesc")}">⚠ GC_PURGED_REMOTE</span>` : "";
+        const gcDiag = isGcPurged ? `
+          <div class="gc-diagnostic-card">
+            <div class="gc-diag-header">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              <span>${t("gcPurgedTitle")}</span>
+            </div>
+            <p class="gc-diag-body">${escapeHtml(ev.diagnostic_message || t("gcPurgedDesc"))}</p>
+            <button class="btn btn-sm btn-outline-amber" onclick="selectLocalFolder()">${t("scanLocalCloneBtn")}</button>
+          </div>` : "";
+        return `<div style="padding:10px 12px;border-radius:9px;background:var(--bg-card);border:1px solid var(--border);">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span class="badge ${ev.event_type === "force_push" ? "badge-critical" : "badge-medium"}">${escapeHtml(ev.event_type)}</span>
+            <div>
+              <span class="badge ${ev.event_type === "force_push" ? "badge-critical" : "badge-medium"}">${escapeHtml(ev.event_type)}</span>
+              ${gcBadge}
+            </div>
             <span class="ltr-mono" style="font-size:11px;color:var(--text-muted);">${escapeHtml((ev.created_at || "").slice(0, 19))}</span>
           </div>
           <div style="font-size:12.5px;margin-top:6px;color:#ffffff;">${escapeHtml(ev.description || "")}</div>
           <div style="font-size:11.5px;color:var(--cyan-bright);margin-top:4px;" class="ltr-mono">Actor: @${escapeHtml(ev.actor || "unknown")} ${ev.before_sha ? "• Before: " + escapeHtml(ev.before_sha.slice(0, 10)) : ""}</div>
-        </div>`
-      )
+          ${gcDiag}
+        </div>`;
+      })
       .join("");
   }
 
