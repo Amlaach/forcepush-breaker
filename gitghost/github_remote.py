@@ -244,21 +244,40 @@ def parse_gitlab_url(target: str) -> Optional[ParsedRemoteTarget]:
     return None
 
 
-def parse_github_url(target: str) -> Optional[ParsedRemoteTarget]:
-    """Parses a GitHub HTTPS URL (including /tree/... browser links), SSH URL, or 'owner/repo' shorthand.
+def parse_remote_url(target: str) -> Optional[ParsedRemoteTarget]:
+    """Parses a remote Git target across GitHub, GitLab, or Bitbucket.
 
-    Returns None if the target points to an existing local path or is not a valid GitHub identifier.
+    Returns None if the target points to an existing local path or is not a valid remote identifier.
     """
     raw = (target or "").strip()
     if not raw or raw in (".", ".."):
         return None
+
+    try:
+        local_candidate = Path(raw)
+        if (
+            local_candidate.exists()
+            or raw.startswith(("/", "\\", "./", ".\\", "../", "..\\"))
+            or (len(raw) > 1 and raw[1] == ":")
+        ):
+            return None
+    except Exception:
+        pass
+
+    gl = parse_gitlab_url(raw)
+    if gl is not None:
+        return gl
+
+    bb = parse_bitbucket_url(raw)
+    if bb is not None:
+        return bb
 
     m = _HTTPS_GITHUB_RE.match(raw) or _SSH_GITHUB_RE.match(raw)
     if m:
         owner, repo = m.group(1), m.group(2)
         if repo.lower().endswith(".git"):
             repo = repo[:-4]
-        if owner in ("settings", "orgs", "organizations", "users", "marketplace", "explore", "topics"):
+        if owner in ("settings", "orgs", "organizations", "users", "marketplace", "explore", "topics", "login"):
             return None
         return ParsedGitHubTarget(
             owner=owner,
@@ -267,14 +286,6 @@ def parse_github_url(target: str) -> Optional[ParsedRemoteTarget]:
             api_repo_url=f"https://api.github.com/repos/{owner}/{repo}",
             original_input=raw,
         )
-
-    # Check if it's an existing local filesystem path before treating as owner/repo shorthand
-    try:
-        local_candidate = Path(raw)
-        if local_candidate.exists() or raw.startswith(("/", "\\", "./", ".\\", "../", "..\\")) or ":" in raw:
-            return None
-    except Exception:
-        pass
 
     m_short = _SHORTHAND_GITHUB_RE.match(raw)
     if m_short:
@@ -293,9 +304,19 @@ def parse_github_url(target: str) -> Optional[ParsedRemoteTarget]:
     return None
 
 
+def parse_github_url(target: str) -> Optional[ParsedRemoteTarget]:
+    """Backwards-compatible wrapper that aliases multi-platform parse_remote_url."""
+    return parse_remote_url(target)
+
+
+def is_remote_target(target: str) -> bool:
+    """Returns True if the target string represents a remote repository (GitHub, GitLab, Bitbucket)."""
+    return parse_remote_url(target) is not None
+
+
 def is_github_target(target: str) -> bool:
-    """Returns True if the target string represents a remote GitHub repository."""
-    return parse_github_url(target) is not None
+    """Backwards-compatible alias for is_remote_target."""
+    return is_remote_target(target)
 
 
 class GitHubAPIForensicsClient:
