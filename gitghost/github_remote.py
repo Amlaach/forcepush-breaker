@@ -500,6 +500,91 @@ class GitLabAPIForensicsClient:
 
         return events, candidate_shas, warnings
 
+    def fetch_commit_or_check_gc(
+        self,
+        target: ParsedRemoteTarget,
+        commit_sha: str,
+        max_text_bytes: int = 10 * 1024 * 1024,
+    ) -> Tuple[Optional[DanglingCommit], bool]:
+        sha = (commit_sha or "").strip()
+        if not sha:
+            return None, False
+
+        commit_url = f"{target.api_repo_url}/repository/commits/{sha}"
+        diff_url = f"{target.api_repo_url}/repository/commits/{sha}/diff"
+        try:
+            req = urllib.request.Request(commit_url, headers=self._build_headers(), method="GET")
+            data = _fetch_json_resilient(req, timeout=self.timeout, token=self._token)
+            if not isinstance(data, dict):
+                return None, False
+
+            full_sha = str(data.get("id") or sha)
+            author_name = str(data.get("author_name") or "Unknown")
+            author_email = str(data.get("author_email") or "")
+            author_str = f"{author_name} <{author_email}>" if author_email else author_name
+            date_str = str(data.get("authored_date") or data.get("created_at") or "")
+            message = str(data.get("message") or "")
+            parents = [str(p) for p in (data.get("parent_ids") or []) if p]
+
+            changed_files: List[str] = []
+            diff_chunks: List[str] = []
+            accumulated_bytes = 0
+
+            try:
+                diff_req = urllib.request.Request(diff_url, headers=self._build_headers(), method="GET")
+                diff_data = _fetch_json_resilient(diff_req, timeout=self.timeout, token=self._token)
+                if isinstance(diff_data, list):
+                    for item in diff_data:
+                        if not isinstance(item, dict):
+                            continue
+                        new_path = str(item.get("new_path") or item.get("old_path") or "")
+                        if new_path:
+                            changed_files.append(new_path)
+                        patch = item.get("diff")
+                        if isinstance(patch, str) and patch:
+                            patch_bytes = len(patch.encode("utf-8", errors="replace"))
+                            if accumulated_bytes + patch_bytes <= max_text_bytes:
+                                diff_chunks.append(
+                                    f"diff --git a/{new_path} b/{new_path}\n--- a/{new_path}\n+++ b/{new_path}\n{patch}"
+                                )
+                                accumulated_bytes += patch_bytes
+            except Exception:
+                pass
+
+            diff_text = "\n".join(diff_chunks)
+            ai_attribution = detect_ai_agent(
+                author=author_str,
+                message=message,
+                diff_content=diff_text,
+            )
+
+            return DanglingCommit(
+                commit_hash=full_sha,
+                author=author_str,
+                date=date_str,
+                message=message,
+                parents=parents,
+                changed_files=changed_files,
+                diff_content=diff_text,
+                is_dangling=True,
+                ai_agent=ai_attribution,
+            ), False
+        except urllib.error.HTTPError as h_err:
+            if h_err.code == 404:
+                return None, True
+            return None, False
+        except Exception:
+            return None, False
+
+    def fetch_orphan_commit_via_api(
+        self,
+        target: ParsedRemoteTarget,
+        commit_sha: str,
+        max_text_bytes: int = 10 * 1024 * 1024,
+    ) -> Optional[DanglingCommit]:
+        commit, _ = self.fetch_commit_or_check_gc(target, commit_sha, max_text_bytes)
+        return commit
+
 
 class GitHubAPIForensicsClient:
     """Queries GitHub REST API for history overwrite events, force-pushes, and orphaned commits.
