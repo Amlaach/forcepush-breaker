@@ -586,6 +586,74 @@ class GitLabAPIForensicsClient:
         return commit
 
 
+class BitbucketAPIForensicsClient:
+    """Queries Bitbucket Cloud REST API 2.0 for force-pushes and declined PR commits."""
+
+    DEFAULT_TIMEOUT_SECONDS = 12
+
+    def __init__(self, bitbucket_token: Optional[str] = None, timeout: int = DEFAULT_TIMEOUT_SECONDS):
+        resolved = (bitbucket_token or resolve_system_bitbucket_token() or "").strip()
+        self._token: Optional[str] = resolved if resolved else None
+        self.timeout = timeout
+
+    def _build_headers(self) -> Dict[str, str]:
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "UnForce-Security-Forensics/1.0.0",
+        }
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
+        return headers
+
+    def discover_history_overwrite_events(
+        self,
+        target: ParsedRemoteTarget,
+        scan_forks: bool = True,
+        max_forks: int = 5,
+    ) -> Tuple[List[HistoryOverwriteEvent], List[str], List[str]]:
+        events: List[HistoryOverwriteEvent] = []
+        candidate_shas: List[str] = []
+        seen_shas: Set[str] = set()
+        warnings: List[str] = []
+        zero_sha = "0" * 40
+
+        prs_url = f"{target.api_repo_url}/pullrequests?state=DECLINED&pagelen=30"
+        try:
+            req = urllib.request.Request(prs_url, headers=self._build_headers(), method="GET")
+            raw_prs = _fetch_json_resilient(req, timeout=self.timeout, token=self._token)
+            values = raw_prs.get("values", []) if isinstance(raw_prs, dict) else []
+            for pr in values:
+                if not isinstance(pr, dict):
+                    continue
+                pr_id = pr.get("id", "?")
+                src = pr.get("source") or {}
+                commit_obj = src.get("commit") or {}
+                sha = str(commit_obj.get("hash") or "").strip()
+                author_obj = pr.get("author") or {}
+                author = author_obj.get("display_name") or author_obj.get("nickname") or "unknown"
+                updated_on = str(pr.get("updated_on") or "")
+                if sha and sha != zero_sha:
+                    events.append(
+                        HistoryOverwriteEvent(
+                            event_id=f"bb-PR-{pr_id}",
+                            event_type="closed_pr_orphan",
+                            ref=f"refs/pull-requests/{pr_id}",
+                            before_sha=sha,
+                            after_sha=None,
+                            actor=author,
+                            created_at=updated_on,
+                            description=f"Bitbucket declined PR #{pr_id} head commit {sha[:10]}",
+                        )
+                    )
+                    if sha not in seen_shas:
+                        seen_shas.add(sha)
+                        candidate_shas.append(sha)
+        except Exception as exc:
+            warnings.append(sanitize_token_in_text(str(exc), self._token))
+
+        return events, candidate_shas, warnings
+
+
 class GitHubAPIForensicsClient:
     """Queries GitHub REST API for history overwrite events, force-pushes, and orphaned commits.
 
