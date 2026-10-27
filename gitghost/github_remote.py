@@ -170,6 +170,9 @@ class HistoryOverwriteEvent:
     actor: str
     created_at: str
     description: str
+    status: str = "detected"  # "detected" | "recovered" | "GC_PURGED_REMOTE"
+    gc_purged: bool = False
+    diagnostic_message: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -198,6 +201,7 @@ class RemoteAcquisitionResult:
     api_recovered_commits: List[DanglingCommit] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     discovered_forks: List[ForkForensicsTarget] = field(default_factory=list)
+    gc_purged_shas: Dict[str, str] = field(default_factory=dict)
 
 
 def _fetch_json_resilient(req: urllib.request.Request, timeout: int, token: Optional[str] = None) -> Any:
