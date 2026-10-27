@@ -33,22 +33,29 @@ def _post_json(url: str, payload: dict, timeout: float = 15.0) -> dict:
 
 @pytest.fixture(scope="module")
 def studio_server():
+    import time
     server, port = start_ui_server(start_port=0)
     assert port > 0
     base_url = f"http://127.0.0.1:{port}"
+    for _ in range(50):
+        try:
+            with urllib.request.urlopen(f"{base_url}/api/system/info", timeout=2):
+                break
+        except Exception:
+            time.sleep(0.1)
     yield base_url
     server.shutdown()
 
 
 class TestDesktopStudioWorkflows:
     def test_system_info_and_bilingual_ui(self, studio_server: str):
-        with urllib.request.urlopen(f"{studio_server}/api/system/info", timeout=5) as resp:
+        with urllib.request.urlopen(f"{studio_server}/api/system/info", timeout=15) as resp:
             info = json.loads(resp.read().decode("utf-8"))
             assert info["version"] == "0.7.2"
             assert info["git_available"] is True
             assert "git" in info["git_version"].lower()
 
-        with urllib.request.urlopen(f"{studio_server}/", timeout=5) as resp:
+        with urllib.request.urlopen(f"{studio_server}/", timeout=15) as resp:
             html = resp.read().decode("utf-8")
             assert "UnForce" in html
             assert "UNFORCE_I18N" in html

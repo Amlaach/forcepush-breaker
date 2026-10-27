@@ -10,7 +10,6 @@
 
 [![UnForce CI](https://github.com/Amlaach/forcepush-breaker/actions/workflows/ci.yml/badge.svg)](https://github.com/Amlaach/forcepush-breaker/actions/workflows/ci.yml)
 [![Desktop Releases](https://github.com/Amlaach/forcepush-breaker/actions/workflows/release.yml/badge.svg)](https://github.com/Amlaach/forcepush-breaker/releases)
-[![Security & SARIF Scan](https://github.com/Amlaach/forcepush-breaker/actions/workflows/security.yml/badge.svg)](https://github.com/Amlaach/forcepush-breaker/actions/workflows/security.yml)
 [![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://github.com/Amlaach/forcepush-breaker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![SARIF 2.1.0](https://img.shields.io/badge/SARIF-2.1.0%20Compliant-purple.svg)](https://sarifweb.azurewebsites.net/)

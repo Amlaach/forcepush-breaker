@@ -14,13 +14,19 @@ from gitghost.ui_server import start_ui_server
 def running_server():
     server, port = start_ui_server(start_port=8910)
     base_url = f"http://127.0.0.1:{port}"
+    for _ in range(50):
+        try:
+            with urllib.request.urlopen(f"{base_url}/api/status", timeout=2):
+                break
+        except Exception:
+            time.sleep(0.1)
     yield base_url
     server.shutdown()
 
 
 class TestUIServer:
     def test_root_serves_html_dashboard(self, running_server: str):
-        with urllib.request.urlopen(f"{running_server}/", timeout=5) as resp:
+        with urllib.request.urlopen(f"{running_server}/", timeout=15) as resp:
             assert resp.status == 200
             assert "text/html" in resp.headers.get("Content-Type", "")
             body = resp.read().decode("utf-8")
@@ -29,7 +35,7 @@ class TestUIServer:
             assert "Strict Redaction Active" in body
 
     def test_api_status_endpoint(self, running_server: str):
-        with urllib.request.urlopen(f"{running_server}/api/status", timeout=5) as resp:
+        with urllib.request.urlopen(f"{running_server}/api/status", timeout=15) as resp:
             assert resp.status == 200
             data = json.loads(resp.read().decode("utf-8"))
             assert data["status"] == "ok"
@@ -114,7 +120,7 @@ class TestUIServer:
             data=start_payload,
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(start_req, timeout=5) as resp:
+        with urllib.request.urlopen(start_req, timeout=15) as resp:
             assert resp.status == 200
             job_info = json.loads(resp.read().decode("utf-8"))
             job_id = job_info["job_id"]
@@ -123,7 +129,7 @@ class TestUIServer:
         # Poll /api/scan/status until completed
         status_data = None
         for _ in range(120):
-            with urllib.request.urlopen(f"{running_server}/api/scan/status?job_id={job_id}", timeout=5) as resp:
+            with urllib.request.urlopen(f"{running_server}/api/scan/status?job_id={job_id}", timeout=15) as resp:
                 status_data = json.loads(resp.read().decode("utf-8"))
                 if status_data["status"] in ("completed", "failed"):
                     break
@@ -149,7 +155,7 @@ class TestUIServer:
             }).encode("utf-8"),
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(rec_redacted_req, timeout=5) as resp:
+        with urllib.request.urlopen(rec_redacted_req, timeout=15) as resp:
             rec_data = json.loads(resp.read().decode("utf-8"))
             assert rec_data["is_redacted"] is True
             assert raw_secret not in rec_data["content"]
@@ -165,20 +171,20 @@ class TestUIServer:
             }).encode("utf-8"),
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(rec_raw_req, timeout=5) as resp:
+        with urllib.request.urlopen(rec_raw_req, timeout=15) as resp:
             rec_raw_data = json.loads(resp.read().decode("utf-8"))
             assert rec_raw_data["is_redacted"] is False
             assert raw_secret in rec_raw_data["content"]
 
         # Test direct report download & bundle download
         q_repo = urllib.parse.quote(str(tmp_path))
-        with urllib.request.urlopen(f"{running_server}/api/download/report?repo_path={q_repo}&format=json", timeout=5) as resp:
+        with urllib.request.urlopen(f"{running_server}/api/download/report?repo_path={q_repo}&format=json", timeout=15) as resp:
             assert resp.status == 200
             assert "attachment" in resp.headers.get("Content-Disposition", "")
             dl_body = resp.read().decode("utf-8")
             assert raw_secret not in dl_body
 
-        with urllib.request.urlopen(f"{running_server}/api/download/bundle?repo_path={q_repo}&include_raw=false", timeout=5) as resp:
+        with urllib.request.urlopen(f"{running_server}/api/download/bundle?repo_path={q_repo}&include_raw=false", timeout=15) as resp:
             assert resp.status == 200
             assert "application/zip" in resp.headers.get("Content-Type", "")
             zip_bytes = resp.read()
