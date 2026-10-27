@@ -53,31 +53,101 @@ async function apiFetch(endpoint, options = {}) {
   return fetch(`${base}${endpoint}`, options);
 }
 
-/* ---- GitHub URL Parsing & Validation (ONLY Allowed Target Method) ---- */
-function parseGitHubRepoInput(rawInput) {
+/* ---- Smart Target Parsing & Validation (Local Repositories, GitHub, GitLab, Bitbucket) ---- */
+function parseSmartTarget(rawInput) {
   const raw = String(rawInput || "").trim();
   if (!raw) return null;
-  if (/^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith("/") || raw.startsWith("\\") || raw.startsWith(".")) {
-    return null;
+
+  // Local filesystem directory detection
+  const isWindowsPath = /^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith("\\\\");
+  const isUnixPath = raw.startsWith("/") || raw.startsWith("~/");
+  const isRelative = raw === "." || raw === ".." || raw.startsWith("./") || raw.startsWith(".\\") || raw.startsWith("../") || raw.startsWith("..\\");
+
+  if (isWindowsPath || isUnixPath || isRelative) {
+    const parts = raw.replace(/\\/g, "/").split("/").filter(Boolean);
+    const slug = parts.length > 0 ? parts[parts.length - 1] : raw;
+    return {
+      type: "local",
+      platform: "local",
+      path: raw,
+      slug: slug,
+      cleanUrl: raw,
+    };
   }
-  let m = raw.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/i);
-  if (!m) {
-    m = raw.match(/^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i);
+
+  // GitLab
+  const mGitLab = raw.match(/^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*?)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/i) ||
+                  raw.match(/^git@gitlab\.com:([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*?)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i);
+  if (mGitLab) {
+    const group = mGitLab[1];
+    const repo = mGitLab[2].replace(/\.git$/i, "");
+    const slug = `${group}/${repo}`;
+    return {
+      type: "gitlab",
+      platform: "gitlab",
+      owner: group,
+      repo: repo,
+      slug: slug,
+      cleanUrl: `https://gitlab.com/${slug}`,
+    };
   }
-  if (!m) {
-    m = raw.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
+
+  // Bitbucket
+  const mBb = raw.match(/^(?:https?:\/\/)?(?:www\.)?bitbucket\.org\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/i) ||
+              raw.match(/^git@bitbucket\.org:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i);
+  if (mBb) {
+    const ws = mBb[1];
+    const repo = mBb[2].replace(/\.git$/i, "");
+    const slug = `${ws}/${repo}`;
+    return {
+      type: "bitbucket",
+      platform: "bitbucket",
+      owner: ws,
+      repo: repo,
+      slug: slug,
+      cleanUrl: `https://bitbucket.org/${slug}`,
+    };
   }
-  if (!m) return null;
-  const owner = m[1];
-  const repo = m[2].replace(/\.git$/i, "");
-  const reserved = ["settings", "orgs", "organizations", "users", "marketplace", "explore", "topics", "login"];
-  if (!owner || !repo || reserved.includes(owner.toLowerCase())) return null;
-  return {
-    owner,
-    repo,
-    slug: `${owner}/${repo}`,
-    cleanUrl: `https://github.com/${owner}/${repo}`,
-  };
+
+  // GitHub
+  let mGh = raw.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/i);
+  if (!mGh) {
+    mGh = raw.match(/^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i);
+  }
+  if (!mGh) {
+    mGh = raw.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
+  }
+  if (mGh) {
+    const owner = mGh[1];
+    const repo = mGh[2].replace(/\.git$/i, "");
+    const reserved = ["settings", "orgs", "organizations", "users", "marketplace", "explore", "topics", "login"];
+    if (owner && repo && !reserved.includes(owner.toLowerCase())) {
+      return {
+        type: "github",
+        platform: "github",
+        owner: owner,
+        repo: repo,
+        slug: `${owner}/${repo}`,
+        cleanUrl: `https://github.com/${owner}/${repo}`,
+      };
+    }
+  }
+
+  if (raw.length >= 2 && !raw.includes("http://") && !raw.includes("https://")) {
+    return {
+      type: "local",
+      platform: "local",
+      path: raw,
+      slug: raw,
+      cleanUrl: raw,
+    };
+  }
+
+  return null;
+}
+
+function parseGitHubRepoInput(rawInput) {
+  return parseSmartTarget(rawInput);
 }
 
 function updateTargetTypeBadge() {
