@@ -272,7 +272,7 @@ def run_scan_pipeline(
                 commit_hash=bc.commit_hash,
             )
             bc.redacted_message = bc_msg_res.redacted_text
-            if gh_target is not None and not clone_source_override and bc.commit_hash not in dangling_sha_set:
+            if remote_target is not None and not clone_source_override and bc.commit_hash not in dangling_sha_set:
                 findings.extend(bc_msg_res.findings)
                 if idx_bc < 25:
                     raw_bc_diff = forensics.read_commit_diff(bc.commit_hash)
@@ -357,8 +357,8 @@ def run_scan_pipeline(
             triage_map=triage_map,
             hygiene=hygiene,
             remediation=remediation,
-            is_remote=gh_target is not None,
-            remote_url=gh_target.clone_url if gh_target else None,
+            is_remote=remote_target is not None,
+            remote_url=remote_target.clone_url if remote_target else None,
             local_mirror_path=retained_mirror,
             history_events=remote_acq.history_events if remote_acq else [],
             discovered_forks=remote_acq.discovered_forks if remote_acq else [],
