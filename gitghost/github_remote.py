@@ -45,6 +45,14 @@ _SSH_GITLAB_RE = re.compile(
     r"^git@gitlab\.com:([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*?)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$",
     re.IGNORECASE,
 )
+_HTTPS_BITBUCKET_RE = re.compile(
+    r"^(?:https?://)?(?:www\.)?bitbucket\.org/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$",
+    re.IGNORECASE,
+)
+_SSH_BITBUCKET_RE = re.compile(
+    r"^git@bitbucket\.org:([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$",
+    re.IGNORECASE,
+)
 
 _CACHED_SYS_GH_TOKEN: Optional[str] = None
 _SYS_GH_TOKEN_PROBED: bool = False
@@ -188,6 +196,27 @@ def sanitize_token_in_text(text: str, token: Optional[str] = None) -> str:
         sanitized,
     )
     return sanitized
+
+
+def parse_bitbucket_url(target: str) -> Optional[ParsedRemoteTarget]:
+    raw = (target or "").strip()
+    if not raw or "bitbucket.org" not in raw.lower():
+        return None
+    m = _HTTPS_BITBUCKET_RE.match(raw) or _SSH_BITBUCKET_RE.match(raw)
+    if m:
+        workspace, repo_slug = m.group(1), m.group(2)
+        if repo_slug.lower().endswith(".git"):
+            repo_slug = repo_slug[:-4]
+        return ParsedRemoteTarget(
+            platform="bitbucket",
+            host="bitbucket.org",
+            owner=workspace,
+            repo=repo_slug,
+            clone_url=f"https://bitbucket.org/{workspace}/{repo_slug}.git",
+            api_repo_url=f"https://api.bitbucket.org/2.0/repositories/{workspace}/{repo_slug}",
+            original_input=raw,
+        )
+    return None
 
 
 def parse_gitlab_url(target: str) -> Optional[ParsedRemoteTarget]:
