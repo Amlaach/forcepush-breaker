@@ -954,6 +954,45 @@ async function copyActiveCommitSha() {
   showToast(`✓ Copied SHA: ${activeCommitObj.commit_hash.slice(0, 12)}`);
 }
 
+async function restoreCommitToNewBranch(commitHash) {
+  const repoInput = document.getElementById("repoPathInput");
+  const repoPath = repoInput ? repoInput.value.trim() : "";
+  const defaultBranch = `recovered/${commitHash.slice(0, 7)}`;
+  const branchName = prompt(t("branchPrompt") || "Enter name for the new branch:", defaultBranch);
+  if (!branchName || !branchName.trim()) return;
+
+  logTerminal("GIT", `Restoring commit ${commitHash.slice(0, 7)} to branch '${branchName.trim()}'...`, "cmd");
+  try {
+    const resp = await apiFetch("/api/git/restore-branch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo_path: repoPath,
+        commit_hash: commitHash,
+        branch_name: branchName.trim(),
+        checkout: false,
+      }),
+    });
+    const result = await resp.json();
+    if (result.success) {
+      logTerminal("OK", result.message || `Branch '${branchName}' created successfully!`, "ok");
+      alert(result.message || `${t("branchRestored")}: ${branchName}`);
+    } else {
+      logTerminal("ERR", result.error || "Branch restoration failed.", "err");
+      alert(`Error: ${result.error || "Failed to create branch."}`);
+    }
+  } catch (err) {
+    logTerminal("ERR", `Restore request failed: ${err.message}`, "err");
+    alert(`Error: ${err.message}`);
+  }
+}
+
+function restoreActiveCommitBranch() {
+  if (activeCommitObj && activeCommitObj.commit_hash) {
+    restoreCommitToNewBranch(activeCommitObj.commit_hash);
+  }
+}
+
 async function exportActiveCommitPatch() {
   if (!activeCommitObj) return;
   const sha = activeCommitObj.commit_hash;
