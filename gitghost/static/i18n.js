@@ -1,7 +1,7 @@
 /* Bilingual Cyber-Forensics Dictionary (Hebrew RTL default + English LTR) */
 window.UNFORCE_I18N = {
   he: {
-    cmdPlaceholder: "פקודה מהירה או ניווט... (Ctrl+K)",
+    cmdPlaceholder: "חיפוש פקודה... (Ctrl+K)",
     brandSub: "פורנזיקת GitHub, שחזור קומיטים וציד סודות",
     secQuickStart: "סריקת GitHub מהירה",
     qaPasteAndScan: "הדבק כתובת מ-GitHub וסרוק",
@@ -16,7 +16,7 @@ window.UNFORCE_I18N = {
     navLogs: "לוגים",
     secRecent: "ריפואים שנסרקו לאחרונה",
     recentEmpty: "טרם נסרקו ריפואים מ-GitHub.",
-    pasteBtn: "הדבק",
+    pasteBtn: "הדבק כתובת",
     scanBtn: "סרוק ריפו",
     browseLocalBtn: "בחר תיקייה",
     localTargetPill: "מאגר מקומי",
@@ -86,6 +86,7 @@ window.UNFORCE_I18N = {
     detachedBlobsTitle: "עצמי Git מנותקים (Detached Blobs)",
     remTitle: "תוכנית עבודה: מחיקת היסטוריה מ-GitHub והסרת סודות",
     invalidGhUrl: "אנא הזן כתובת ריפו תקינה (למשל https://github.com/owner/repo) או נתיב מקומי",
+    pastedSuccess: "הכתובת הודבקה בהצלחה",
     clipboardEmpty: "לוח ההעתקה ריק — העתק תחילה כתובת ריפו או נתיב תיקייה",
     gcPurgedBadge: "נמחק ב-GC של השרת",
     gcPurgedTitle: "קומיט נמחק ב-Garbage Collection (404)",
@@ -115,7 +116,7 @@ window.UNFORCE_I18N = {
     updateCheckNow: "בדוק עדכונים עכשיו"
   },
   en: {
-    cmdPlaceholder: "Quick command or jump to... (Ctrl+K)",
+    cmdPlaceholder: "Search command... (Ctrl+K)",
     brandSub: "GitHub Forensics, Commit Recovery & Secret Hunting",
     secQuickStart: "Quick GitHub Audit",
     qaPasteAndScan: "Paste GitHub URL & Scan",
@@ -200,6 +201,7 @@ window.UNFORCE_I18N = {
     detachedBlobsTitle: "Detached Git Blobs",
     remTitle: "GitHub History Purge & Secret Excision Playbook",
     invalidGhUrl: "Please paste a valid GitHub repository URL (e.g. https://github.com/owner/repo) or local path",
+    pastedSuccess: "Repository address pasted successfully",
     clipboardEmpty: "Clipboard is empty — copy a repository URL or local path first",
     gcPurgedBadge: "Server GC Purged",
     gcPurgedTitle: "Commit Purged by Cloud Garbage Collection (404)",

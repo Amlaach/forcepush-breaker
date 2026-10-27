@@ -1456,3 +1456,43 @@ body.state-workspace #workspaceView {
   pointer-events: auto;
   transform: translateY(0);
 }
+
+
+/* Toast Icon & Status Styles */
+.toast {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.toast-icon svg {
+  display: block;
+}
+.toast.toast-error {
+  border-color: var(--crimson) !important;
+}
+.toast.toast-warn {
+  border-color: var(--amber) !important;
+}
+.toast.toast-success {
+  border-color: var(--neon-green) !important;
+}
+
+/* Command Palette SVG Items */
+.cmd-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.cmd-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--cyan);
+}

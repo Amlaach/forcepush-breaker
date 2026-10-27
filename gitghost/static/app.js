@@ -472,19 +472,19 @@ function updateTargetTypeBadge() {
   const parsed = parseSmartTarget(input.value);
   if (parsed) {
     if (parsed.type === "local") {
-      badge.textContent = `📁 ${parsed.slug}`;
+      badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end:4px;vertical-align:middle;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg><span>${escapeHtml(parsed.slug)}</span>`;
       pill.style.borderColor = "rgba(0, 229, 255, 0.5)";
       pill.style.color = "var(--cyan-bright)";
     } else if (parsed.type === "gitlab") {
-      badge.textContent = `🦊 ${parsed.slug}`;
+      badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end:4px;vertical-align:middle;"><path d="m22 13.29-1.32-4.06a.84.84 0 0 0-.32-.42.85.85 0 0 0-.52-.16.87.87 0 0 0-.52.17.84.84 0 0 0-.32.41L17.3 14H6.7l-1.72-4.77a.85.85 0 0 0-.84-.58.85.85 0 0 0-.84.58L2 13.29a.86.86 0 0 0 .31 1l9.34 6.8a.86.86 0 0 0 .7 0l9.34-6.8a.86.86 0 0 0 .31-1z"></path></svg><span>${escapeHtml(parsed.slug)}</span>`;
       pill.style.borderColor = "rgba(252, 109, 38, 0.6)";
       pill.style.color = "#fc6d26";
     } else if (parsed.type === "bitbucket") {
-      badge.textContent = `🔷 ${parsed.slug}`;
+      badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end:4px;vertical-align:middle;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg><span>${escapeHtml(parsed.slug)}</span>`;
       pill.style.borderColor = "rgba(38, 132, 255, 0.6)";
       pill.style.color = "#2684ff";
     } else {
-      badge.textContent = parsed.slug;
+      badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end:4px;vertical-align:middle;"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg><span>${escapeHtml(parsed.slug)}</span>`;
       pill.style.borderColor = "rgba(0, 255, 157, 0.5)";
       pill.style.color = "var(--neon-green)";
     }
@@ -538,23 +538,25 @@ async function writeClipboardTextSafe(text) {
 }
 
 async function pasteGitHubUrlOnly() {
-  const clip = (await readClipboardTextSafe()).trim();
   const input = document.getElementById("repoPathInput");
+  let clip = (await readClipboardTextSafe()).trim();
   if (!clip) {
-    showToast(t("clipboardEmpty"));
+    showToast(t("clipboardEmpty") || "לוח ההעתקה ריק — העתק תחילה כתובת ריפו", "warn");
     if (input) input.focus();
     return false;
   }
-  const parsed = parseGitHubRepoInput(clip);
+  clip = clip.replace(/^["'`<]|["'`>]$/g, "").trim();
+  const parsed = parseSmartTarget(clip);
   if (input) {
     input.value = parsed ? parsed.cleanUrl : clip;
     updateTargetTypeBadge();
     input.focus();
   }
   if (!parsed) {
-    showToast(t("invalidGhUrl"));
+    showToast(t("invalidGhUrl") || "הכתובת אינה מזוהה כריפו תקין", "warn");
     return false;
   }
+  showToast(t("pastedSuccess") || "הכתובת הודבקה בהצלחה", "success");
   logTerminal("CLIPBOARD", `Target loaded: ${parsed.cleanUrl}`, "cmd");
   return true;
 }
@@ -625,11 +627,42 @@ function openActiveCommitOnGitHub() {
 
 /* ---- Toast ---- */
 let toastTimer = null;
-function showToast(msg) {
+function showToast(msg, type = "info") {
   const el = document.getElementById("toast");
   const txt = document.getElementById("toastMessage");
+  const ico = document.getElementById("toastIcon");
   if (!el || !txt) return;
-  txt.textContent = msg;
+
+  let cleanMsg = String(msg || "");
+  let inferredType = type;
+
+  if (cleanMsg.startsWith("✓")) {
+    inferredType = "success";
+    cleanMsg = cleanMsg.replace(/^✓\s*/, "");
+  } else if (cleanMsg.startsWith("✗")) {
+    inferredType = "error";
+    cleanMsg = cleanMsg.replace(/^✗\s*/, "");
+  } else if (cleanMsg.startsWith("⚠")) {
+    inferredType = "warn";
+    cleanMsg = cleanMsg.replace(/^⚠\s*/, "");
+  }
+
+  el.classList.remove("toast-success", "toast-error", "toast-warn", "toast-info");
+  el.classList.add(`toast-${inferredType}`);
+
+  if (ico) {
+    if (inferredType === "success") {
+      ico.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    } else if (inferredType === "error") {
+      ico.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crimson)" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+    } else if (inferredType === "warn") {
+      ico.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+    } else {
+      ico.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+    }
+  }
+
+  txt.textContent = cleanMsg;
   el.classList.add("show");
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("show"), 3400);
@@ -696,7 +729,7 @@ function renderRecentRepos() {
       const p = parseGitHubRepoInput(url);
       const label = p ? p.slug : url;
       return `<button class="recent-repo-btn" onclick="loadSampleGitHubUrl('${escapeHtml(url)}')" title="${escapeHtml(url)}">
-        <span style="color:var(--neon-green);">●</span>
+        <svg width="8" height="8" viewBox="0 0 10 10" style="vertical-align:middle;margin-inline-end:4px;"><circle cx="5" cy="5" r="4" fill="var(--neon-green)"/></svg>
         <span>${escapeHtml(label)}</span>
       </button>`;
     })
@@ -838,10 +871,10 @@ async function startScan() {
       `Audit complete on ${parsed.slug} -> Hygiene: ${finalResult.hygiene_score.score}/100 | Ghost Commits: ${ghostCount} | Repo Commits: ${branchCount} | Secrets: ${secCount}`,
       secCount > 0 ? "warn" : "ok"
     );
-    showToast(`✓ ${parsed.slug} — Score: ${finalResult.hygiene_score.score}/100`);
+    showToast(`${parsed.slug} — Score: ${finalResult.hygiene_score.score}/100`);
   } catch (err) {
     logTerminal("ERROR", String(err.message || err), "err");
-    showToast(`✗ ${err.message || err}`);
+    showToast(`${err.message || err}`);
   } finally {
     if (scanBtn) scanBtn.disabled = false;
     if (scanBtnText) scanBtnText.textContent = t("scanBtn");
@@ -1011,7 +1044,7 @@ function renderCommitsList() {
     if (activeCommitSubtab === "dangling" && (currentScanData.branch_commits || []).length > 0 && !q) {
       const totalBranch = (currentScanData.branch_commits || []).length;
       container.innerHTML = `<div class="card" style="text-align:center;padding:26px;">
-        <div style="color:var(--neon-green);font-weight:800;margin-bottom:6px;">✓ 0 Force-Pushed Ghost Commits Exposed</div>
+        <div style="color:var(--neon-green);font-weight:800;margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> 0 Force-Pushed Ghost Commits Exposed</div>
         <div style="color:var(--text-secondary);font-size:12.5px;margin-bottom:14px;">GitHub did not expose un-GC'd dangling commits on this repo, and <strong>${totalBranch}</strong> repository commits are mirrored and ready for inspection.</div>
         <button class="btn btn-primary btn-sm" onclick="switchCommitSubtab('branch')">Browse All ${totalBranch} Repo Commits →</button>
       </div>`;
@@ -1161,7 +1194,7 @@ async function loadCommitFileTree(commitSha) {
     }
     treeBox.innerHTML = files
       .map((f, idx) => {
-        const star = f.is_changed ? `<span style="color:var(--neon-green);margin-right:4px;">●</span>` : `📄 `;
+        const star = f.is_changed ? `<svg width="8" height="8" viewBox="0 0 10 10" style="vertical-align:middle;margin-inline-end:4px;"><circle cx="5" cy="5" r="4" fill="var(--neon-green)"/></svg>` : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="vertical-align:middle;margin-inline-end:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
         return `<button class="tree-file-btn" id="treeFileBtn_${idx}" onclick="previewCommitFile('${escapeHtml(commitSha)}', ${idx})" data-filepath="${escapeHtml(f.path)}" title="${escapeHtml(f.path)} (${f.size || 0} B)">
           ${star}${escapeHtml(f.path)}
         </button>`;
@@ -1223,7 +1256,7 @@ async function previewCommitFile(commitSha, btnIdx) {
 async function copyPreviewedFile() {
   if (!activePreviewedFile) return;
   await writeClipboardTextSafe(activePreviewedFile.content);
-  showToast(`✓ Copied ${activePreviewedFile.filePath}`);
+  showToast(`Copied ${activePreviewedFile.filePath}`);
 }
 
 async function savePreviewedFileAs() {
@@ -1235,7 +1268,7 @@ async function savePreviewedFileAs() {
 async function copyActiveCommitSha() {
   if (!activeCommitObj) return;
   await writeClipboardTextSafe(activeCommitObj.commit_hash);
-  showToast(`✓ Copied SHA: ${activeCommitObj.commit_hash.slice(0, 12)}`);
+  showToast(`Copied SHA: ${activeCommitObj.commit_hash.slice(0, 12)}`);
 }
 
 async function restoreCommitToNewBranch(commitHash) {
@@ -1331,7 +1364,7 @@ function renderRemoteEventsAndForks(events, forks) {
     evBox.innerHTML = events
       .map((ev) => {
         const isGcPurged = ev.gc_purged || ev.status === "GC_PURGED_REMOTE";
-        const gcBadge = isGcPurged ? `<span class="badge-gc-purged" title="${t("gcPurgedDesc")}">⚠ GC_PURGED_REMOTE</span>` : "";
+        const gcBadge = isGcPurged ? `<span class="badge-gc-purged" title="${t("gcPurgedDesc")}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-inline-end:3px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>GC_PURGED_REMOTE</span>` : "";
         const gcDiag = isGcPurged ? `
           <div class="gc-diagnostic-card">
             <div class="gc-diag-header">
@@ -1662,7 +1695,7 @@ async function previewTimeMachineEntry(idx) {
     document.getElementById("modalRecoverBtn").style.display = "inline-flex";
     document.getElementById("detailModal").classList.add("active");
   } catch (err) {
-    showToast(`✗ ${err.message}`);
+    showToast(`${err.message}`);
   }
 }
 
@@ -1673,7 +1706,7 @@ async function downloadTimeMachineEntry(idx) {
     const res = await fetchTimeMachineContent(entry);
     await saveTextArtifact(res.filename || entry.filePath.split("/").pop() || "recovered_config.txt", res.content || "");
   } catch (err) {
-    showToast(`✗ ${err.message}`);
+    showToast(`${err.message}`);
   }
 }
 
@@ -1788,7 +1821,7 @@ async function inspectDetachedBlob(blobSha) {
     document.getElementById("modalRecoverBtn").style.display = "inline-flex";
     document.getElementById("detailModal").classList.add("active");
   } catch (err) {
-    showToast(`✗ ${err.message}`);
+    showToast(`${err.message}`);
   }
 }
 
@@ -1830,7 +1863,7 @@ async function copyActiveScript() {
       ? document.getElementById("remediationBashScript").textContent
       : document.getElementById("remediationPSScript").textContent;
   await writeClipboardTextSafe(txt);
-  showToast("✓ Remediation script copied to clipboard");
+  showToast("Remediation script copied to clipboard");
 }
 
 async function saveActiveScriptAs() {
@@ -1844,7 +1877,7 @@ async function saveActiveScriptAs() {
 async function copySupportTicket() {
   const txt = document.getElementById("remediationSupportTicket").textContent;
   await writeClipboardTextSafe(txt);
-  showToast("✓ GitHub Support purge ticket copied");
+  showToast("GitHub Support purge ticket copied");
 }
 
 /* ---- Modal Helpers & Artifact Saving ---- */
@@ -1855,7 +1888,7 @@ function closeModal() {
 async function copyModalContent() {
   if (!activeModalContext) return;
   await writeClipboardTextSafe(activeModalContext.copyText || "");
-  showToast("✓ Copied to clipboard");
+  showToast("Copied to clipboard");
 }
 
 async function recoverFromActiveModal() {
@@ -1884,7 +1917,7 @@ async function recoverFromActiveModal() {
       if (!resp.ok || res.error) throw new Error(res.error || "Export failed");
       await saveTextArtifact(res.filename || "finding_artifact.txt", res.content || "");
     } catch (err) {
-      showToast(`✗ ${err.message}`);
+      showToast(`${err.message}`);
     }
   }
 }
@@ -1897,13 +1930,13 @@ async function saveTextArtifact(defaultFilename, content) {
       encoding: "utf8",
     });
     if (res && res.saved) {
-      showToast(`✓ Saved: ${res.filePath}`);
+      showToast(`Saved: ${res.filePath}`);
     }
     return;
   }
   const blob = new Blob([String(content ?? "")], { type: "text/plain;charset=utf-8" });
   triggerBrowserDownload(blob, defaultFilename);
-  showToast(`✓ Downloaded ${defaultFilename}`);
+  showToast(`Downloaded ${defaultFilename}`);
 }
 
 function triggerBrowserDownload(blob, filename) {
@@ -1934,7 +1967,7 @@ async function downloadReport(fmt) {
     const ext = fmt === "markdown" ? "md" : fmt === "sarif" ? "sarif" : "json";
     await saveTextArtifact(`unforce_audit_report.${ext}`, text);
   } catch (err) {
-    showToast(`✗ ${err.message}`);
+    showToast(`${err.message}`);
   }
 }
 
@@ -1968,13 +2001,13 @@ async function downloadRecoveryBundle() {
         content: b64,
         encoding: "base64",
       });
-      if (saved && saved.saved) showToast(`✓ Saved ZIP Bundle: ${saved.filePath}`);
+      if (saved && saved.saved) showToast(`Saved ZIP Bundle: ${saved.filePath}`);
       return;
     }
     triggerBrowserDownload(new Blob([arrayBuf], { type: "application/zip" }), defaultName);
-    showToast(`✓ Downloaded ${defaultName}`);
+    showToast(`Downloaded ${defaultName}`);
   } catch (err) {
-    showToast(`✗ ${err.message}`);
+    showToast(`${err.message}`);
   }
 }
 
@@ -2012,7 +2045,7 @@ function saveAIKey() {
   ephemeralSession.aiKey = val;
   document.getElementById("aiApiKeyInput").value = "";
   updateAISettingsUI();
-  showToast("✓ AI API Key held strictly in-memory");
+  showToast("AI API Key held strictly in-memory");
 }
 
 function clearAIKey() {
@@ -2026,7 +2059,7 @@ function saveGHToken() {
   ephemeralSession.ghToken = val;
   document.getElementById("githubTokenInput").value = "";
   refreshGHStatusUI();
-  showToast("✓ GitHub Token held strictly in-memory");
+  showToast("GitHub Token held strictly in-memory");
 }
 
 function clearGHToken() {
@@ -2059,22 +2092,62 @@ function refreshGHStatusUI() {
 }
 
 function toggleRawRecoveryMode(enabled) {
-  showToast(enabled ? "⚠ Raw unredacted file export enabled" : "✓ Strict Redaction Active");
+  showToast(enabled ? "Raw unredacted file export enabled" : "Strict Redaction Active", enabled ? "warn" : "success");
 }
 
 /* ---- Command Palette (Ctrl+K) ---- */
 function getPaletteCommands() {
   return [
-    { label: "📋 Paste GitHub URL & Scan Now", action: () => pasteAndScanGitHub() },
-    { label: "📊 Jump to Command HUD & Hygiene Score", action: () => switchView("overview") },
-    { label: "🌿 Jump to Commit & File-Tree Explorer", action: () => switchView("commits") },
-    { label: "🔑 Jump to Discovered Secrets & AI Triage", action: () => switchView("findings") },
-    { label: "⏱ Jump to .env & Config Time-Machine", action: () => switchView("timemachine") },
-    { label: "🔍 Jump to Deep Search & Detached Blobs", action: () => switchView("searchblobs") },
-    { label: "🛡 Jump to GitHub History Purge Playbook", action: () => switchView("remediation") },
-    { label: "📦 Export Full Recovery Bundle (.ZIP)", action: () => downloadRecoveryBundle() },
-    { label: "🌐 Switch Language (עברית / English)", action: () => toggleLanguage() },
-    { label: "⚙ Open Settings & Credentials", action: () => openSettingsModal() },
+    {
+      label: "Paste Repository URL & Scan",
+      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+      action: () => pasteAndScanGitHub()
+    },
+    {
+      label: "Jump to Command HUD & Hygiene Score",
+      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>',
+      action: () => switchView("overview")
+    },
+    {
+      label: "Jump to Commit & File-Tree Explorer",
+      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>',
+      action: () => switchView("commits")
+    },
+    {
+      label: "Jump to Discovered Secrets & AI Triage",
+      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg>',
+      action: () => switchView("findings")
+    },
+    {
+      label: "Jump to .env & Config Time-Machine",
+      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
+      action: () => switchView("timemachine")
+    },
+    {
+      label: "Jump to Deep Search & Detached Blobs",
+      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
+      action: () => switchView("searchblobs")
+    },
+    {
+      label: "Jump to GitHub History Purge Playbook",
+      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>',
+      action: () => switchView("remediation")
+    },
+    {
+      label: "Export Full Recovery Bundle (.ZIP)",
+      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+      action: () => downloadRecoveryBundle()
+    },
+    {
+      label: "Switch Language (עברית / English)",
+      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>',
+      action: () => toggleLanguage()
+    },
+    {
+      label: "Open Settings & Credentials",
+      iconSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>',
+      action: () => openSettingsModal()
+    },
   ];
 }
 
@@ -2104,6 +2177,7 @@ function renderCmdPaletteItems() {
   list.innerHTML = items
     .map(
       (item, idx) => `<button class="cmd-item ${idx === cmdSelectedIndex ? "selected" : ""}" onclick="runPaletteCommand(${idx})">
+        <span class="cmd-item-icon">${item.iconSvg || ""}</span>
         <span>${escapeHtml(item.label)}</span>
       </button>`
     )

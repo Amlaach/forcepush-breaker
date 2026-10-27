@@ -31,11 +31,7 @@
         <span data-i18n="updateClick"> — לחץ לעדכון</span>
       </button>
 
-      <button class="cmd-trigger-btn" onclick="openCmdPalette()" title="פקודה מהירה (Ctrl+K)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <span data-i18n="cmdPlaceholder">פקודה מהירה... (Ctrl+K)</span>
-        <span class="kbd-pill">Ctrl+K</span>
-      </button>
+      
     </div>
 
     <div class="titlebar-controls">
@@ -99,7 +95,7 @@
         <div class="landing-action-buttons">
           <button class="btn btn-paste" onclick="pasteGitHubUrlOnly()" title="הדבק כתובת מלוח ההעתקה">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            <span data-i18n="pasteBtn">הדבק URL</span>
+            <span data-i18n="pasteBtn">הדבק כתובת</span>
           </button>
 
           <button class="btn btn-secondary" id="browseLocalBtn" onclick="selectLocalFolder()" title="בחר תיקיית מאגר מקומית">
@@ -116,12 +112,6 @@
 
       <!-- Quick Samples & Recent Audited Repos -->
       <div class="landing-meta-row">
-        <div class="landing-samples">
-          <span class="meta-label" data-i18n="sampleLabel">דוגמה מהירה:</span>
-          <button class="sample-chip" onclick="loadSampleGitHubUrl('https://github.com/octocat/Spoon-Knife')">octocat/Spoon-Knife</button>
-          <button class="sample-chip" onclick="loadSampleGitHubUrl('https://github.com/Amlaach/forcepush-breaker')">Amlaach/forcepush-breaker</button>
-        </div>
-
         <div id="landingRecentContainer" class="landing-recent" style="display:none;">
           <span class="meta-label" data-i18n="recentLabel">נסרק לאחרונה:</span>
           <div id="landingRecentChips" class="recent-chips-wrap"></div>
@@ -137,13 +127,13 @@
       </div>
       <div class="footer-actions">
         <button class="text-link-btn" onclick="openLogsConsole()">
-          📜 <span data-i18n="navLogs">לוגים</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-inline-end:5px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span data-i18n="navLogs">לוגים</span>
         </button>
         <button class="text-link-btn" onclick="checkAppVersion(true)">
-          🔄 <span data-i18n="updateCheckNow">בדוק עדכונים</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-inline-end:5px;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg><span data-i18n="updateCheckNow">בדוק עדכונים</span>
         </button>
         <button class="text-link-btn" onclick="openSettingsModal()">
-          ⚙️ <span data-i18n="settingsBtn">הגדרות</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-inline-end:5px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg><span data-i18n="settingsBtn">הגדרות</span>
         </button>
         <button class="text-link-btn" id="langSwitchBtn" onclick="toggleLanguage()">
           EN / עב
@@ -626,7 +616,7 @@
 
           <button class="btn btn-secondary btn-sm" onclick="copyAllLogs()" data-i18n="logsCopy">העתק הכל</button>
           <button class="btn btn-secondary btn-sm" onclick="clearAllLogs()" data-i18n="logsClear">נקה</button>
-          <button class="btn btn-secondary btn-sm" onclick="closeLogsConsole()">✕</button>
+          <button class="btn btn-secondary btn-sm" onclick="closeLogsConsole()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
       </div>
 
@@ -641,7 +631,7 @@
     <div class="modal-box" style="max-width:580px;">
       <div class="modal-header">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:22px;">🚀</span>
+          <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path><path d="M12 9V4s3.03.55 4 2c1.08 1.62 0 5 0 5"></path></svg></span>
           <div>
             <h3 style="font-size:16px;font-weight:800;color:var(--neon-green);" data-i18n="updateModalTitle">עדכון גרסה זמין לתוכנה</h3>
             <div style="font-size:12px;color:var(--text-muted);">
@@ -651,7 +641,7 @@
             </div>
           </div>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="closeUpdateModal()">✕</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeUpdateModal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
 
       <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
@@ -698,7 +688,7 @@
           <span id="modalSevBadge" class="badge"></span>
           <h3 id="modalTitle" style="font-size:15px;font-weight:800;">Finding Details</h3>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="closeModal()">✕</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -725,7 +715,7 @@
     <div class="modal-box" style="max-width:560px;">
       <div class="modal-header">
         <h3 style="font-size:16px;font-weight:800;" data-i18n="settingsBtn">הגדרות</h3>
-        <button class="btn btn-secondary btn-sm" onclick="closeSettingsModal()">✕</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeSettingsModal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:16px;">
         <div>
@@ -781,7 +771,7 @@
       </div>
       <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
         <button class="btn btn-secondary btn-sm" onclick="checkAppVersion(true)">
-          🔄 בדוק עדכונים כעת
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-inline-end:5px;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg><span data-i18n="updateCheckNow">בדוק עדכונים כעת</span>
         </button>
         <button class="btn btn-primary" onclick="closeSettingsModal()">Done</button>
       </div>
@@ -810,6 +800,7 @@
 
   <!-- Toast Notification -->
   <div id="toast" class="toast">
+    <span id="toastIcon" class="toast-icon"></span>
     <span id="toastMessage">Ready</span>
   </div>
 
