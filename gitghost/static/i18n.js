@@ -176,6 +176,11 @@ window.UNFORCE_I18N = {
     detachedBlobsTitle: "Detached Git Blobs",
     remTitle: "GitHub History Purge & Secret Excision Playbook",
     invalidGhUrl: "Please paste a valid GitHub repository URL (e.g. https://github.com/owner/repo)",
-    clipboardEmpty: "Clipboard is empty — copy a GitHub repository URL first"
+    clipboardEmpty: "Clipboard is empty — copy a repository URL or local path first",
+    gcPurgedBadge: "Server GC Purged",
+    gcPurgedTitle: "Commit Purged by Cloud Garbage Collection (404)",
+    gcPurgedDesc: "Commit was identified in force-push event logs but was purged from server cloud cache (HTTP 404, 30-90 day GC cycle). Scan a developer's local repository clone to exhume the object from the local reflog.",
+    scanLocalCloneBtn: "Scan Developer's Local Clone",
+    promptLocalPath: "Enter local Git repository directory path:"
   }
 };
