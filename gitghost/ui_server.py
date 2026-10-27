@@ -1008,20 +1008,24 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._send_error(500, str(exc))
 
     def _handle_git_cherry_pick(self, data: dict):
-        from gitghost.github_remote import is_github_target
+        from gitghost.git_forensics import GitForensics
         from gitghost.recovery import ObjectRecoveryEngine
 
         repo_path_str = (data.get("repo_path") or ".").strip() or "."
         commit_hash = (data.get("commit_hash") or "").strip()
         no_commit = bool(data.get("no_commit", False))
 
-        if is_github_target(repo_path_str):
-            self._send_error(400, "Cherry-pick requires a local repository.")
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        git_dir = _get_effective_git_dir(pipeline_res) if pipeline_res else None
+        target_dir = git_dir or Path(repo_path_str).resolve()
+
+        if not GitForensics(target_dir).is_valid_repo():
+            self._send_error(400, "Cherry-pick requires a valid local repository clone.")
             return
 
         try:
             res = ObjectRecoveryEngine.cherry_pick_commit(
-                repo_path=repo_path_str,
+                repo_path=target_dir,
                 commit_hash=commit_hash,
                 no_commit=no_commit,
             )
