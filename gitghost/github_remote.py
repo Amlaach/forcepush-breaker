@@ -1164,6 +1164,7 @@ class SmartGitCloner:
                 ["clone", "--mirror", effective_clone_url, str(temp_dir)],
                 cwd=temp_dir.parent,
                 token=resolved_token,
+                target_host=target.host,
                 timeout=cls.CLONE_TIMEOUT_SECONDS,
             )
 
@@ -1261,19 +1262,34 @@ class SmartGitCloner:
         timeout: int,
         check: bool = True,
         disable_ssl_verify: bool = False,
+        target_host: Optional[str] = None,
     ) -> subprocess.CompletedProcess[str]:
         cmd = ["git"]
         if disable_ssl_verify or os.getenv("NODE_TLS_REJECT_UNAUTHORIZED") == "0":
             cmd.extend(["-c", "http.sslVerify=false"])
 
         if token:
-            # GitHub Git Smart HTTP requires Basic auth with x-access-token:<token>
-            b64_creds = base64.b64encode(f"x-access-token:{token.strip()}".encode("utf-8")).decode("ascii")
-            cmd.extend([
-                "-c", "credential.helper=",
-                "-c", "core.askPass=",
-                "-c", f"http.https://github.com/.extraHeader=Authorization: Basic {b64_creds}",
-            ])
+            clean_tok = token.strip()
+            if target_host and "gitlab" in target_host:
+                cmd.extend([
+                    "-c", "credential.helper=",
+                    "-c", "core.askPass=",
+                    "-c", f"http.https://{target_host}/.extraHeader=PRIVATE-TOKEN: {clean_tok}",
+                ])
+            elif target_host and "bitbucket" in target_host:
+                b64_creds = base64.b64encode(f"x-token-auth:{clean_tok}".encode("utf-8")).decode("ascii")
+                cmd.extend([
+                    "-c", "credential.helper=",
+                    "-c", "core.askPass=",
+                    "-c", f"http.https://{target_host}/.extraHeader=Authorization: Basic {b64_creds}",
+                ])
+            else:
+                b64_creds = base64.b64encode(f"x-access-token:{clean_tok}".encode("utf-8")).decode("ascii")
+                cmd.extend([
+                    "-c", "credential.helper=",
+                    "-c", "core.askPass=",
+                    "-c", f"http.https://github.com/.extraHeader=Authorization: Basic {b64_creds}",
+                ])
         else:
             cmd.extend(["-c", "core.askPass="])
 
