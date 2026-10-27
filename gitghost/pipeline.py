@@ -167,6 +167,7 @@ def run_scan_pipeline(
         forensics = GitForensics(working_repo_path)
         scan_result = forensics.scan()
         scan_result.repo_path = display_repo_label
+        # Ensure local reflogs and dangling objects are preserved for downstream triage
 
         if remote_acq is not None:
             existing_hashes = {c.commit_hash for c in scan_result.dangling_commits}
