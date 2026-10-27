@@ -3,34 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UnForce (ForcePush-Breaker) — GitGhost Cyber Forensics Studio</title>
+  <title>UnForce (ForcePush-Breaker / GitGhost) — Git Forensics &amp; Commit Recovery Studio</title>
   <!-- __UNFORCE_INLINE_CSS__ -->
 </head>
-<body>
+<body class="state-landing">
 
-  <!-- Custom Frameless Chromium Titlebar -->
+  <!-- Custom Frameless Desktop Titlebar -->
   <div id="desktopTitlebar" class="desktop-titlebar">
     <div class="titlebar-brand">
       <img id="titlebarLogoImg" class="titlebar-logo-img" alt="" style="display:none;">
-      <svg id="titlebarFallbackSvg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.2">
+      <svg id="titlebarFallbackSvg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.2">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
         <polygon points="13 6 8 14 12 14 11 18 16 10 12 10 13 6"></polygon>
       </svg>
-      <span>UNFORCE // FORCEPUSH-BREAKER</span>
-      <span id="titlebarVerBadge" class="titlebar-badge">v1.0.0</span>
+      <span class="brand-title-text">UNFORCE</span>
+      <span class="brand-divider">//</span>
+      <span class="brand-sub-text">FORCEPUSH-BREAKER</span>
+      <span id="titlebarVerBadge" class="titlebar-badge">v0.7.2</span>
     </div>
 
     <div class="titlebar-center">
-      <button class="cmd-trigger-btn" onclick="openCmdPalette()" title="Ctrl+K">
-        <span style="display:inline-flex;align-items:center;gap:6px;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <span data-i18n="cmdPlaceholder">פקודה מהירה או ניווט... (Ctrl+K)</span>
-        </span>
+      <!-- Update Available Pill Button (Shown instantly when newer GitHub release detected) -->
+      <button id="updateAvailableBtn" class="update-pulse-btn" onclick="openUpdateModal()" style="display:none;" title="עדכון גרסה זמין מ-GitHub">
+        <span class="pulse-indicator"></span>
+        <span data-i18n="updateAvailable">עדכון זמין: v</span>
+        <span id="updateVerBadge">0.7.2</span>
+        <span data-i18n="updateClick"> — לחץ לעדכון</span>
+      </button>
+
+      <button class="cmd-trigger-btn" onclick="openCmdPalette()" title="פקודה מהירה (Ctrl+K)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span data-i18n="cmdPlaceholder">פקודה מהירה... (Ctrl+K)</span>
         <span class="kbd-pill">Ctrl+K</span>
       </button>
     </div>
 
     <div class="titlebar-controls">
+      <button class="titlebar-icon-btn" onclick="openLogsConsole()" title="יומן פעילות ופורנזיקה">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span data-i18n="navLogs">לוגים</span>
+        <span id="titlebarLogsBadge" class="badge-mini">0</span>
+      </button>
       <button class="win-btn" onclick="winMinimize()" title="Minimize">
         <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.3"/></svg>
       </button>
@@ -43,712 +56,656 @@
     </div>
   </div>
 
-  <div class="app-shell">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="sidebar-logo-row">
-        <div class="brand-cluster">
-          <div class="brand-emblem">
-            <img id="sidebarLogoImg" alt="UnForce Logo" style="display:none;">
-            <svg id="sidebarFallbackSvg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-              <polygon points="13 6 8 14 12 14 11 18 16 10 12 10 13 6"></polygon>
-            </svg>
-          </div>
-          <div>
-            <div class="brand-name">UNFORCE</div>
-            <div class="brand-sub" data-i18n="brandSub">פורנזיקת GitHub, שחזור קומיטים וציד סודות</div>
-          </div>
-        </div>
+  <!-- =============================================================== -->
+  <!-- STATE 1: CLEAN EMPTY HERO LANDING VIEW (Before Repo Paste)      -->
+  <!-- =============================================================== -->
+  <div id="landingView" class="landing-viewport">
+    <div class="landing-content">
+      <div class="landing-emblem">
+        <img id="landingLogoImg" class="landing-logo-img" alt="UnForce Logo" style="display:none;">
+        <svg id="landingFallbackSvg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <polygon points="13 6 8 14 12 14 11 18 16 10 12 10 13 6"></polygon>
+        </svg>
       </div>
 
-      <!-- Quick GitHub URL Actions -->
-      <div>
-        <div class="sidebar-section-label" data-i18n="secQuickStart">סריקת GitHub מהירה</div>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <button class="btn btn-primary" style="width:100%;height:36px;font-size:12.5px;" onclick="pasteAndScanGitHub()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            <span data-i18n="qaPasteAndScan">הדבק כתובת מ-GitHub וסרוק</span>
-          </button>
-          <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:flex-start;padding-inline:10px;" onclick="focusGitHubInput()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-            <span data-i18n="qaFocusInput">הזן כתובת ריפו מ-GitHub</span>
-          </button>
-        </div>
-      </div>
+      <h1 class="landing-brand-title">UNFORCE</h1>
+      <p class="landing-slogan" data-i18n="landingSlogan">
+        שחזור היסטוריית קומיטים שנמחקו ב-Force-Push, איתור סודות ופורנזיקת Git
+      </p>
 
-      <!-- Forensics Modules Navigation -->
-      <div>
-        <div class="sidebar-section-label" data-i18n="secWorkspace">מודולי פורנזיקה</div>
-        <div class="nav-list">
-          <button class="nav-item active" data-view="overview" onclick="switchView('overview')">
-            <span class="nav-item-left">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-              <span data-i18n="navOverview">מוקד בקרה וציון אבטחה</span>
-            </span>
-            <span id="navBadgeScore" class="nav-badge">—</span>
-          </button>
-
-          <button class="nav-item" data-view="commits" onclick="switchView('commits')">
-            <span class="nav-item-left">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>
-              <span data-i18n="navCommits">חוקר קומיטים ועצי קבצים</span>
-            </span>
-            <span id="navBadgeCommits" class="nav-badge">0</span>
-          </button>
-
-          <button class="nav-item" data-view="findings" onclick="switchView('findings')">
-            <span class="nav-item-left">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg>
-              <span data-i18n="navFindings">סודות ודליפות מידע</span>
-            </span>
-            <span id="navBadgeFindings" class="nav-badge">0</span>
-          </button>
-
-          <button class="nav-item" data-view="timemachine" onclick="switchView('timemachine')">
-            <span class="nav-item-left">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              <span data-i18n="navTimeMachine">מכונת זמן לקבצי .env</span>
-            </span>
-            <span id="navBadgeTimeMachine" class="nav-badge">0</span>
-          </button>
-
-          <button class="nav-item" data-view="searchblobs" onclick="switchView('searchblobs')">
-            <span class="nav-item-left">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <span data-i18n="navSearchBlobs">חיפוש עמוק ועצמי רפאים</span>
-            </span>
-            <span id="navBadgeBlobs" class="nav-badge">0</span>
-          </button>
-
-          <button class="nav-item" data-view="remediation" onclick="switchView('remediation')">
-            <span class="nav-item-left">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-              <span data-i18n="navRemediation">ניקוי היסטוריה ב-GitHub</span>
-            </span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Recent Scanned GitHub Repos -->
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding-inline:8px;margin-bottom:6px;">
-          <span class="sidebar-section-label" style="padding:0;margin:0;" data-i18n="secRecent">ריפואים שנסרקו לאחרונה</span>
-          <button onclick="clearRecentRepos()" style="background:none;border:none;color:var(--text-muted);font-size:11px;cursor:pointer;" title="Clear">✕</button>
-        </div>
-        <div id="recentReposList" class="recent-list">
-          <div style="font-size:11.5px;color:var(--text-muted);padding:4px 8px;" data-i18n="recentEmpty">טרם נסרקו ריפואים מ-GitHub.</div>
-        </div>
-      </div>
-
-      <!-- Sidebar Footer: System Telemetry -->
-      <div class="sidebar-footer">
-        <div class="git-health-row">
-          <span style="display:inline-flex;align-items:center;gap:6px;">
-            <span id="gitHealthDot" class="dot dot-green"></span>
-            <span id="gitHealthText" class="ltr-mono" style="font-size:11px;">ENGINE ONLINE</span>
+      <!-- Primary Minimalist Repo Input & Action Bar -->
+      <div class="landing-search-card" id="landingSearchDropZone">
+        <div class="landing-input-wrap">
+          <span class="landing-input-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+          </span>
+          <input
+            type="text"
+            id="repoPathInput"
+            class="landing-input ltr-mono"
+            placeholder="https://github.com/owner/repo"
+            spellcheck="false"
+            autocomplete="off"
+            oninput="updateTargetTypeBadge()"
+            onkeydown="if(event.key==='Enter') startScan()"
+            autofocus
+          >
+          <span id="repoTargetBadge" class="target-type-pill">
+            <span id="repoTargetBadgeText" data-i18n="githubTargetPill">GitHub Repo</span>
           </span>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span>GitGhost // UnForce</span>
-          <span id="footerVersionText" class="ltr-mono">v1.0.0</span>
+
+        <div class="landing-action-buttons">
+          <button class="btn btn-paste" onclick="pasteGitHubUrlOnly()" title="הדבק כתובת מלוח ההעתקה">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span data-i18n="pasteBtn">הדבק URL</span>
+          </button>
+
+          <button class="btn btn-secondary" id="browseLocalBtn" onclick="selectLocalFolder()" title="בחר תיקיית מאגר מקומית">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            <span data-i18n="browseLocalBtn">בחר תיקייה</span>
+          </button>
+
+          <button class="btn btn-primary" id="scanBtn" onclick="startScan()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <span id="scanBtnText" data-i18n="scanBtn">סרוק ריפו</span>
+          </button>
         </div>
       </div>
-    </aside>
 
-    <!-- Main Workspace -->
-    <div class="workspace-main">
-      <!-- Top GitHub Repo URL Command Bar (ONLY Repo Selection Method) -->
-      <header class="top-toolbar">
-        <div class="toolbar-upper">
-          <div class="target-bar-row" title="גרור ושחרר תיקייה מקומית או הזן כתובת ריפו (GitHub / GitLab / Bitbucket)">
-            <div class="repo-input-wrap">
-              <span class="repo-input-icon" title="GitHub Repository URL">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-              </span>
-              <input
-                type="text"
-                id="repoPathInput"
-                class="repo-input ltr-mono"
-                placeholder="https://github.com/owner/repo"
-                value=""
-                spellcheck="false"
-                autocomplete="off"
-                oninput="updateTargetTypeBadge()"
-                onkeydown="if(event.key==='Enter') startScan()"
-              >
-              <span id="repoTargetBadge" class="target-type-pill">
-                <span id="repoTargetBadgeText" data-i18n="githubTargetPill">GitHub Repo</span>
-              </span>
+      <!-- Quick Samples & Recent Audited Repos -->
+      <div class="landing-meta-row">
+        <div class="landing-samples">
+          <span class="meta-label" data-i18n="sampleLabel">דוגמה מהירה:</span>
+          <button class="sample-chip" onclick="loadSampleGitHubUrl('https://github.com/octocat/Spoon-Knife')">octocat/Spoon-Knife</button>
+          <button class="sample-chip" onclick="loadSampleGitHubUrl('https://github.com/Amlaach/forcepush-breaker')">Amlaach/forcepush-breaker</button>
+        </div>
+
+        <div id="landingRecentContainer" class="landing-recent" style="display:none;">
+          <span class="meta-label" data-i18n="recentLabel">נסרק לאחרונה:</span>
+          <div id="landingRecentChips" class="recent-chips-wrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Minimalist Bottom Status Dock -->
+    <footer class="landing-footer">
+      <div class="footer-telemetry">
+        <span class="dot dot-green"></span>
+        <span class="ltr-mono">ENGINE ONLINE v0.7.2</span>
+      </div>
+      <div class="footer-actions">
+        <button class="text-link-btn" onclick="openLogsConsole()">
+          📜 <span data-i18n="navLogs">לוגים</span>
+        </button>
+        <button class="text-link-btn" onclick="checkAppVersion(true)">
+          🔄 <span data-i18n="updateCheckNow">בדוק עדכונים</span>
+        </button>
+        <button class="text-link-btn" onclick="openSettingsModal()">
+          ⚙️ <span data-i18n="settingsBtn">הגדרות</span>
+        </button>
+        <button class="text-link-btn" id="langSwitchBtn" onclick="toggleLanguage()">
+          EN / עב
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- STATE 2: ACTIVE REPO WORKSPACE VIEW (Shown During/After Scan)   -->
+  <!-- =============================================================== -->
+  <div id="workspaceView" class="workspace-viewport" style="display:none;">
+    <!-- Unified Sleek Workspace Top Header -->
+    <header class="workspace-header">
+      <div class="ws-header-left">
+        <button class="btn btn-secondary btn-sm ws-back-btn" onclick="returnToLanding()" title="חזרה למסך החיפוש הנקי">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 18-6-6 6-6"/></svg>
+          <span data-i18n="btnBackToHome">← חזרה לחיפוש</span>
+        </button>
+
+        <div class="active-repo-badge">
+          <span id="metaRepoPath" class="repo-name-text ltr-mono">—</span>
+          <span id="metaBranchBadge" class="badge badge-medium ltr-mono">main</span>
+          <span id="metaCleanBadge" class="badge badge-low ltr-mono" style="display:none;"></span>
+          <button class="icon-link-btn" onclick="openActiveRepoOnGitHub()" title="פתח ריפו ב-GitHub ↗">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Clean Horizontal Navigation Tabs -->
+      <nav class="ws-nav-tabs">
+        <button class="ws-tab-btn active" data-view="overview" onclick="switchView('overview')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span data-i18n="navOverview">סקירה ומדדים</span>
+        </button>
+
+        <button class="ws-tab-btn" data-view="commits" onclick="switchView('commits')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>
+          <span data-i18n="navCommits">קומיטים</span>
+          <span id="navBadgeCommits" class="tab-badge">0</span>
+        </button>
+
+        <button class="ws-tab-btn" data-view="findings" onclick="switchView('findings')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg>
+          <span data-i18n="navFindings">סודות ודליפות</span>
+          <span id="navBadgeFindings" class="tab-badge">0</span>
+        </button>
+
+        <button class="ws-tab-btn" data-view="timemachine" onclick="switchView('timemachine')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span data-i18n="navTimeMachine">מכונת זמן .env</span>
+          <span id="navBadgeTimeMachine" class="tab-badge">0</span>
+        </button>
+
+        <button class="ws-tab-btn" data-view="searchblobs" onclick="switchView('searchblobs')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <span data-i18n="navSearchBlobs">חיפוש עמוק</span>
+        </button>
+
+        <button class="ws-tab-btn" data-view="remediation" onclick="switchView('remediation')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <span data-i18n="navRemediation">ניקוי היסטוריה</span>
+        </button>
+      </nav>
+
+      <!-- Right Header Actions -->
+      <div class="ws-header-right">
+        <button class="btn btn-secondary btn-sm" onclick="openLogsConsole()" title="יומן פעילות ופורנזיקה">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span data-i18n="navLogs">לוגים</span>
+          <span id="wsLogsBadge" class="badge-mini">0</span>
+        </button>
+
+        <button class="btn btn-purple btn-sm" onclick="downloadRecoveryBundle()" title="חבילת שחזור מלאה (.ZIP)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span data-i18n="bundleBtn">ZIP שחזור</span>
+        </button>
+
+        <button class="btn btn-secondary btn-sm" onclick="downloadReport('json')" title="Export JSON">JSON</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportSARIF()" title="Export SARIF 2.1.0">SARIF</button>
+
+        <button class="btn btn-secondary btn-sm" onclick="openSettingsModal()" title="Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Sleek High-Tech Progress Bar (Visible while scanning) -->
+    <div id="scanProgressContainer" class="scan-progress-box" style="display:none;">
+      <div class="progress-info-row">
+        <span id="progressStatusText" class="ltr-mono">Acquiring GitHub bare mirror...</span>
+        <span id="progressPctText" class="ltr-mono">0%</span>
+      </div>
+      <div class="scan-progress-track">
+        <div id="scanProgressFill" class="scan-progress-fill"></div>
+      </div>
+    </div>
+
+    <!-- Main Workspace Content Scroll Viewport -->
+    <main class="ws-content-viewport">
+
+      <!-- ========================================================= -->
+      <!-- VIEW 1: OVERVIEW & HYGIENE SCORE                          -->
+      <!-- ========================================================= -->
+      <section id="viewOverview" class="view-panel active">
+        <!-- KPI Cards Grid -->
+        <div class="overview-cards-grid">
+          <div class="kpi-card" onclick="openCommitsWithSubtab('dangling')">
+            <div class="kpi-top">
+              <span data-i18n="kpiCommits">קומיטים יתומים / Force-Push</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--magenta)" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
             </div>
-
-            <button class="btn btn-secondary" style="height:40px;" id="browseLocalBtn" onclick="selectLocalFolder()" title="בחר תיקיית מאגר מקומית">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-              <span data-i18n="browseLocalBtn">בחר תיקייה</span>
-            </button>
-
-            <button class="btn btn-paste" onclick="pasteGitHubUrlOnly()" title="הדבק כתובת מלוח ההעתקה">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              <span data-i18n="pasteBtn">הדבק URL</span>
-            </button>
-
-            <button class="btn btn-primary" style="height:40px;" id="scanBtn" onclick="startScan()">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-              <span id="scanBtnText" data-i18n="scanBtn">סרוק ריפו מ-GitHub</span>
-            </button>
+            <div id="statCommits" class="kpi-val">0</div>
+            <div class="kpi-sub" data-i18n="kpiCommitsSub">קומיטים שנדרסו או נותקו מההיסטוריה</div>
           </div>
 
-          <div class="toolbar-actions">
-            <div class="status-pill" onclick="openSettingsModal()" style="cursor:pointer;" title="AI Triage Engine">
-              <span id="aiDot" class="dot dot-green"></span>
-              <span id="aiStatusText" class="ltr-mono" style="font-size:11px;">AI: Heuristic</span>
+          <div class="kpi-card" onclick="openCommitsWithSubtab('branch')">
+            <div class="kpi-top">
+              <span data-i18n="kpiBranchCommits">קומיטים בהיסטוריית הריפו</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
             </div>
-            <div class="status-pill" onclick="openSettingsModal()" style="cursor:pointer;" title="GitHub Auth Status">
-              <span id="ghDot" class="dot dot-cyan"></span>
-              <span id="ghStatusText" class="ltr-mono" style="font-size:11px;">GH: Ready</span>
+            <div id="statBranchCommits" class="kpi-val" style="color:var(--cyan-bright);">0</div>
+            <div class="kpi-sub" data-i18n="kpiBranchCommitsSub">זמינים לעיון מלא ב-Diff ובעץ הקבצים</div>
+          </div>
+
+          <div class="kpi-card" onclick="switchView('findings')">
+            <div class="kpi-top">
+              <span data-i18n="kpiSecrets">סודות ופרטי גישה שזוהו</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
             </div>
+            <div id="statSecrets" class="kpi-val" style="color:var(--neon-green);">0</div>
+            <div id="statSecretsBreakdown" class="kpi-sub" data-i18n="kpiSecretsSub">מוסווים קריפטוגרפית (Strict Redaction)</div>
+          </div>
 
-            <button class="btn btn-purple btn-sm" onclick="downloadRecoveryBundle()" title="Download Full Forensics & Recovery ZIP Bundle">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              <span data-i18n="bundleBtn">חבילת שחזור (.ZIP)</span>
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="downloadReport('json')" title="Export JSON Audit">JSON</button>
-            <button class="btn btn-secondary btn-sm" onclick="downloadReport('markdown')" title="Export Markdown Report">MD</button>
-            <button class="btn btn-secondary btn-sm" onclick="exportSARIF()" title="Export SARIF 2.1.0">SARIF</button>
-
-            <button class="btn btn-secondary btn-sm" id="langSwitchBtn" onclick="toggleLanguage()" title="Switch Language / החלף שפה">
-              EN / עב
-            </button>
-
-            <button class="btn btn-secondary btn-sm" onclick="openSettingsModal()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-              <span data-i18n="settingsBtn">הגדרות</span>
-            </button>
+          <div class="kpi-card" onclick="switchView('timemachine')">
+            <div class="kpi-top">
+              <span data-i18n="kpiConfigs">קבצי .env / Blobs שנחשפו</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div id="statTotalObjects" class="kpi-val">0</div>
+            <div class="kpi-sub" data-i18n="kpiConfigsSub">קבצי הגדרות שנמחקו או עצמים מנותקים</div>
           </div>
         </div>
 
-        <!-- Live Progress Indicator -->
-        <div id="scanProgressContainer" class="scan-progress-box">
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--neon-green);font-weight:700;">
-            <span id="progressStatusText" class="ltr-mono">Acquiring GitHub bare mirror...</span>
-            <span id="progressPctText" class="ltr-mono">0%</span>
-          </div>
-          <div class="scan-progress-track">
-            <div id="scanProgressFill" class="scan-progress-fill"></div>
-          </div>
-        </div>
-      </header>
-
-      <!-- Main Scrollable Viewport -->
-      <main class="content-scroll">
-
-        <!-- Active GitHub Target Strip -->
-        <div id="repoMetaStrip" class="repo-meta-strip">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <span id="metaRepoPath" class="code-chip" style="font-weight:700;color:var(--neon-green);border-color:rgba(0,255,157,0.4);"></span>
-            <span id="metaBranchBadge" class="badge badge-medium ltr-mono"></span>
-            <span id="metaCleanBadge" class="badge badge-low ltr-mono"></span>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-secondary btn-sm" onclick="openActiveRepoOnGitHub()">
-              <span data-i18n="btnOpenGitHub">פתח ריפו ב-GitHub ↗</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- ========================================================= -->
-        <!-- VIEW 1: CYBER COMMAND HUD & SCORECARD                     -->
-        <!-- ========================================================= -->
-        <section id="viewOverview" class="view-panel active">
-          <!-- Onboarding Hacker Hero Card -->
-          <div id="welcomeBanner" class="welcome-banner">
-            <div style="flex:1;min-width:300px;">
-              <div class="cyber-tag">
-                <span>●</span>
-                <span data-i18n="cyberTag">CYBER GIT FORENSICS // GITHUB MIRROR ENGINE</span>
-              </div>
-              <h1 style="font-size:20px;font-weight:900;margin-bottom:6px;color:#ffffff;" data-i18n="heroTitle">
-                העתק כתובת ריפו מ-GitHub — וחשוף כל קומיט, קובץ או סוד שנמחקו
-              </h1>
-              <p style="color:var(--text-secondary);font-size:13.5px;max-width:820px;" data-i18n="heroDesc">
-                סריקת פורנזיקה עמוקה למאגרי GitHub (ציבוריים ופרטיים): חילוץ קומיטים שנדרסו ב-Force-Push, עיון מלא בעץ הקבצים של כל קומיט בהיסטוריה, שחזור קבצי .env שנמחקו וזיהוי מפתחות API דולפים.
-              </p>
-
-              <div class="welcome-steps">
-                <div class="welcome-step-box">
-                  <div style="font-weight:800;color:var(--neon-green);margin-bottom:4px;" data-i18n="step1Title">1. העתק קישור של ריפו מ-GitHub</div>
-                  <div style="font-size:12px;color:var(--text-secondary);" data-i18n="step1Desc">העתק כל כתובת מהדפדפן (למשל https://github.com/owner/repo) — תומך אוטומטית גם בריפואים פרטיים שלך.</div>
-                </div>
-                <div class="welcome-step-box">
-                  <div style="font-weight:800;color:var(--cyan-bright);margin-bottom:4px;" data-i18n="step2Title">2. לחץ ״הדבק וסרוק״</div>
-                  <div style="font-size:12px;color:var(--text-secondary);" data-i18n="step2Desc">המנוע מוריד תמונת מראה מלאה, סורק אירועי Force-Push, היסטוריית קומיטים, עצי קבצים ורמות אנטרופיה.</div>
-                </div>
-                <div class="welcome-step-box">
-                  <div style="font-weight:800;color:var(--purple-bright);margin-bottom:4px;" data-i18n="step3Title">3. צפה ב-Diff, שחזר או נקה</div>
-                  <div style="font-size:12px;color:var(--text-secondary);" data-i18n="step3Desc">דפדף בכל קובץ בכל נקודת זמן, אמת האם מפתח API עדיין פעיל, וייצא דוח או חבילת שחזור (.ZIP).</div>
-                </div>
-              </div>
-
-              <div class="sample-targets-row">
-                <span style="font-size:12px;color:var(--text-muted);font-weight:700;" data-i18n="sampleLabel">בדיקה מהירה (לחץ לטעינה):</span>
-                <button class="sample-chip" onclick="loadSampleGitHubUrl('https://github.com/Amlaach/forcepush-breaker')">github.com/Amlaach/forcepush-breaker</button>
-                <button class="sample-chip" onclick="loadSampleGitHubUrl('https://github.com/octocat/Spoon-Knife')">github.com/octocat/Spoon-Knife</button>
+        <!-- Hygiene Score & History Rewrite Events Row -->
+        <div class="overview-details-grid">
+          <div class="card score-card">
+            <div class="card-header-clean">
+              <span data-i18n="scoreTitle">ציון היגיינת ריפו</span>
+              <span id="scoreGrade" class="gauge-grade">A+ READY</span>
+            </div>
+            <div class="gauge-wrap">
+              <svg class="gauge-svg" viewBox="0 0 160 160">
+                <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
+                <circle id="gaugeCircle" class="gauge-arc" cx="80" cy="80" r="70"></circle>
+              </svg>
+              <div class="gauge-center">
+                <span id="scoreNumber" class="gauge-num">100</span>
+                <span class="gauge-pct">/ 100</span>
               </div>
             </div>
-
-            <div style="display:flex;flex-direction:column;gap:10px;min-width:230px;">
-              <button class="btn btn-primary" style="height:44px;font-size:14px;" onclick="pasteAndScanGitHub()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                <span data-i18n="qaPasteAndScan">הדבק כתובת מ-GitHub וסרוק</span>
-              </button>
+            <div id="scoreSummary" class="score-summary-text" data-i18n="scoreReady">
+              הסריקה הושלמה בהצלחה.
             </div>
+            <div id="deductionsList" class="deductions-list"></div>
           </div>
 
-          <!-- Live Hacker Forensics Operations Console -->
-          <div class="hacker-terminal">
-            <div class="terminal-header">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div class="terminal-dots">
-                  <span style="background:#ff2a6d;"></span>
-                  <span style="background:#ffb800;"></span>
-                  <span style="background:#00ff9d;"></span>
-                </div>
-                <span style="font-family:var(--font-mono);font-size:11px;font-weight:800;color:var(--neon-green);letter-spacing:0.06em;" data-i18n="terminalTitle">LIVE FORENSICS OPS CONSOLE</span>
-              </div>
-              <button onclick="clearTerminalLogs()" style="background:none;border:none;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;cursor:pointer;">[CLEAR]</button>
-            </div>
-            <div id="terminalLogBody" class="terminal-body">
-              <div class="term-line"><span class="term-ts">[READY]</span><span class="term-ok">UnForce Cyber-Forensics Engine initialized. Strict cryptographic secret masking active.</span></div>
-              <div class="term-line"><span class="term-ts">[INPUT]</span><span>Awaiting target GitHub repository URL (https://github.com/owner/repo)...</span></div>
-            </div>
-          </div>
-
-          <!-- Top KPI & Hygiene Gauge -->
-          <div class="overview-hero-grid">
-            <div class="card score-card">
-              <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.06em;">
-                <span data-i18n="scoreTitle">Repo Hygiene Score</span>
-              </div>
-              <div class="gauge-wrap">
-                <svg class="gauge-svg" viewBox="0 0 160 160">
-                  <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
-                  <circle id="gaugeCircle" class="gauge-arc" cx="80" cy="80" r="70"></circle>
-                </svg>
-                <div class="gauge-center">
-                  <span id="scoreNumber" class="gauge-num">100</span>
-                  <span id="scoreGrade" class="gauge-grade">A+ READY</span>
-                </div>
-              </div>
-              <div id="scoreSummary" style="font-size:12.5px;color:var(--text-muted);" data-i18n="scoreReady">
-                הדבק כתובת GitHub למעלה כדי להתחיל בסריקה.
-              </div>
-            </div>
-
-            <div class="kpi-grid">
-              <div class="kpi-card" onclick="openCommitsWithSubtab('dangling')">
-                <div class="kpi-top">
-                  <span data-i18n="kpiCommits">קומיטים יתומים / Force-Push</span>
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--magenta)" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
-                </div>
-                <div id="statCommits" class="kpi-val">0</div>
-                <div class="kpi-sub" data-i18n="kpiCommitsSub">קומיטים שנדרסו או נותקו מההיסטוריה</div>
-              </div>
-
-              <div class="kpi-card" onclick="openCommitsWithSubtab('branch')">
-                <div class="kpi-top">
-                  <span data-i18n="kpiBranchCommits">קומיטים בהיסטוריית הריפו</span>
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                </div>
-                <div id="statBranchCommits" class="kpi-val" style="color:var(--cyan-bright);">0</div>
-                <div class="kpi-sub" data-i18n="kpiBranchCommitsSub">זמינים לעיון מלא ב-Diff ובעץ הקבצים</div>
-              </div>
-
-              <div class="kpi-card" onclick="switchView('findings')">
-                <div class="kpi-top">
-                  <span data-i18n="kpiSecrets">סודות ופרטי גישה שזוהו</span>
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
-                </div>
-                <div id="statSecrets" class="kpi-val" style="color:var(--neon-green);">0</div>
-                <div id="statSecretsBreakdown" class="kpi-sub" data-i18n="kpiSecretsSub">מוסווים קריפטוגרפית (Strict Redaction)</div>
-              </div>
-
-              <div class="kpi-card" onclick="switchView('timemachine')">
-                <div class="kpi-top">
-                  <span data-i18n="kpiConfigs">קבצי .env / Blobs שנחשפו</span>
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                </div>
-                <div id="statTotalObjects" class="kpi-val">0</div>
-                <div class="kpi-sub" data-i18n="kpiConfigsSub">קבצי הגדרות שנמחקו או עצמים מנותקים</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Deductions & Latest Commits Row -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-            <div class="card">
-              <h3 style="font-size:15px;font-weight:800;color:var(--cyan-bright);margin-bottom:10px;" data-i18n="deductionsTitle">
-                פירוט ממצאים והפחתות ציון
+          <div class="card events-card">
+            <div class="card-header-clean">
+              <h3 style="font-size:14px;font-weight:800;color:var(--cyan-bright);" data-i18n="latestCommitsTitle">
+                קומיטים אחרונים ואירועי Force-Push
               </h3>
-              <div id="deductionsList" style="display:flex;flex-direction:column;gap:8px;">
-                <div style="color:var(--neon-green);font-size:13px;" class="ltr-mono">[READY] Paste a GitHub URL and execute scan.</div>
-              </div>
+              <button class="btn btn-secondary btn-sm" onclick="switchView('commits')" data-i18n="openExplorerBtn">
+                לסייר הקומיטים ←
+              </button>
+            </div>
+            <div id="overviewRecentCommits" class="overview-commits-list">
+              <div class="empty-hint">אין קומיטים להצגה עדיין.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- VIEW 2: COMMIT & FILE-TREE FORENSICS EXPLORER             -->
+      <!-- ========================================================= -->
+      <section id="viewCommits" class="view-panel">
+        <div class="panel-toolbar">
+          <div class="segmented-bar">
+            <button class="seg-btn active" id="segBtnDangling" onclick="switchCommitSubtab('dangling')">
+              <span data-i18n="subtabDangling">קומיטים יתומים / Force-Push</span>
+              (<span id="subCountDangling">0</span>)
+            </button>
+            <button class="seg-btn" id="segBtnBranch" onclick="switchCommitSubtab('branch')">
+              <span data-i18n="subtabBranch">כל היסטוריית הקומיטים</span>
+              (<span id="subCountBranch">0</span>)
+            </button>
+            <button class="seg-btn" id="segBtnRemote" onclick="switchCommitSubtab('remote')">
+              <span data-i18n="subtabRemote">אירועי Force-Push ו-Forks</span>
+              (<span id="subCountRemote">0</span>)
+            </button>
+          </div>
+
+          <input
+            type="text"
+            id="commitFilterInput"
+            class="input-field"
+            style="min-width:260px;"
+            placeholder="סינון לפי הודעה, מחבר, קובץ, SHA..."
+            oninput="renderCommitsList()"
+          >
+        </div>
+
+        <!-- Split View: Commits List on Left + Inspector Pane on Right -->
+        <div id="subpanelCommitsSplit" class="recovery-split">
+          <div id="commitsListContainer" class="commit-card-list">
+            <div class="card empty-card" data-i18n="selectCommitPrompt">
+              סרוק ריפו כדי לצפות בקומיטים שנמחקו.
+            </div>
+          </div>
+
+          <div class="inspector-pane" id="commitInspectorPane">
+            <div id="commitInspectorEmpty" class="inspector-empty">
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.6"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>
+              <div data-i18n="selectCommitPrompt">בחר קומיט מהרשימה לצפייה ב-Diff המלא, דפדוף בעץ הקבצים או שחזור.</div>
             </div>
 
-            <div class="card">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <h3 style="font-size:15px;font-weight:800;color:var(--neon-green);" data-i18n="latestCommitsTitle">קומיטים אחרונים ונקודות שחזור</h3>
-                <button class="btn btn-secondary btn-sm" onclick="switchView('commits')" data-i18n="openExplorerBtn">לסייר הקומיטים ←</button>
+            <div id="commitInspectorContent" style="display:none;flex-direction:column;height:100%;">
+              <div class="inspector-header">
+                <div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span id="inspCommitSha" class="code-chip ltr-mono" style="font-weight:700;"></span>
+                    <span id="inspCommitTypeBadge" class="badge badge-high"></span>
+                  </div>
+                  <div id="inspCommitSubject" style="font-weight:800;font-size:14.5px;color:#ffffff;margin-top:4px;"></div>
+                  <div id="inspCommitMeta" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+                </div>
+
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <button class="btn btn-secondary btn-sm" onclick="exportActiveCommitPatch()" data-i18n="btnExportPatch">Export .patch</button>
+                  <button class="btn btn-secondary btn-sm" id="btnInspOpenGH" onclick="openActiveCommitOnGitHub()" data-i18n="btnOpenCommitGH">GitHub ↗</button>
+                  <button class="btn btn-secondary btn-sm" id="btnInspCherryPick" onclick="cherryPickActiveCommit()" data-i18n="btnCherryPick">שחזר לענף נוכחי</button>
+                  <button class="btn btn-primary btn-sm" id="btnInspRestoreBranch" onclick="restoreActiveCommitToBranch()" data-i18n="btnRestoreBranch">שחזר לענף חדש</button>
+                </div>
               </div>
-              <div id="overviewRecentCommits" style="display:flex;flex-direction:column;gap:8px;">
-                <div style="color:var(--text-muted);font-size:13px;">Run a GitHub scan to inspect commits and file trees.</div>
+
+              <!-- Inspector Inner Tabs: Diff vs File Tree -->
+              <div class="inspector-subtabs">
+                <button class="subtab-btn active" id="tabBtnDiff" onclick="switchInspectorSubtab('diff')" data-i18n="tabDiffView">Unified Diff</button>
+                <button class="subtab-btn" id="tabBtnTree" onclick="switchInspectorSubtab('tree')">
+                  <span data-i18n="tabFileTree">עץ קבצים</span> (<span id="inspFileCount">0</span>)
+                </button>
+              </div>
+
+              <div id="inspDiffPane" class="inspector-body active">
+                <div id="inspDiffContainer" class="diff-container"></div>
+              </div>
+
+              <div id="inspTreePane" class="inspector-body">
+                <div class="tree-layout">
+                  <div id="inspTreeList" class="tree-list"></div>
+                  <div class="tree-preview">
+                    <div class="tree-preview-header">
+                      <span id="treePreviewFilePath" class="ltr-mono" style="font-size:12px;color:var(--cyan-bright);font-weight:700;">No file selected</span>
+                      <div style="display:flex;gap:6px;">
+                        <button class="btn btn-secondary btn-sm" id="btnSaveThisFile" onclick="savePreviewedFileAs()" data-i18n="btnSaveFile">Save File</button>
+                        <button class="btn btn-secondary btn-sm" id="btnCopyThisFile" onclick="copyPreviewedFile()" data-i18n="btnCopyFile">Copy Content</button>
+                      </div>
+                    </div>
+                    <div id="treePreviewContent" class="code-view" style="flex:1;">Select a file to inspect content</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <!-- ========================================================= -->
-        <!-- VIEW 2: COMMIT & FILE-TREE FORENSICS EXPLORER             -->
-        <!-- ========================================================= -->
-        <section id="viewCommits" class="view-panel">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
-            <div class="segmented-bar">
-              <button class="seg-btn active" id="segBtnDangling" onclick="switchCommitSubtab('dangling')">
-                <span data-i18n="subtabDangling">קומיטים יתומים / Force-Push</span>
-                (<span id="subCountDangling">0</span>)
-              </button>
-              <button class="seg-btn" id="segBtnBranch" onclick="switchCommitSubtab('branch')">
-                <span data-i18n="subtabBranch">כל היסטוריית הקומיטים בריפו</span>
-                (<span id="subCountBranch">0</span>)
-              </button>
-              <button class="seg-btn" id="segBtnRemote" onclick="switchCommitSubtab('remote')">
-                <span data-i18n="subtabRemote">אירועי Force-Push ו-Forks</span>
-                (<span id="subCountRemote">0</span>)
-              </button>
-            </div>
+        <!-- Remote Force-Push Events Subpanel -->
+        <div id="subpanelRemoteEvents" style="display:none;">
+          <div id="remoteEventsContainer" style="display:flex;flex-direction:column;gap:12px;"></div>
+        </div>
+      </section>
 
+      <!-- ========================================================= -->
+      <!-- VIEW 3: SECRETS & LEAKS (Findings)                        -->
+      <!-- ========================================================= -->
+      <section id="viewFindings" class="view-panel">
+        <div class="panel-toolbar">
+          <input
+            type="text"
+            id="findingsFilterInput"
+            class="input-field"
+            style="min-width:280px;"
+            placeholder="סנן לפי קובץ, כלל, ערך מוסווה..."
+            oninput="filterFindings()"
+          >
+
+          <select id="severityFilter" class="select-field" onchange="filterFindings()">
+            <option value="all">כל דרגות החומרה</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:60px;" data-i18n="thId">מזהה</th>
+                <th style="width:100px;" data-i18n="thSeverity">חומרה</th>
+                <th data-i18n="thRule">סוג ממצא</th>
+                <th data-i18n="thMasked">סוד מוסווה</th>
+                <th data-i18n="thLocation">מיקום</th>
+                <th style="width:80px;" data-i18n="thEntropy">אנטרופיה</th>
+                <th style="width:140px;" data-i18n="thVerdict">פסק דין AI</th>
+                <th style="width:140px;" data-i18n="thActions">פעולות</th>
+              </tr>
+            </thead>
+            <tbody id="findingsTableBody">
+              <tr><td colspan="8" class="empty-cell">סרוק מאגר לצפייה בממצאי סודות ודליפות מידע.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- VIEW 4: .ENV TIME MACHINE                                 -->
+      <!-- ========================================================= -->
+      <section id="viewTimeMachine" class="view-panel">
+        <div class="panel-toolbar">
+          <input
+            type="text"
+            id="tmFilterInput"
+            class="input-field"
+            style="min-width:280px;"
+            placeholder="סנן קבצים (.env, secrets.json, id_rsa)..."
+            oninput="renderTimeMachineTable()"
+          >
+          <select id="tmTypeFilter" class="select-field" onchange="renderTimeMachineTable()">
+            <option value="all">כל סוגי הקבצים</option>
+            <option value="env">קבצי .env בלבד</option>
+            <option value="key">מפתחות פרטיים (Keys)</option>
+            <option value="credential">קבצי Credentials &amp; Secrets</option>
+          </select>
+        </div>
+
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th data-i18n="thFileName">שם ונתיב קובץ</th>
+                <th style="width:120px;" data-i18n="thCategory">קטגוריה</th>
+                <th data-i18n="thOrigin">קומיט מקור / Blob</th>
+                <th style="width:160px;" data-i18n="thAuthorDate">מחבר ותאריך</th>
+                <th style="width:180px;" data-i18n="thActions">פעולות</th>
+              </tr>
+            </thead>
+            <tbody id="timeMachineTableBody">
+              <tr><td colspan="5" class="empty-cell">אין קבצי תצורה רגישים להצגה כרגע.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- VIEW 5: DEEP FORENSICS OBJECT SEARCH                      -->
+      <!-- ========================================================= -->
+      <section id="viewSearchBlobs" class="view-panel">
+        <div class="card" style="margin-bottom:16px;">
+          <h3 style="font-size:15px;font-weight:800;color:var(--cyan-bright);margin-bottom:8px;" data-i18n="deepSearchTitle">
+            חיפוש עמוק בכל הקומיטים, ה-Diffs ועצמי ה-Git
+          </h3>
+          <div style="display:flex;gap:8px;">
             <input
               type="text"
-              id="commitFilterInput"
-              class="input-field"
-              style="min-width:260px;"
-              placeholder="Filter commits by message, file, author, SHA..."
-              oninput="renderCommitsList()"
+              id="deepSearchInput"
+              class="input-field ltr-mono"
+              style="flex:1;"
+              placeholder="חפש מילת מפתח, שם משתנה, הודעת קומיט או hash..."
+              onkeydown="if(event.key==='Enter') executeDeepSearch()"
             >
+            <button class="btn btn-primary" onclick="executeDeepSearch()" data-i18n="deepSearchBtn">
+              הרץ חיפוש
+            </button>
+          </div>
+        </div>
+
+        <div id="searchResultsCard" class="card" style="display:none;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h4 style="font-size:14px;font-weight:800;color:var(--neon-green);" id="searchResultsTitle">תוצאות חיפוש</h4>
+            <span id="searchResultsCount" class="badge badge-medium">0 תוצאות</span>
+          </div>
+          <div id="searchResultsList" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+
+        <div class="card table-card">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+            <h3 style="font-size:14px;font-weight:800;color:var(--amber);" data-i18n="detachedBlobsTitle">עצמי Git מנותקים (Detached Blobs)</h3>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:180px;">SHA / Object</th>
+                <th style="width:100px;">גודל</th>
+                <th style="width:120px;">סוג</th>
+                <th>תצוגה מקדימה מוסווית</th>
+                <th style="width:140px;">פעולות</th>
+              </tr>
+            </thead>
+            <tbody id="detachedBlobsTableBody">
+              <tr><td colspan="5" class="empty-cell">סרוק ריפו כדי לחלץ אובייקטים מנותקים.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- VIEW 6: HISTORY CLEANUP & REMEDIATION                     -->
+      <!-- ========================================================= -->
+      <section id="viewRemediation" class="view-panel">
+        <div class="card" style="margin-bottom:16px;">
+          <h2 style="font-size:18px;font-weight:800;color:var(--neon-green);margin-bottom:6px;" data-i18n="remTitle">
+            תוכנית עבודה: מחיקת היסטוריה מ-GitHub והסרת סודות
+          </h2>
+          <p style="font-size:13px;color:var(--text-secondary);">
+            פקודות Git מומלצות לטיהור סופי של סודות וקומיטים שנדרסו.
+          </p>
+        </div>
+
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header-clean">
+            <h3 style="font-size:14px;font-weight:800;color:var(--cyan-bright);">טיהור באמצעות git-filter-repo</h3>
+            <button class="btn btn-secondary btn-sm" onclick="copyFilterRepoCommands()">העתק פקודות</button>
+          </div>
+          <pre id="remediationScriptView" class="code-view ltr-mono" style="padding:12px 16px;font-size:12.5px;"></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-header-clean">
+            <h3 style="font-size:14px;font-weight:800;color:var(--amber);">פנייה לתמיכת GitHub (Cache Excision Ticket)</h3>
+            <button class="btn btn-secondary btn-sm" onclick="copySupportTicket()">העתק פנייה</button>
+          </div>
+          <pre id="supportTicketView" class="code-view" style="padding:12px 16px;font-size:12.5px;"></pre>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- DEDICATED FORENSICS ACTIVITY & LOGS DRAWER                      -->
+  <!-- =============================================================== -->
+  <div id="logsDrawer" class="logs-drawer-overlay" style="display:none;" onclick="if(event.target===this) closeLogsConsole()">
+    <div class="logs-drawer-panel">
+      <div class="logs-header">
+        <div class="logs-title-row">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span style="font-weight:800;font-size:14px;color:#ffffff;" data-i18n="logsTitle">יומן פעילות ופורנזיקה (Logs)</span>
+          <span id="logsTotalCountBadge" class="badge-pill">0</span>
+        </div>
+
+        <div class="logs-controls">
+          <div class="logs-filters">
+            <button class="log-filter-btn active" data-filter="all" onclick="filterLogs('all')" data-i18n="logsFilterAll">הכל</button>
+            <button class="log-filter-btn" data-filter="info" onclick="filterLogs('info')" data-i18n="logsFilterInfo">מידע</button>
+            <button class="log-filter-btn" data-filter="warn" onclick="filterLogs('warn')" data-i18n="logsFilterWarn">אזהרות</button>
+            <button class="log-filter-btn" data-filter="error" onclick="filterLogs('error')" data-i18n="logsFilterError">שגיאות</button>
+            <button class="log-filter-btn" data-filter="forensics" onclick="filterLogs('forensics')" data-i18n="logsFilterForensics">פורנזיקה</button>
           </div>
 
-          <!-- Split Inspector (Used for BOTH Dangling & Full Branch Commit Log!) -->
-          <div id="subpanelCommitsSplit" class="recovery-split">
-            <div id="commitsListContainer" class="commit-card-list">
-              <div class="card" style="text-align:center;color:var(--text-muted);padding:32px;">
-                Paste a GitHub URL and scan to browse commits.
-              </div>
-            </div>
+          <input type="text" id="logsSearchInput" class="input-field ltr-mono" style="height:28px;font-size:12px;width:180px;" placeholder="סינון..." oninput="renderLogsConsole()">
 
-            <div class="inspector-pane" id="commitInspectorPane">
-              <div id="commitInspectorEmpty" style="margin:auto;text-align:center;padding:40px;color:var(--text-muted);max-width:440px;">
-                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.6" style="margin-bottom:10px;opacity:0.7;"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>
-                <div data-i18n="selectCommitPrompt">בחר קומיט מהרשימה כדי לצפות ב-Diff המלא, לדפדף בכל הקבצים באותו קומיט או להוריד קבצים.</div>
-              </div>
+          <label class="logs-autoscroll-label">
+            <input type="checkbox" id="logsAutoScrollCheck" checked onchange="toggleLogsAutoScroll(this.checked)">
+            <span data-i18n="logsAutoScroll">גלילה אוטומטית</span>
+          </label>
 
-              <div id="commitInspectorContent" style="display:none;flex-direction:column;height:100%;">
-                <div class="inspector-header">
-                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
-                    <div>
-                      <div id="inspCommitTitle" style="font-size:15.5px;font-weight:800;color:#ffffff;"></div>
-                      <div id="inspCommitMeta" style="font-size:12px;color:var(--text-muted);margin-top:3px;"></div>
-                    </div>
-                    <span id="inspCommitShaChip" class="code-chip" style="cursor:pointer;" onclick="copyActiveCommitSha()" title="Click to copy full SHA"></span>
-                  </div>
+          <button class="btn btn-secondary btn-sm" onclick="copyAllLogs()" data-i18n="logsCopy">העתק הכל</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearAllLogs()" data-i18n="logsClear">נקה</button>
+          <button class="btn btn-secondary btn-sm" onclick="closeLogsConsole()">✕</button>
+        </div>
+      </div>
 
-                  <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;">
-                    <button class="btn btn-emerald btn-sm" onclick="switchInspectorMode('files')">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                      <span data-i18n="tabFileTree">עץ קבצים מלא בקומיט</span>
-                    </button>
-                    <button class="btn btn-secondary btn-sm" id="btnRestoreCommitBranch" onclick="restoreActiveCommitBranch()" title="שחזר קומיט לענף מקומי חדש">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
-                      <span data-i18n="btnRestoreBranch">שחזר לענף חדש</span>
-                    </button>
-                    <button class="btn btn-secondary btn-sm" id="btnCherryPickCommit" onclick="cherryPickActiveCommit()" title="Cherry-Pick לענף הנוכחי">
-                      <span data-i18n="btnCherryPick">Cherry-Pick</span>
-                    </button>
-                    <button class="btn btn-secondary btn-sm" onclick="exportActiveCommitPatch()">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                      <span data-i18n="btnExportPatch">ייצא קובץ .patch</span>
-                    </button>
-                    <button class="btn btn-secondary btn-sm" onclick="openActiveCommitOnGitHub()">
-                      <span data-i18n="btnOpenCommitGH">צפה ב-GitHub ↗</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div class="inspector-subtabs">
-                  <button class="seg-btn active" id="inspTabDiff" onclick="switchInspectorMode('diff')" data-i18n="tabDiffView">תצוגת שינויים (Unified Diff)</button>
-                  <button class="seg-btn" id="inspTabFiles" onclick="switchInspectorMode('files')" data-i18n="tabFileTree">עץ קבצים מלא בקומיט</button>
-                </div>
-
-                <div id="inspDiffBody" style="padding:14px;">
-                  <div id="inspDiffViewer" class="code-view"></div>
-                </div>
-
-                <div id="inspFilesBody" style="display:none;padding:14px;">
-                  <div style="display:grid;grid-template-columns:255px 1fr;gap:12px;">
-                    <div id="inspFilesTreeList" style="max-height:430px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;border-inline-end:1px solid var(--border);padding-inline-end:8px;"></div>
-                    <div style="min-width:0;">
-                      <div id="inspFilePreviewHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-                        <span id="inspPreviewFileName" class="code-chip">Select a file</span>
-                        <div style="display:flex;gap:6px;">
-                          <button class="btn btn-secondary btn-sm" id="btnCopyThisFile" onclick="copyPreviewedFile()" style="display:none;" data-i18n="btnCopyFile">
-                            העתק תוכן
-                          </button>
-                          <button class="btn btn-emerald btn-sm" id="btnSaveThisFileAs" onclick="savePreviewedFileAs()" style="display:none;" data-i18n="btnSaveFile">
-                            שמור קובץ למחשב...
-                          </button>
-                        </div>
-                      </div>
-                      <div id="inspFilePreviewCode" class="code-view">
-                        <div class="diff-line" style="color:var(--text-muted);">Click any file in the commit tree to inspect or download its exact historical snapshot.</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Sub-panel C: Remote GitHub Force-Push Events & Forks -->
-          <div id="subpanelRemote" style="display:none;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-              <div class="card">
-                <h3 style="font-size:15px;font-weight:800;color:var(--cyan-bright);margin-bottom:10px;">
-                  GitHub Force-Push &amp; History Overwrite Events
-                </h3>
-                <div id="historyEventsList" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto;">
-                  <!-- Structured GC_PURGED_REMOTE diagnostic cards and overwrite timelines render dynamically here -->
-                  <div style="color:var(--text-muted);font-size:13px;">No remote history overwrite events detected in recent GitHub Events window.</div>
-                </div>
-              </div>
-
-              <div class="card">
-                <h3 style="font-size:15px;font-weight:800;color:var(--purple-bright);margin-bottom:10px;">
-                  Public Forks &amp; Divergent Branch Audit
-                </h3>
-                <div id="forksAuditList" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto;">
-                  <div style="color:var(--text-muted);font-size:13px;">No public forks detected on this repository.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ========================================================= -->
-        <!-- VIEW 3: DISCOVERED SECRETS & AI TRIAGE                    -->
-        <!-- ========================================================= -->
-        <section id="viewFindings" class="view-panel">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <input type="text" id="findingsFilter" class="input-field" style="width:260px;" data-i18n-placeholder="filterFindingsPlaceholder" placeholder="Filter findings..." oninput="filterFindings()">
-              <select id="severityFilter" class="select-field" onchange="filterFindings()">
-                <option value="ALL" data-i18n="sevAll">All Severities</option>
-                <option value="CRITICAL">Critical</option>
-                <option value="HIGH">High</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="LOW">Low</option>
-              </select>
-            </div>
-            <div style="font-size:12px;color:var(--neon-green);display:flex;align-items:center;gap:6px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              <span data-i18n="redactionNotice">Strict Redaction Active: Raw tokens are cryptographically masked before render.</span>
-            </div>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th data-i18n="thId">ID</th>
-                  <th data-i18n="thSeverity">Severity</th>
-                  <th data-i18n="thRule">Rule / Finding Type</th>
-                  <th data-i18n="thMasked">Masked Credential</th>
-                  <th data-i18n="thLocation">Location</th>
-                  <th data-i18n="thEntropy">Entropy</th>
-                  <th data-i18n="thVerdict">AI Triage Verdict</th>
-                  <th data-i18n="thActions">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="findingsTableBody">
-                <tr>
-                  <td colspan="8" style="text-align:center;color:var(--text-muted);padding:36px;">
-                    Scan a GitHub repository to inspect discovered secrets and AI risk triage.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- ========================================================= -->
-        <!-- VIEW 4: .ENV & CONFIG TIME-MACHINE                        -->
-        <!-- ========================================================= -->
-        <section id="viewTimeMachine" class="view-panel">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <input type="text" id="timeMachineFilter" class="input-field" style="width:260px;" data-i18n-placeholder="tmFilterPlaceholder" placeholder="Filter config files..." oninput="filterTimeMachine()">
-              <select id="timeMachineTypeFilter" class="select-field" onchange="filterTimeMachine()">
-                <option value="ALL" data-i18n="tmAllTypes">All File Types</option>
-                <option value="env">.env files</option>
-                <option value="key">Private Keys (*.pem, *.key)</option>
-                <option value="credential">Credentials &amp; Secrets</option>
-                <option value="terraform">Terraform State (*.tfstate)</option>
-                <option value="config">App Config (*.json, *.yml)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th data-i18n="thFileName">File Path</th>
-                  <th data-i18n="thCategory">Category</th>
-                  <th data-i18n="thOrigin">Origin Commit / Blob</th>
-                  <th data-i18n="thAuthorDate">Author / Date</th>
-                  <th data-i18n="thActions">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="timeMachineTableBody">
-                <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;">Scan a GitHub repository to exhume deleted or historical .env and configuration files.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- ========================================================= -->
-        <!-- VIEW 5: DEEP SEARCH & DETACHED BLOBS                      -->
-        <!-- ========================================================= -->
-        <section id="viewSearchBlobs" class="view-panel">
-          <div class="card" style="margin-bottom:16px;">
-            <h3 style="font-size:15px;font-weight:800;color:var(--cyan-bright);margin-bottom:10px;" data-i18n="deepSearchTitle">
-              חיפוש עמוק בכל הקומיטים, ה-Diffs והקבצים בריפו
-            </h3>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <input
-                type="text"
-                id="deepSearchInput"
-                class="input-field"
-                style="flex:1;min-width:260px;"
-                data-i18n-placeholder="deepSearchPlaceholder"
-                placeholder="Search function name, variable, commit message, file path, or SHA..."
-                onkeydown="if(event.key==='Enter') runDeepSearch()"
-              >
-              <button class="btn btn-primary" onclick="runDeepSearch()" data-i18n="deepSearchBtn">בצע חיפוש עמוק</button>
-            </div>
-            <div id="deepSearchResults" style="margin-top:12px;display:none;flex-direction:column;gap:8px;"></div>
-          </div>
-
-          <div class="card">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-              <h3 style="font-size:15px;font-weight:800;color:var(--amber);" data-i18n="detachedBlobsTitle">
-                עצמי Blobs מנותקים במסד הנתונים של Git
-              </h3>
-              <span id="blobsCountPill" class="badge badge-medium">0 blobs</span>
-            </div>
-            <div id="danglingBlobsList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;">
-              <div style="color:var(--text-muted);font-size:13px;">No detached blobs detected in remote packfiles.</div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ========================================================= -->
-        <!-- VIEW 6: GITHUB HISTORY PURGE & REMEDIATION PLAYBOOK       -->
-        <!-- ========================================================= -->
-        <section id="viewRemediation" class="view-panel">
-          <div class="card">
-            <h3 style="font-size:16px;font-weight:800;margin-bottom:12px;color:#ffffff;" data-i18n="remTitle">
-              פרוטוקול ניקוי היסטוריית GitHub והסרת סודות לצמיתות
-            </h3>
-
-            <div style="background:rgba(255,42,109,0.13);border:1px solid rgba(255,42,109,0.45);border-radius:10px;padding:12px 15px;margin-bottom:18px;color:#ffd0df;font-size:13px;">
-              <strong>[!] Critical Credential Rotation Notice: </strong>
-              <span id="remediationRotationWarning">Always rotate any compromised credentials with your cloud or identity provider BEFORE rewriting GitHub commit history.</span>
-            </div>
-
-            <div id="remediationStepsList"></div>
-
-            <h4 style="font-size:14px;font-weight:800;margin:18px 0 8px;color:var(--neon-green);">Automated GitHub Mirror Purge Scripts (`git filter-repo`)</h4>
-            <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;">
-              <div class="segmented-bar">
-                <button class="seg-btn active" id="btnScriptBash" onclick="switchScriptTab('bash')">Bash (.sh)</button>
-                <button class="seg-btn" id="btnScriptPS" onclick="switchScriptTab('ps')">PowerShell (.ps1)</button>
-              </div>
-              <button class="btn btn-secondary btn-sm" onclick="copyActiveScript()">Copy Script</button>
-              <button class="btn btn-emerald btn-sm" onclick="saveActiveScriptAs()">Save Script File...</button>
-            </div>
-
-            <div id="bashScriptContainer" class="code-view" style="padding:12px 16px;">
-              <pre id="remediationBashScript" style="white-space:pre-wrap;color:#9efcd6;font-family:inherit;"># Scan a GitHub repo to generate customized Bash mirror-purge script</pre>
-            </div>
-            <div id="psScriptContainer" class="code-view" style="padding:12px 16px;display:none;">
-              <pre id="remediationPSScript" style="white-space:pre-wrap;color:#9efcd6;font-family:inherit;"># Scan a GitHub repo to generate customized PowerShell mirror-purge script</pre>
-            </div>
-
-            <h4 style="font-size:14px;font-weight:800;margin:20px 0 6px;color:var(--purple-bright);">
-              GitHub Support Ticket (Server-Side Commit Cache Purge)
-            </h4>
-            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;">
-              GitHub caches overwritten commit SHAs on its servers even after `git push --force --mirror`. Submit this auto-generated ticket to purge cached commits on GitHub's backend.
-            </p>
-            <div class="code-view" style="padding:12px 16px;">
-              <pre id="remediationSupportTicket" style="white-space:pre-wrap;color:#e9d5ff;font-family:inherit;"># Scan a GitHub repo to generate a ready-to-send GitHub Support cache purge request</pre>
-            </div>
-            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-              <button class="btn btn-secondary btn-sm" onclick="copySupportTicket()">Copy Support Ticket</button>
-              <button class="btn btn-purple btn-sm" onclick="openExternalUrl('https://support.github.com/contact')">Open GitHub Support ↗</button>
-            </div>
-          </div>
-        </section>
-
-      </main>
+      <div id="logsConsoleBody" class="logs-body ltr-mono"></div>
     </div>
   </div>
 
   <!-- =============================================================== -->
-  <!-- MODAL 1: FINDING / FILE / BLOB INSPECTOR                        -->
+  <!-- IN-APP VERSION UPDATE MODAL                                     -->
   <!-- =============================================================== -->
-  <div id="detailModal" class="modal-overlay" onclick="if(event.target===this) closeModal()">
-    <div class="modal-box">
+  <div id="updateModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeUpdateModal()">
+    <div class="modal-box" style="max-width:580px;">
       <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">🚀</span>
+          <div>
+            <h3 style="font-size:16px;font-weight:800;color:var(--neon-green);" data-i18n="updateModalTitle">עדכון גרסה זמין לתוכנה</h3>
+            <div style="font-size:12px;color:var(--text-muted);">
+              <span data-i18n="updateCurrent">גרסה נוכחית:</span> <strong class="ltr-mono">v0.7.2</strong>
+              &nbsp;→&nbsp;
+              <span data-i18n="updateLatest">גרסה חדשה:</span> <strong id="modalUpdateTargetVer" class="ltr-mono" style="color:var(--neon-green);">v0.7.2</strong>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeUpdateModal()">✕</button>
+      </div>
+
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
         <div>
-          <h3 id="modalTitle" style="font-size:16px;font-weight:800;color:#ffffff;">Artifact Inspector</h3>
-          <div id="modalSubtitle" class="ltr-mono" style="font-size:11.5px;color:var(--cyan-bright);margin-top:2px;"></div>
+          <div style="font-weight:700;font-size:13px;color:var(--cyan-bright);margin-bottom:6px;" data-i18n="updateReleaseNotes">
+            מה חדש בגרסה זו:
+          </div>
+          <div id="modalUpdateNotes" class="code-view" style="max-height:220px;overflow-y:auto;white-space:pre-wrap;font-size:12.5px;"></div>
+        </div>
+
+        <div id="updateDownloadProgressBox" style="display:none;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+            <span id="updateProgressText" data-i18n="updateDownloading">מוריד עדכון...</span>
+            <span id="updateProgressPct" class="ltr-mono">0%</span>
+          </div>
+          <div class="scan-progress-track">
+            <div id="updateProgressFill" class="scan-progress-fill" style="width:0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn btn-secondary btn-sm" onclick="openReleasePageGH()" data-i18n="updateViewGH">
+          צפה ב-GitHub ↗
+        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" onclick="closeUpdateModal()">סגור</button>
+          <button class="btn btn-primary" id="btnDownloadUpdate" onclick="downloadLatestRelease()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span data-i18n="updateDownloadBtn">הורד והתקן עדכון</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- MODAL: FINDING DETAIL & RECOVERY                                -->
+  <!-- =============================================================== -->
+  <div id="findingDetailModal" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="modal-box" style="max-width:740px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="modalSevBadge" class="badge"></span>
+          <h3 id="modalTitle" style="font-size:15px;font-weight:800;">Finding Details</h3>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="closeModal()">✕</button>
       </div>
-      <div class="modal-body">
-        <div id="modalTriageMeta">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-            <div>
-              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Severity &amp; Verdict</div>
-              <div id="modalSeverityBadge" style="margin-top:4px;"></div>
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Shannon Entropy</div>
-              <div id="modalEntropyVal" class="ltr-mono" style="font-weight:800;margin-top:4px;color:var(--cyan-bright);"></div>
-            </div>
-          </div>
-          <div style="margin-bottom:10px;">
-            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Technical Explanation</div>
-            <div id="modalExplanation" style="font-size:13px;margin-top:3px;"></div>
-          </div>
-          <div style="margin-bottom:12px;">
-            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Recommended Action</div>
-            <div id="modalAction" style="font-size:13px;margin-top:3px;color:var(--neon-green);"></div>
-          </div>
-          <div id="modalLivenessRow" style="display:none;margin-bottom:12px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);">
-            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Passive Key Liveness Status</div>
-            <div id="modalLivenessBadge" style="margin-top:4px;font-weight:700;"></div>
-            <div id="modalLivenessDetails" style="font-size:12px;color:var(--text-secondary);margin-top:3px;"></div>
-          </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;">RULE / TYPE:</span><div id="modalRule" class="ltr-mono" style="font-size:12.5px;color:var(--cyan-bright);font-weight:700;"></div></div>
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;">LOCATION:</span><div id="modalLocation" class="ltr-mono" style="font-size:12.5px;"></div></div>
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;">ENTROPY:</span><div id="modalEntropy" class="ltr-mono" style="font-size:12.5px;"></div></div>
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;">LIVENESS VERDICT:</span><div id="modalLiveness" class="ltr-mono" style="font-size:12.5px;font-weight:700;"></div></div>
         </div>
         <div id="modalCodeView" class="code-view"></div>
       </div>
@@ -762,12 +719,12 @@
   </div>
 
   <!-- =============================================================== -->
-  <!-- MODAL 2: SETTINGS & EPHEMERAL CREDENTIALS                       -->
+  <!-- MODAL: SETTINGS & EPHEMERAL CREDENTIALS                         -->
   <!-- =============================================================== -->
   <div id="settingsModal" class="modal-overlay" onclick="if(event.target===this) closeSettingsModal()">
     <div class="modal-box" style="max-width:560px;">
       <div class="modal-header">
-        <h3 style="font-size:16px;font-weight:800;">Settings &amp; Ephemeral Credentials</h3>
+        <h3 style="font-size:16px;font-weight:800;" data-i18n="settingsBtn">הגדרות</h3>
         <button class="btn btn-secondary btn-sm" onclick="closeSettingsModal()">✕</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:16px;">
@@ -793,15 +750,12 @@
         </div>
 
         <div>
-          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:4px;">GitHub Personal Access Token (Optional Override)</label>
-          <div id="ghSystemAuthNotice" style="font-size:11.5px;color:var(--neon-green);margin-bottom:6px;display:none;">
-            ✓ System GitHub credentials detected automatically via Git Credential Manager (Private repos work out-of-the-box).
-          </div>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:4px;">GitHub Personal Access Token (Optional)</label>
           <div id="ghTokenInputRow" style="display:flex;gap:6px;">
-            <input type="password" id="githubTokenInput" class="input-field ltr-mono" style="flex:1;" placeholder="ghp_... (optional override, held in-memory)" autocomplete="off">
+            <input type="password" id="githubTokenInput" class="input-field ltr-mono" style="flex:1;" placeholder="ghp_... (held strictly in-memory)" autocomplete="off">
             <button class="btn btn-secondary" onclick="saveGHToken()">Save Token</button>
           </div>
-          <div id="ghTokenConfiguredRow" style="display:none;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.35);border-radius:8px;">
+          <div id="ghTokenConfiguredRow" style="display:none;margin-top:8px;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.35);border-radius:8px;">
             <span style="font-size:12px;color:var(--neon-green);font-weight:700;">[OK] Custom GitHub Token Active (In-Memory)</span>
             <button class="btn btn-secondary btn-sm" onclick="clearGHToken()">Clear</button>
           </div>
@@ -825,14 +779,17 @@
           </label>
         </div>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn btn-secondary btn-sm" onclick="checkAppVersion(true)">
+          🔄 בדוק עדכונים כעת
+        </button>
         <button class="btn btn-primary" onclick="closeSettingsModal()">Done</button>
       </div>
     </div>
   </div>
 
   <!-- =============================================================== -->
-  <!-- MODAL 3: COMMAND PALETTE (Ctrl+K)                               -->
+  <!-- MODAL: COMMAND PALETTE (Ctrl+K)                                 -->
   <!-- =============================================================== -->
   <div id="cmdPaletteModal" class="modal-overlay" onclick="if(event.target===this) closeCmdPalette()">
     <div class="modal-box" style="max-width:560px;">
@@ -842,7 +799,7 @@
           id="cmdPaletteInput"
           class="input-field"
           style="width:100%;font-size:14px;"
-          placeholder="Type a command or jump to module..."
+          placeholder="פקודה מהירה או ניווט..."
           oninput="renderCmdPaletteItems()"
           onkeydown="handleCmdPaletteKey(event)"
         >

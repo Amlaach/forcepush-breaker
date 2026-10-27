@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gitghost"
-version = "1.0.0"
+version = "0.7.2"
 description = "UnForce (ForcePush-Breaker) — Chromium Desktop & CLI Suite for Git Commit Recovery, Branch Restoration & Secret Forensics."
 readme = "README.md"
 requires-python = ">=3.9"

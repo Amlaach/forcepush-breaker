@@ -16,6 +16,291 @@ let ephemeralSession = { aiKey: "", ghToken: "", ghAutoDetected: false };
 let seenPhaseLogs = new Set();
 let cmdSelectedIndex = 0;
 let cachedTimeMachineEntries = [];
+let currentUiState = "landing"; // "landing" | "workspace"
+let latestReleaseInfo = null;
+let clientLogs = [];
+let lastServerLogId = 0;
+let activeLogFilter = "all";
+let autoScrollLogs = true;
+
+/* ---- UI State Machine: Landing vs Workspace ---- */
+function setUiState(state) {
+  currentUiState = state;
+  const landing = document.getElementById("landingView");
+  const ws = document.getElementById("workspaceView");
+  if (state === "landing") {
+    document.body.classList.remove("state-workspace");
+    document.body.classList.add("state-landing");
+    if (ws) ws.style.display = "none";
+    if (landing) landing.style.display = "flex";
+    const inp = document.getElementById("repoPathInput");
+    if (inp) inp.focus();
+  } else {
+    document.body.classList.remove("state-landing");
+    document.body.classList.add("state-workspace");
+    if (landing) landing.style.display = "none";
+    if (ws) ws.style.display = "flex";
+  }
+}
+
+function returnToLanding() {
+  setUiState("landing");
+  const progBox = document.getElementById("scanProgressContainer");
+  if (progBox) progBox.style.display = "none";
+}
+
+/* ---- In-App Version Update System (Instant GitHub Release Detection & Safe SSL) ---- */
+async function checkAppVersion(isManual = false) {
+  try {
+    logEvent("INFO", "updater", "Checking for updates on GitHub (v0.7.2)...");
+    const res = await apiFetch("/api/version/check");
+    if (!res.ok) {
+      if (isManual) showToast("שגיאה בבדיקת עדכונים: " + res.statusText);
+      return;
+    }
+    const data = await res.json();
+    if (data && data.has_update) {
+      latestReleaseInfo = data;
+      const btn = document.getElementById("updateAvailableBtn");
+      const badge = document.getElementById("updateVerBadge");
+      if (btn) btn.style.display = "inline-flex";
+      if (badge) badge.textContent = data.latest_version;
+      logEvent("WARN", "updater", `New version available on GitHub: v${data.latest_version}`);
+      if (isManual) {
+        openUpdateModal();
+      }
+    } else {
+      const btn = document.getElementById("updateAvailableBtn");
+      if (btn) btn.style.display = "none";
+      if (isManual) {
+        showToast(currentLang === "he" ? "המערכת מעודכנת לגירסה העדכנית (v0.7.2)" : "Software is up to date (v0.7.2)");
+      }
+      logEvent("INFO", "updater", "Software is up to date (v0.7.2).");
+    }
+  } catch (err) {
+    logEvent("ERROR", "updater", "Update check failed: " + err.message);
+    if (isManual) showToast("בדיקת עדכונים נכשלה: " + err.message);
+  }
+}
+
+function openUpdateModal() {
+  if (!latestReleaseInfo) {
+    latestReleaseInfo = {
+      latest_version: "0.7.2",
+      release_name: "UnForce v0.7.2",
+      release_notes: "Latest stable release for UnForce Forensics Studio.",
+      html_url: "https://github.com/Amlaach/forcepush-breaker/releases",
+      assets: []
+    };
+  }
+  const modal = document.getElementById("updateModal");
+  const targetVer = document.getElementById("modalUpdateTargetVer");
+  const notes = document.getElementById("modalUpdateNotes");
+  if (targetVer) targetVer.textContent = `v${latestReleaseInfo.latest_version}`;
+  if (notes) notes.textContent = latestReleaseInfo.release_notes || "Release notes available on GitHub.";
+  if (modal) modal.style.display = "flex";
+}
+
+function closeUpdateModal() {
+  const modal = document.getElementById("updateModal");
+  if (modal) modal.style.display = "none";
+}
+
+function openReleasePageGH() {
+  const url = (latestReleaseInfo && latestReleaseInfo.html_url) || "https://github.com/Amlaach/forcepush-breaker/releases";
+  openExternalUrl(url);
+}
+
+async function downloadLatestRelease() {
+  if (!latestReleaseInfo || !latestReleaseInfo.assets || latestReleaseInfo.assets.length === 0) {
+    openReleasePageGH();
+    return;
+  }
+  const asset = latestReleaseInfo.assets[0];
+  const progBox = document.getElementById("updateDownloadProgressBox");
+  const progFill = document.getElementById("updateProgressFill");
+  const progText = document.getElementById("updateProgressText");
+  const progPct = document.getElementById("updateProgressPct");
+  const btn = document.getElementById("btnDownloadUpdate");
+
+  if (progBox) progBox.style.display = "block";
+  if (btn) btn.disabled = true;
+  if (progFill) progFill.style.width = "40%";
+  if (progPct) progPct.textContent = "40%";
+  if (progText) progText.textContent = t("updateDownloading");
+
+  try {
+    const res = await apiFetch("/api/version/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ download_url: asset.download_url, filename: asset.name }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    if (progFill) progFill.style.width = "100%";
+    if (progPct) progPct.textContent = "100%";
+    if (progText) progText.textContent = t("updateDone");
+    showToast(currentLang === "he" ? `העדכון נשמר ב: ${data.saved_path}` : `Update saved to: ${data.saved_path}`);
+    logEvent("INFO", "updater", `Update binary saved to: ${data.saved_path}`);
+  } catch (err) {
+    if (progText) progText.textContent = "Download error: " + err.message;
+    showToast("שגיאה בהורדת עדכון: " + err.message);
+    logEvent("ERROR", "updater", "Download error: " + err.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/* ---- Dedicated Forensics Activity & Logs Console ---- */
+function logEvent(level, source, message, details = null) {
+  const entry = {
+    id: Date.now() * 1000 + Math.floor(Math.random() * 999),
+    timestamp: new Date().toTimeString().split(" ")[0],
+    level: String(level || "INFO").toUpperCase(),
+    source: String(source || "engine").toLowerCase(),
+    message: String(message || ""),
+    details,
+  };
+  clientLogs.push(entry);
+  if (clientLogs.length > 1500) clientLogs.shift();
+
+  updateLogsBadges();
+  appendLogToConsole(entry);
+
+  ensureApiBase().then((base) => {
+    if (base) {
+      fetch(`${base}/api/logs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry),
+      }).catch(() => {});
+    }
+  });
+}
+
+function updateLogsBadges() {
+  const count = clientLogs.length;
+  const b1 = document.getElementById("titlebarLogsBadge");
+  const b2 = document.getElementById("wsLogsBadge");
+  const b3 = document.getElementById("logsTotalCountBadge");
+  if (b1) b1.textContent = String(count);
+  if (b2) b2.textContent = String(count);
+  if (b3) b3.textContent = String(count);
+}
+
+function appendLogToConsole(entry) {
+  const container = document.getElementById("logsConsoleBody");
+  if (!container) return;
+
+  if (activeLogFilter !== "all" && entry.level.toLowerCase() !== activeLogFilter) {
+    return;
+  }
+
+  const row = document.createElement("div");
+  row.className = "log-entry-row";
+  row.innerHTML = `
+    <span class="log-ts">[${escapeHtml(entry.timestamp)}]</span>
+    <span class="log-tag log-tag-${entry.level.toLowerCase()}">${escapeHtml(entry.level)}</span>
+    <span class="log-src">[${escapeHtml(entry.source.toUpperCase())}]</span>
+    <span class="log-msg">${escapeHtml(entry.message)}</span>
+  `;
+  container.appendChild(row);
+
+  if (autoScrollLogs) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function renderLogsConsole() {
+  const container = document.getElementById("logsConsoleBody");
+  if (!container) return;
+  const searchInput = document.getElementById("logsSearchInput");
+  const search = (searchInput ? searchInput.value : "").toLowerCase();
+  container.innerHTML = "";
+
+  const filtered = clientLogs.filter((l) => {
+    if (activeLogFilter !== "all" && l.level.toLowerCase() !== activeLogFilter) return false;
+    if (search && !l.message.toLowerCase().includes(search) && !l.source.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  filtered.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "log-entry-row";
+    row.innerHTML = `
+      <span class="log-ts">[${escapeHtml(entry.timestamp)}]</span>
+      <span class="log-tag log-tag-${entry.level.toLowerCase()}">${escapeHtml(entry.level)}</span>
+      <span class="log-src">[${escapeHtml(entry.source.toUpperCase())}]</span>
+      <span class="log-msg">${escapeHtml(entry.message)}</span>
+    `;
+    container.appendChild(row);
+  });
+
+  if (autoScrollLogs) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function filterLogs(level) {
+  activeLogFilter = level;
+  document.querySelectorAll(".log-filter-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-filter") === level);
+  });
+  renderLogsConsole();
+}
+
+function toggleLogsAutoScroll(val) {
+  autoScrollLogs = Boolean(val);
+}
+
+function openLogsConsole() {
+  const drawer = document.getElementById("logsDrawer");
+  if (drawer) drawer.style.display = "flex";
+  syncLogsFromServer();
+  renderLogsConsole();
+}
+
+function closeLogsConsole() {
+  const drawer = document.getElementById("logsDrawer");
+  if (drawer) drawer.style.display = "none";
+}
+
+function copyAllLogs() {
+  const text = clientLogs.map((l) => `[${l.timestamp}] [${l.level}] [${l.source.toUpperCase()}] ${l.message}`).join("\n");
+  writeClipboardTextSafe(text);
+  showToast(currentLang === "he" ? "כל הלוגים הועתקו ללוח!" : "All logs copied to clipboard!");
+}
+
+async function clearAllLogs() {
+  clientLogs = [];
+  updateLogsBadges();
+  renderLogsConsole();
+  try {
+    await apiFetch("/api/logs/clear", { method: "POST" });
+  } catch (_) {}
+  showToast(currentLang === "he" ? "יומן הלוגים נוקה" : "Logs cleared");
+}
+
+async function syncLogsFromServer() {
+  try {
+    const res = await apiFetch(`/api/logs?since_id=${lastServerLogId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.logs && data.logs.length > 0) {
+        data.logs.forEach((srvLog) => {
+          if (!clientLogs.some((c) => c.id === srvLog.id)) {
+            clientLogs.push(srvLog);
+          }
+          if (srvLog.id > lastServerLogId) {
+            lastServerLogId = srvLog.id;
+          }
+        });
+        updateLogsBadges();
+        renderLogsConsole();
+      }
+    }
+  } catch (_) {}
+}
 
 function t(key) {
   const dict = (window.UNFORCE_I18N && window.UNFORCE_I18N[currentLang]) || window.UNFORCE_I18N.he;
@@ -212,18 +497,11 @@ function updateTargetTypeBadge() {
 
 /* ---- Live Hacker Terminal Stream ---- */
 function logTerminal(tag, message, tone = "") {
-  const body = document.getElementById("terminalLogBody");
-  if (!body) return;
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mm = String(now.getMinutes()).padStart(2, "0");
-  const ss = String(now.getSeconds()).padStart(2, "0");
-  const cls = tone === "ok" ? "term-ok" : tone === "warn" ? "term-warn" : tone === "err" ? "term-err" : tone === "cmd" ? "term-cmd" : "";
-  const div = document.createElement("div");
-  div.className = "term-line";
-  div.innerHTML = `<span class="term-ts">[${hh}:${mm}:${ss}] [${escapeHtml(tag)}]</span><span class="${cls}">${escapeHtml(message)}</span>`;
-  body.appendChild(div);
-  body.scrollTop = body.scrollHeight;
+  let level = "INFO";
+  if (tone === "err" || tag === "ERR" || tag === "ERROR") level = "ERROR";
+  else if (tone === "warn" || tag === "WARN") level = "WARN";
+  else if (tag === "TARGET" || tag === "OBJECT" || tag === "GHOST" || tag === "GIT") level = "FORENSICS";
+  logEvent(level, tag || "forensics", message);
 }
 
 function clearTerminalLogs() {
@@ -440,7 +718,7 @@ function switchView(viewName) {
     const panel = document.getElementById(id);
     if (panel) panel.classList.toggle("active", k === viewName);
   });
-  document.querySelectorAll(".nav-item").forEach((btn) => {
+  document.querySelectorAll(".nav-item, .ws-tab-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.getAttribute("data-view") === viewName);
   });
 }
@@ -473,11 +751,16 @@ async function startScan() {
   const progTxt = document.getElementById("progressStatusText");
   const progPct = document.getElementById("progressPctText");
 
+  setUiState("workspace");
+  switchView("overview");
   if (scanBtn) scanBtn.disabled = true;
   if (scanBtnText) scanBtnText.textContent = t("scanningBtn");
-  if (progBox) progBox.classList.add("active");
+  if (progBox) {
+    progBox.style.display = "block";
+    progBox.classList.add("active");
+  }
   if (progFill) progFill.style.width = "6%";
-  if (progTxt) progTxt.textContent = `Connecting to GitHub: ${parsed.slug}...`;
+  if (progTxt) progTxt.textContent = `Connecting to target: ${parsed.slug}...`;
   if (progPct) progPct.textContent = "6%";
 
   seenPhaseLogs.clear();
@@ -545,6 +828,7 @@ async function startScan() {
     activeGithubHtmlUrl = finalResult.github_html_url || parsed.cleanUrl;
     addRecentRepo(parsed.cleanUrl);
     renderScanResult(finalResult, parsed);
+    if (progBox) progBox.style.display = "none";
 
     const ghostCount = (finalResult.dangling_commits || []).length;
     const branchCount = (finalResult.branch_commits || []).length;
@@ -1955,4 +2239,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   initBackendTelemetry();
+  setUiState("landing");
+  checkAppVersion(false);
+  setInterval(() => checkAppVersion(false), 10 * 60 * 1000);
+  setInterval(syncLogsFromServer, 3500);
 });

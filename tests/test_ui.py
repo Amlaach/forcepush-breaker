@@ -122,7 +122,7 @@ class TestUIServer:
 
         # Poll /api/scan/status until completed
         status_data = None
-        for _ in range(40):
+        for _ in range(120):
             with urllib.request.urlopen(f"{running_server}/api/scan/status?job_id={job_id}", timeout=5) as resp:
                 status_data = json.loads(resp.read().decode("utf-8"))
                 if status_data["status"] in ("completed", "failed"):

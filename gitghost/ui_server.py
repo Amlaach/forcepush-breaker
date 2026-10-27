@@ -10,11 +10,16 @@ import atexit
 import json
 import os
 import platform
+import re
 import shutil
+import ssl
 import subprocess
 import sys
 import threading
+import time
+import urllib.error
 import urllib.parse
+import urllib.request
 import uuid
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -22,6 +27,188 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from gitghost import BRAND_NAME, BRAND_SHORT, __version__
+
+
+@dataclass
+class LogEntry:
+    id: int
+    timestamp: str
+    level: str
+    source: str
+    message: str
+    details: Optional[Dict[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp,
+            "level": self.level,
+            "source": self.source,
+            "message": self.message,
+            "details": self.details,
+        }
+
+
+class LogStore:
+    """Thread-safe circular log storage for UnForce forensics engine telemetry and diagnostics."""
+
+    _lock = threading.Lock()
+    _logs: List[LogEntry] = []
+    _counter = 0
+    MAX_LOGS = 1500
+
+    @classmethod
+    def add(cls, level: str, source: str, message: str, details: Optional[Dict[str, Any]] = None) -> LogEntry:
+        with cls._lock:
+            cls._counter += 1
+            entry = LogEntry(
+                id=int(time.time() * 1000) * 1000 + (cls._counter % 1000),
+                timestamp=time.strftime("%H:%M:%S"),
+                level=level.upper(),
+                source=source.lower(),
+                message=str(message),
+                details=details,
+            )
+            cls._logs.append(entry)
+            if len(cls._logs) > cls.MAX_LOGS:
+                cls._logs.pop(0)
+            return entry
+
+    @classmethod
+    def get_all(cls, since_id: int = 0) -> List[Dict[str, Any]]:
+        with cls._lock:
+            if since_id <= 0:
+                return [l.to_dict() for l in cls._logs]
+            return [l.to_dict() for l in cls._logs if l.id > since_id]
+
+    @classmethod
+    def clear(cls) -> None:
+        with cls._lock:
+            cls._logs.clear()
+
+
+LogStore.add("INFO", "engine", f"UnForce Forensics Engine v{__version__} initialized.")
+LogStore.add("INFO", "security", "Strict token redaction & zero-knowledge secret hunter ready.")
+LogStore.add("INFO", "system", f"Python {platform.python_version()} on {platform.system()} {platform.release()}")
+
+
+def _is_newer_semver(remote: str, current: str) -> bool:
+    if not remote or not current:
+        return False
+    try:
+        def parse_v(v_str: str) -> List[int]:
+            cleaned = re.sub(r"[^0-9.]", "", v_str.split("-")[0])
+            return [int(x) for x in cleaned.split(".") if x.isdigit()]
+        r_parts = parse_v(remote)
+        c_parts = parse_v(current)
+        max_len = max(len(r_parts), len(c_parts), 3)
+        r_parts += [0] * (max_len - len(r_parts))
+        c_parts += [0] * (max_len - len(c_parts))
+        return r_parts > c_parts
+    except Exception:
+        return False
+
+
+def check_for_updates_from_github(repo: str = "Amlaach/forcepush-breaker", token: Optional[str] = None) -> Dict[str, Any]:
+    """Checks GitHub Releases / Tags for newer versions with bulletproof SSL error tolerance."""
+    current_ver = __version__
+    api_url = f"https://api.github.com/repos/{repo}/releases/latest"
+    headers = {
+        "User-Agent": f"UnForce-Updater/{__version__}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    effective_token = token or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+    if effective_token:
+        headers["Authorization"] = f"Bearer {effective_token}"
+
+    def _fetch_json(url: str, verify_ssl: bool = True) -> Any:
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        ctx = None if verify_ssl else ssl._create_unverified_context()
+        with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+            return json.loads(resp.read().decode("utf-8", errors="replace"))
+
+    LogStore.add("INFO", "updater", f"Checking GitHub ({repo}) for updates... (Current: v{current_ver})")
+    try:
+        try:
+            data = _fetch_json(api_url, verify_ssl=True)
+        except (ssl.SSLError, urllib.error.URLError) as ssl_exc:
+            reason = str(getattr(ssl_exc, "reason", ssl_exc))
+            LogStore.add("WARN", "updater", f"SSL certificate check issue ({reason}). Falling back to unverified SSL context...")
+            data = _fetch_json(api_url, verify_ssl=False)
+
+        tag = str(data.get("tag_name") or data.get("name") or "").strip().lstrip("v")
+        has_update = _is_newer_semver(tag, current_ver)
+        assets = []
+        for a in data.get("assets", []):
+            assets.append({
+                "name": a.get("name"),
+                "size": a.get("size"),
+                "download_url": a.get("browser_download_url"),
+            })
+
+        if has_update:
+            LogStore.add("WARN", "updater", f"New version detected: v{tag} (Current: v{current_ver})")
+        else:
+            LogStore.add("INFO", "updater", f"Software is up-to-date (v{current_ver}).")
+
+        return {
+            "status": "ok",
+            "current_version": current_ver,
+            "latest_version": tag or current_ver,
+            "has_update": has_update,
+            "release_name": data.get("name", f"v{tag}"),
+            "release_notes": data.get("body", ""),
+            "html_url": data.get("html_url", f"https://github.com/{repo}/releases"),
+            "assets": assets,
+        }
+    except urllib.error.HTTPError as http_err:
+        if http_err.code == 404:
+            tags_url = f"https://api.github.com/repos/{repo}/tags"
+            try:
+                tags = _fetch_json(tags_url, verify_ssl=False)
+                if isinstance(tags, list) and len(tags) > 0:
+                    latest_tag = str(tags[0].get("name", "")).strip().lstrip("v")
+                    has_update = _is_newer_semver(latest_tag, current_ver)
+                    if has_update:
+                        LogStore.add("WARN", "updater", f"New tag detected on GitHub: v{latest_tag}")
+                    return {
+                        "status": "ok",
+                        "current_version": current_ver,
+                        "latest_version": latest_tag,
+                        "has_update": has_update,
+                        "release_name": f"v{latest_tag}",
+                        "release_notes": f"New version {latest_tag} is available on GitHub.",
+                        "html_url": f"https://github.com/{repo}/releases/tag/v{latest_tag}",
+                        "assets": [],
+                    }
+            except Exception:
+                pass
+            LogStore.add("INFO", "updater", "No published releases or tags found yet on GitHub.")
+            return {
+                "status": "ok",
+                "current_version": current_ver,
+                "latest_version": current_ver,
+                "has_update": False,
+                "note": "No published releases found yet on repository",
+            }
+        err_msg = f"HTTP {http_err.code}: {http_err.reason}"
+        LogStore.add("ERROR", "updater", f"GitHub API error during update check: {err_msg}")
+        return {
+            "status": "error",
+            "current_version": current_ver,
+            "latest_version": current_ver,
+            "has_update": False,
+            "error": err_msg,
+        }
+    except Exception as exc:
+        LogStore.add("ERROR", "updater", f"Update check error: {exc}")
+        return {
+            "status": "error",
+            "current_version": current_ver,
+            "latest_version": current_ver,
+            "has_update": False,
+            "error": str(exc),
+        }
 
 # Thread-safe server-side cache for full pipeline scan results
 _SCAN_CACHE: Dict[str, Any] = {}
@@ -274,6 +461,10 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._handle_download_report_get()
         elif self.path.startswith("/api/download/bundle"):
             self._handle_download_bundle_get()
+        elif self.path == "/api/version/check" or self.path.startswith("/api/version/check?"):
+            self._handle_version_check()
+        elif self.path == "/api/logs" or self.path.startswith("/api/logs?"):
+            self._handle_get_logs()
         else:
             self._send_error(404, "Not Found")
 
@@ -305,6 +496,10 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             "/api/search": lambda: self._handle_search(data),
             "/api/verify/key": lambda: self._handle_verify_key(data),
             "/api/hook": lambda: self._handle_hook(data),
+            "/api/version/check": lambda: self._handle_version_check(data),
+            "/api/version/download": lambda: self._handle_version_download(data),
+            "/api/logs": lambda: self._handle_add_log(data),
+            "/api/logs/clear": lambda: self._handle_clear_logs(),
             "/api/shutdown": lambda: self._handle_shutdown(),
         }
 
@@ -347,6 +542,80 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
 
     def _send_error(self, status: int, message: str):
         self._send_json({"error": message, "status": status}, status=status)
+
+    def _extract_token_from_header(self) -> Optional[str]:
+        auth = self.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            return auth[7:].strip()
+        return None
+
+    def _handle_version_check(self, data: Optional[Dict[str, Any]] = None):
+        data = data or {}
+        token = data.get("token") or self._extract_token_from_header()
+        res = check_for_updates_from_github(token=token)
+        self._send_json(res)
+
+    def _handle_version_download(self, data: Dict[str, Any]):
+        download_url = data.get("download_url")
+        if not download_url:
+            self._send_error(400, "Missing download_url")
+            return
+
+        dest_dir = Path.home() / "Downloads"
+        if not dest_dir.exists():
+            dest_dir = Path.home()
+        filename = data.get("filename") or os.path.basename(urllib.parse.urlparse(download_url).path) or f"UnForce-Update-{__version__}.exe"
+        dest_path = dest_dir / filename
+
+        LogStore.add("INFO", "updater", f"Downloading update asset {filename} to {dest_path}...")
+        headers = {"User-Agent": f"UnForce-Updater/{__version__}"}
+
+        try:
+            def _stream_download(verify_ssl: bool = True):
+                req = urllib.request.Request(download_url, headers=headers, method="GET")
+                ctx = None if verify_ssl else ssl._create_unverified_context()
+                with urllib.request.urlopen(req, timeout=30, context=ctx) as resp, open(dest_path, "wb") as out_f:
+                    shutil.copyfileobj(resp, out_f)
+
+            try:
+                _stream_download(verify_ssl=True)
+            except (ssl.SSLError, urllib.error.URLError) as ssl_err:
+                LogStore.add("WARN", "updater", f"Download SSL verification issue ({ssl_err}), retrying with unverified context...")
+                _stream_download(verify_ssl=False)
+
+            LogStore.add("INFO", "updater", f"Download complete: {dest_path}")
+            self._send_json({
+                "status": "ok",
+                "saved_path": str(dest_path),
+                "filename": filename,
+            })
+        except Exception as exc:
+            LogStore.add("ERROR", "updater", f"Download failed: {exc}")
+            self._send_error(500, f"Download failed: {exc}")
+
+    def _handle_get_logs(self):
+        query = urllib.parse.urlparse(self.path).query
+        params = urllib.parse.parse_qs(query)
+        since_id = 0
+        if "since_id" in params and params["since_id"]:
+            try:
+                since_id = int(params["since_id"][0])
+            except ValueError:
+                since_id = 0
+        logs = LogStore.get_all(since_id=since_id)
+        self._send_json({"status": "ok", "logs": logs, "total": len(logs)})
+
+    def _handle_add_log(self, data: Dict[str, Any]):
+        level = data.get("level", "INFO")
+        source = data.get("source", "client")
+        message = data.get("message", "")
+        details = data.get("details")
+        entry = LogStore.add(level, source, message, details)
+        self._send_json({"status": "ok", "entry": entry.to_dict()})
+
+    def _handle_clear_logs(self):
+        LogStore.clear()
+        self._send_json({"status": "ok"})
 
     def _handle_system_info(self):
         from gitghost.github_remote import resolve_system_github_token

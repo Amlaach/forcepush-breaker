@@ -1,7 +1,7 @@
 # Builds the standalone UnForce (ForcePush-Breaker) Chromium Desktop Application for Windows.
 # Output artifacts:
-#   - desktop/dist/UnForce-Setup-1.0.0.exe    (NSIS Installer)
-#   - desktop/dist/UnForce-Portable-1.0.0.exe (Zero-install Portable EXE)
+#   - desktop/dist/UnForce-Setup-0.7.2.exe    (NSIS Installer)
+#   - desktop/dist/UnForce-Portable-0.7.2.exe (Zero-install Portable EXE)
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot

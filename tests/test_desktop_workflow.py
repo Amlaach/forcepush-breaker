@@ -44,7 +44,7 @@ class TestDesktopStudioWorkflows:
     def test_system_info_and_bilingual_ui(self, studio_server: str):
         with urllib.request.urlopen(f"{studio_server}/api/system/info", timeout=5) as resp:
             info = json.loads(resp.read().decode("utf-8"))
-            assert info["version"] == "1.0.0"
+            assert info["version"] == "0.7.2"
             assert info["git_available"] is True
             assert "git" in info["git_version"].lower()
 
