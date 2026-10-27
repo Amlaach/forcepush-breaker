@@ -1036,15 +1036,15 @@ class GitHubAPIForensicsClient:
                 continue
         return divergent_commits
 
-    def fetch_orphan_commit_via_api(
+    def fetch_commit_or_check_gc(
         self,
-        target: ParsedGitHubTarget,
+        target: ParsedRemoteTarget,
         commit_sha: str,
         max_text_bytes: int = 10 * 1024 * 1024,
-    ) -> Optional[DanglingCommit]:
+    ) -> Tuple[Optional[DanglingCommit], bool]:
         sha = (commit_sha or "").strip()
         if not sha:
-            return None
+            return None, False
 
         commit_url = f"{target.api_repo_url}/commits/{sha}"
         try:
@@ -1102,9 +1102,25 @@ class GitHubAPIForensicsClient:
                 diff_content=diff_text,
                 is_dangling=True,
                 ai_agent=ai_attribution,
-            )
-        except Exception:
-            return None
+            ), False
+        except urllib.error.HTTPError as h_err:
+            if h_err.code == 404:
+                return None, True
+            return None, False
+        except Exception as exc:
+            msg_str = str(exc)
+            if "404" in msg_str or "Not Found" in msg_str:
+                return None, True
+            return None, False
+
+    def fetch_orphan_commit_via_api(
+        self,
+        target: ParsedRemoteTarget,
+        commit_sha: str,
+        max_text_bytes: int = 10 * 1024 * 1024,
+    ) -> Optional[DanglingCommit]:
+        commit, _ = self.fetch_commit_or_check_gc(target, commit_sha, max_text_bytes)
+        return commit
 
 
 def get_forensics_client_for_target(target: ParsedRemoteTarget, token: Optional[str] = None):
