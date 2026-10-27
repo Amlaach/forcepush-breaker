@@ -47,6 +47,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64 || true
 
+      - name: Install Windows NSIS Build Dependencies
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          choco install nsis -y
+          $nsisPath = "C:\Program Files (x86)\NSIS"
+          if (Test-Path $nsisPath) {
+            echo $nsisPath >> $env:GITHUB_PATH
+          }
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
