@@ -85,7 +85,7 @@ atexit.register(_cleanup_all_workspaces)
 
 
 def _cache_pipeline_result(pipeline_res: Any, raw_target: str) -> None:
-    from gitghost.github_remote import parse_github_url
+    from gitghost.github_remote import parse_github_url, parse_remote_url, is_remote_target
 
     keys = {pipeline_res.repo_path, raw_target, "__latest__"}
     if getattr(pipeline_res, "remote_url", None):
@@ -423,25 +423,25 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
 
     def _validate_target_or_error(self, repo_path_str: str) -> Optional[str]:
         from gitghost.git_forensics import GitForensics
-        from gitghost.github_remote import is_github_target
+        from gitghost.github_remote import is_remote_target
 
         if not shutil.which("git"):
             self._send_error(500, "Git executable not found in system PATH. Install Git to scan repositories.")
             return None
-        if is_github_target(repo_path_str):
+        if is_remote_target(repo_path_str):
             return repo_path_str
         repo_path = Path(repo_path_str).resolve()
         if not repo_path.exists():
             self._send_error(
                 400,
-                f"Invalid GitHub repository URL: '{repo_path_str}'. Paste a valid GitHub link (e.g. https://github.com/owner/repo).",
+                f"Invalid repository target: '{repo_path_str}'. Provide a valid GitHub, GitLab, or Bitbucket URL, or an existing local Git directory path.",
             )
             return None
         forensics = GitForensics(repo_path)
         if not forensics.is_valid_repo():
             self._send_error(
                 400,
-                f"Invalid GitHub repository URL: '{repo_path_str}'. Paste a GitHub URL like https://github.com/owner/repo.",
+                f"Directory '{repo_path}' is not a valid Git repository (missing .git directory).",
             )
             return None
         return str(repo_path)
