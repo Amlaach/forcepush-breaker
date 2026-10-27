@@ -978,7 +978,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._send_error(500, f"Git command failed: {e.stderr or e.stdout}")
 
     def _handle_git_restore_branch(self, data: dict):
-        from gitghost.github_remote import is_github_target
+        from gitghost.git_forensics import GitForensics
         from gitghost.recovery import ObjectRecoveryEngine
 
         repo_path_str = (data.get("repo_path") or ".").strip() or "."
@@ -986,13 +986,17 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
         branch_name = (data.get("branch_name") or "").strip()
         checkout = bool(data.get("checkout", False))
 
-        if is_github_target(repo_path_str):
-            self._send_error(400, "Branch restoration requires a local clone.")
+        pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        git_dir = _get_effective_git_dir(pipeline_res) if pipeline_res else None
+        target_dir = git_dir or Path(repo_path_str).resolve()
+
+        if not GitForensics(target_dir).is_valid_repo():
+            self._send_error(400, "Branch restoration requires a valid local repository or active session clone.")
             return
 
         try:
             res = ObjectRecoveryEngine.restore_commit_as_branch(
-                repo_path=repo_path_str,
+                repo_path=target_dir,
                 commit_hash=commit_hash,
                 branch_name=branch_name,
                 checkout=checkout,
