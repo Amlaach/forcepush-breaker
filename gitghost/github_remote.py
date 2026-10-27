@@ -212,13 +212,18 @@ def sanitize_token_in_text(text: str, token: Optional[str] = None) -> str:
         sanitized = sanitized.replace(b64_basic, "[REDACTED_GITHUB_TOKEN]")
 
     sanitized = re.sub(
-        r"(https?://)([^@\s/]+)@github\.com",
-        r"\1[REDACTED_GITHUB_TOKEN]@github.com",
+        r"(https?://)([^@\s/]+)@(github\.com|gitlab\.com|bitbucket\.org)",
+        r"\1[REDACTED_TOKEN]@\3",
         sanitized,
     )
     sanitized = re.sub(
         r"(?i)(authorization:\s*(?:bearer|token|basic)\s+)([^\s\"']+)",
-        r"\1[REDACTED_GITHUB_TOKEN]",
+        r"\1[REDACTED_TOKEN]",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(?i)(private-token:\s*)([^\s\"']+)",
+        r"\1[REDACTED_TOKEN]",
         sanitized,
     )
     return sanitized
