@@ -37,6 +37,14 @@ _SSH_GITHUB_RE = re.compile(
 _SHORTHAND_GITHUB_RE = re.compile(
     r"^([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)$"
 )
+_HTTPS_GITLAB_RE = re.compile(
+    r"^(?:https?://)?(?:www\.)?gitlab\.com/([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*?)/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$",
+    re.IGNORECASE,
+)
+_SSH_GITLAB_RE = re.compile(
+    r"^git@gitlab\.com:([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*?)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$",
+    re.IGNORECASE,
+)
 
 _CACHED_SYS_GH_TOKEN: Optional[str] = None
 _SYS_GH_TOKEN_PROBED: bool = False
@@ -182,7 +190,32 @@ def sanitize_token_in_text(text: str, token: Optional[str] = None) -> str:
     return sanitized
 
 
-def parse_github_url(target: str) -> Optional[ParsedGitHubTarget]:
+def parse_gitlab_url(target: str) -> Optional[ParsedRemoteTarget]:
+    raw = (target or "").strip()
+    if not raw or "gitlab.com" not in raw.lower():
+        return None
+    m = _HTTPS_GITLAB_RE.match(raw) or _SSH_GITLAB_RE.match(raw)
+    if m:
+        full_group = m.group(1).strip("/")
+        project = m.group(2)
+        if project.lower().endswith(".git"):
+            project = project[:-4]
+        full_project_path = f"{full_group}/{project}".strip("/")
+        encoded_path = urllib.parse.quote(full_project_path, safe="")
+        return ParsedRemoteTarget(
+            platform="gitlab",
+            host="gitlab.com",
+            owner=full_group,
+            repo=project,
+            project_path=full_project_path,
+            clone_url=f"https://gitlab.com/{full_project_path}.git",
+            api_repo_url=f"https://gitlab.com/api/v4/projects/{encoded_path}",
+            original_input=raw,
+        )
+    return None
+
+
+def parse_github_url(target: str) -> Optional[ParsedRemoteTarget]:
     """Parses a GitHub HTTPS URL (including /tree/... browser links), SSH URL, or 'owner/repo' shorthand.
 
     Returns None if the target points to an existing local path or is not a valid GitHub identifier.
