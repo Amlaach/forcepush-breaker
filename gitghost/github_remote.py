@@ -1103,6 +1103,15 @@ class GitHubAPIForensicsClient:
             return None
 
 
+def get_forensics_client_for_target(target: ParsedRemoteTarget, token: Optional[str] = None):
+    """Instantiates the dedicated platform forensics client (GitLab, Bitbucket, or GitHub)."""
+    if target.platform == "gitlab":
+        return GitLabAPIForensicsClient(gitlab_token=token)
+    elif target.platform == "bitbucket":
+        return BitbucketAPIForensicsClient(bitbucket_token=token)
+    return GitHubAPIForensicsClient(github_token=token)
+
+
 class SmartGitCloner:
     """Performs smart mirror cloning of remote GitHub repositories and fetches orphaned SHAs."""
 
