@@ -89,20 +89,33 @@ def resolve_system_github_token() -> Optional[str]:
 
 
 @dataclass(frozen=True)
-class ParsedGitHubTarget:
+class ParsedRemoteTarget:
     owner: str
     repo: str
     clone_url: str
     api_repo_url: str
     original_input: str
+    platform: str = "github"
+    host: str = "github.com"
+    project_path: str = ""
 
     @property
     def full_name(self) -> str:
-        return f"{self.owner}/{self.repo}"
+        return self.project_path or f"{self.owner}/{self.repo}"
 
     @property
     def html_url(self) -> str:
+        if self.platform == "gitlab":
+            return f"https://{self.host}/{self.full_name}"
+        elif self.platform == "bitbucket":
+            return f"https://{self.host}/{self.owner}/{self.repo}"
         return f"https://github.com/{self.owner}/{self.repo}"
+
+
+@dataclass(frozen=True)
+class ParsedGitHubTarget(ParsedRemoteTarget):
+    platform: str = "github"
+    host: str = "github.com"
 
 
 @dataclass
@@ -135,7 +148,7 @@ class ForkForensicsTarget:
 
 @dataclass
 class RemoteAcquisitionResult:
-    target: ParsedGitHubTarget
+    target: ParsedRemoteTarget
     local_clone_path: Path
     is_temporary: bool = True
     history_events: List[HistoryOverwriteEvent] = field(default_factory=list)
