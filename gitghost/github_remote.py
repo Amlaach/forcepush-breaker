@@ -382,6 +382,94 @@ def is_github_target(target: str) -> bool:
     return is_remote_target(target)
 
 
+class GitLabAPIForensicsClient:
+    """Queries GitLab REST API v4 for history overwrite events, force-pushes, and deleted branches."""
+
+    DEFAULT_TIMEOUT_SECONDS = 12
+
+    def __init__(self, gitlab_token: Optional[str] = None, timeout: int = DEFAULT_TIMEOUT_SECONDS):
+        resolved = (gitlab_token or resolve_system_gitlab_token() or "").strip()
+        self._token: Optional[str] = resolved if resolved else None
+        self.timeout = timeout
+
+    def _build_headers(self) -> Dict[str, str]:
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "UnForce-Security-Forensics/1.0.0",
+        }
+        if self._token:
+            headers["PRIVATE-TOKEN"] = self._token
+        return headers
+
+    def discover_history_overwrite_events(
+        self,
+        target: ParsedRemoteTarget,
+        scan_forks: bool = True,
+        max_forks: int = 5,
+    ) -> Tuple[List[HistoryOverwriteEvent], List[str], List[str]]:
+        events: List[HistoryOverwriteEvent] = []
+        candidate_shas: List[str] = []
+        seen_shas: Set[str] = set()
+        warnings: List[str] = []
+        zero_sha = "0" * 40
+
+        events_url = f"{target.api_repo_url}/events?action=pushed&per_page=100"
+        try:
+            req = urllib.request.Request(events_url, headers=self._build_headers(), method="GET")
+            raw_events = _fetch_json_resilient(req, timeout=self.timeout, token=self._token)
+            if isinstance(raw_events, list):
+                for ev in raw_events:
+                    if not isinstance(ev, dict):
+                        continue
+                    ev_id = str(ev.get("id", ""))
+                    author = (ev.get("author") or {}).get("username", "unknown")
+                    created_at = str(ev.get("created_at") or "")
+                    push_data = ev.get("push_data") or {}
+                    commit_from = str(push_data.get("commit_from") or "").strip()
+                    commit_to = str(push_data.get("commit_to") or "").strip()
+                    ref = str(push_data.get("ref") or "main")
+                    action = str(push_data.get("action") or "pushed")
+
+                    if commit_from and commit_from != zero_sha:
+                        if action == "removed":
+                            events.append(
+                                HistoryOverwriteEvent(
+                                    event_id=f"gl-{ev_id}",
+                                    event_type="branch_delete",
+                                    ref=f"refs/heads/{ref}",
+                                    before_sha=commit_from,
+                                    after_sha=None,
+                                    actor=author,
+                                    created_at=created_at,
+                                    description=f"GitLab deleted branch '{ref}' (previous tip {commit_from[:10]})",
+                                )
+                            )
+                            if commit_from not in seen_shas:
+                                seen_shas.add(commit_from)
+                                candidate_shas.append(commit_from)
+                        elif commit_to and commit_from != commit_to:
+                            desc = f"GitLab force-push on {ref} (previous tip {commit_from[:10]} replaced by {commit_to[:10]})"
+                            events.append(
+                                HistoryOverwriteEvent(
+                                    event_id=f"gl-{ev_id}",
+                                    event_type="force_push",
+                                    ref=f"refs/heads/{ref}",
+                                    before_sha=commit_from,
+                                    after_sha=commit_to,
+                                    actor=author,
+                                    created_at=created_at,
+                                    description=desc,
+                                )
+                            )
+                            if commit_from not in seen_shas:
+                                seen_shas.add(commit_from)
+                                candidate_shas.append(commit_from)
+        except Exception as exc:
+            warnings.append(sanitize_token_in_text(str(exc), self._token))
+
+        return events, candidate_shas, warnings
+
+
 class GitHubAPIForensicsClient:
     """Queries GitHub REST API for history overwrite events, force-pushes, and orphaned commits.
 
