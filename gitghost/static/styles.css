@@ -1358,3 +1358,11 @@ tr:hover td {
   transform: translateY(0);
   opacity: 1;
 }
+
+/* RTL Alignment for Local Repository and GC Alerts */
+[dir="rtl"] .gc-diag-header {
+  flex-direction: row;
+}
+[dir="rtl"] .btn-outline-amber {
+  align-self: flex-start;
+}
