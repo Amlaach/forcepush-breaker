@@ -1,0 +1,82 @@
+{
+  "name": "unforce-desktop",
+  "productName": "UnForce",
+  "version": "0.8.1",
+  "description": "UnForce (ForcePush-Breaker) — Cyber-Forensics Chromium Desktop Studio for GitHub Commit Recovery & Secret Hunting",
+  "author": "UnForce / GitGhost Security Team <security@gitghost.io>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Amlaach/forcepush-breaker.git"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke-test",
+    "dist:win": "electron-builder --win dir --publish never && node ../scripts/build_portable.js",
+    "dist:mac": "electron-builder --mac dmg zip --publish never",
+    "dist:linux": "electron-builder --linux AppImage deb --publish never",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.4.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "io.gitghost.unforce",
+    "productName": "UnForce",
+    "copyright": "Copyright © 2026 UnForce / GitGhost Security",
+    "asar": true,
+    "compression": "store",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "ui_bundle.html",
+      "splash.html",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../build_backend/unforce-engine",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "mac": {
+      "icon": "assets/icon.png",
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "artifactName": "UnForce-macOS-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "category": "Development",
+      "synopsis": "GitHub Commit History Forensics & Secret Hunting Studio",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "artifactName": "UnForce-Linux-${version}-${arch}.${ext}"
+    }
+  }
+}
