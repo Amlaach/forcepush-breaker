@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UnForce (ForcePush-Breaker / GitGhost) — Git Forensics &amp; Commit Recovery Studio</title>
+  <!-- __UNFORCE_INLINE_CSS__ -->
+</head>
+<body class="state-landing">
+
+  <!-- Custom Frameless Desktop Titlebar (Windows Native LTR Layout) -->
+  <div id="desktopTitlebar" class="desktop-titlebar">
+    <div class="titlebar-brand">
+      <img id="titlebarLogoImg" class="titlebar-logo-img" alt="" style="display:none;">
+      <svg id="titlebarFallbackSvg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.2">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        <polygon points="13 6 8 14 12 14 11 18 16 10 12 10 13 6"></polygon>
+      </svg>
+      <span class="brand-title-text">UNFORCE</span>
+      <span class="brand-divider">//</span>
+      <span class="brand-sub-text" data-i18n="brandSub">אולפן שחזור קומיטים וסודות Git</span>
+      <span id="titlebarVerBadge" class="titlebar-badge">v0.8.1</span>
+    </div>
+
+    <div class="titlebar-right-dock">
+      <div class="titlebar-actions">
+        <button id="updateAvailableBtn" class="update-pulse-btn" onclick="openUpdateModal()" style="display:none;" title="עדכון גרסה זמין מ-GitHub">
+          <span class="pulse-indicator"></span>
+          <span data-i18n="updateAvailable">עדכון זמין: v</span>
+          <span id="updateVerBadge">0.8.1</span>
+          <span data-i18n="updateClick"> — לחץ לעדכון</span>
+        </button>
+
+        <button class="titlebar-icon-btn" onclick="openLogsConsole()" title="יומן פעילות ופורנזיקה">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span data-i18n="navLogs">לוגים</span>
+          <span id="titlebarLogsBadge" class="badge-mini">0</span>
+        </button>
+      </div>
+
+      <div class="titlebar-controls">
+        <button class="win-btn win-minimize" id="btnWinMinimize" title="מזער חלון" aria-label="Minimize">
+          <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.3"/></svg>
+        </button>
+        <button class="win-btn win-maximize" id="btnWinMaximize" title="הגדל / שחזר חלון" aria-label="Maximize">
+          <svg width="11" height="11" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+        </button>
+        <button class="win-btn win-close" id="btnWinClose" title="סגור חלון" aria-label="Close">
+          <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1.4"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="currentColor" stroke-width="1.4"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- STATE 1: CLEAN EMPTY HERO LANDING VIEW (Before Repo Paste)      -->
+  <!-- =============================================================== -->
+  <div id="landingView" class="landing-viewport">
+    <div class="landing-content">
+      <div class="landing-emblem">
+        <img id="landingLogoImg" class="landing-logo-img" alt="UnForce Logo" style="display:none;">
+        <svg id="landingFallbackSvg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <polygon points="13 6 8 14 12 14 11 18 16 10 12 10 13 6"></polygon>
+        </svg>
+      </div>
+
+      <h1 class="landing-brand-title">UNFORCE</h1>
+      <p class="landing-slogan" data-i18n="landingSlogan">
+        שחזור היסטוריית קומיטים שנמחקו ב-Force-Push, איתור סודות ופורנזיקת Git
+      </p>
+
+      <!-- Primary Minimalist Repo Input & Action Bar -->
+      <div class="landing-search-card" id="landingSearchDropZone">
+        <div class="landing-input-wrap">
+          <span class="landing-input-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+          </span>
+          <input
+            type="text"
+            id="repoPathInput"
+            class="landing-input ltr-mono"
+            placeholder="https://github.com/owner/repo או נתיב תיקייה מקומית" data-i18n-placeholder="landingInputPlaceholder"
+            spellcheck="false"
+            autocomplete="off"
+            oninput="updateTargetTypeBadge()"
+            onkeydown="if(event.key==='Enter') startScan()"
+            autofocus
+          >
+          <span id="repoTargetBadge" class="target-type-pill">
+            <span id="repoTargetBadgeText" data-i18n="githubTargetPill">מאגר GitHub</span>
+          </span>
+        </div>
+
+        <div class="landing-action-buttons">
+          <button class="btn btn-paste" onclick="pasteGitHubUrlOnly()" title="הדבק כתובת מלוח ההעתקה">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span data-i18n="pasteBtn">הדבק כתובת</span>
+          </button>
+
+          <button class="btn btn-secondary" id="browseLocalBtn" onclick="selectLocalFolder()" title="בחר תיקיית מאגר מקומית">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            <span data-i18n="browseLocalBtn">בחר תיקייה</span>
+          </button>
+
+          <button class="btn btn-primary" id="scanBtn" onclick="startScan()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <span id="scanBtnText" data-i18n="scanBtn">סרוק ריפו</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Samples & Private Repo Helper -->
+      <div class="landing-samples-bar" style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;margin-top:14px;">
+        <span style="font-size:12px;color:var(--text-muted);font-weight:600;" data-i18n="sampleLabel">דוגמה מהירה:</span>
+        <button type="button" class="sample-chip-btn demo-chip" onclick="startDemoScan()" title="יוצר ומנתח מאגר Git מקומי עם קומיטים שנדרסו ב-Force-Push וסודות">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>מאגר הדגמה לבדיקה (Live Demo)</span>
+        </button>
+        <button type="button" class="sample-chip-btn" onclick="loadSampleGitHubUrl('https://github.com/Amlaach/forcepush-breaker')" title="סרוק את מאגר המקור הרשמי של התוכנה ב-GitHub">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-bright)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+          <span>מאגר GitHub רשמי</span>
+        </button>
+        <button type="button" class="sample-chip-btn token-helper-btn" onclick="openSettingsModal()" title="לחץ להגדרת טוקן אישי עבור סריקת מאגרים פרטיים">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5-2 2L12 6l-3 3a5.5 5.5 0 1 0 7.78 7.78L22 12l-1-1 2-2-2-2z"/></svg>
+          <span>סורק מאגר פרטי? הגדר טוקן</span>
+        </button>
+      </div>
+
+      <!-- Recent Audited Repos -->
+      <div class="landing-meta-row">
+        <div id="landingRecentContainer" class="landing-recent" style="display:none;">
+          <span class="meta-label" data-i18n="recentLabel">נסרק לאחרונה:</span>
+          <div id="landingRecentChips" class="recent-chips-wrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Minimalist Bottom Status Dock -->
+    <footer class="landing-footer">
+      <div class="footer-telemetry">
+        <span class="dot dot-green"></span>
+        <span class="ltr-mono"><span data-i18n="engineOnline">מנוע שחזור פעיל v0.8.1</span></span>
+      </div>
+      <div class="footer-actions">
+        <button class="text-link-btn" onclick="openLogsConsole()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-inline-end:5px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span data-i18n="navLogs">לוגים</span>
+        </button>
+        <button class="text-link-btn" onclick="checkAppVersion(true)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-inline-end:5px;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg><span data-i18n="updateCheckNow">בדוק עדכונים</span>
+        </button>
+        <button class="text-link-btn" onclick="openSettingsModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-inline-end:5px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg><span data-i18n="settingsBtn">הגדרות</span>
+        </button>
+        <button class="text-link-btn" id="langSwitchBtn" onclick="toggleLanguage()">
+          EN / עב
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- STATE 2: ACTIVE REPO WORKSPACE VIEW (Shown During/After Scan)   -->
+  <!-- =============================================================== -->
+  <div id="workspaceView" class="workspace-viewport" style="display:none;">
+    <!-- Unified Sleek Workspace Top Header -->
+    <header class="workspace-header">
+      <div class="ws-header-left">
+        <button class="btn btn-secondary btn-sm ws-back-btn" onclick="returnToLanding()" title="חזרה למסך החיפוש הנקי">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 18-6-6 6-6"/></svg>
+          <span data-i18n="btnBackToHome">← חזרה לחיפוש</span>
+        </button>
+
+        <div class="active-repo-badge">
+          <span id="metaRepoPath" class="repo-name-text ltr-mono">—</span>
+          <span id="metaBranchBadge" class="badge badge-medium ltr-mono">main</span>
+          <span id="metaCleanBadge" class="badge badge-low ltr-mono" style="display:none;"></span>
+          <button class="icon-link-btn" onclick="openActiveRepoOnGitHub()" title="פתח ריפו ב-GitHub ↗">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Clean Horizontal Navigation Tabs -->
+      <nav class="ws-nav-tabs">
+        <button class="ws-tab-btn active" data-view="overview" onclick="switchView('overview')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span data-i18n="navOverview">סקירה ומדדים</span>
+        </button>
+
+        <button class="ws-tab-btn" data-view="commits" onclick="switchView('commits')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>
+          <span data-i18n="navCommits">קומיטים</span>
+          <span id="navBadgeCommits" class="tab-badge">0</span>
+        </button>
+
+        <button class="ws-tab-btn" data-view="findings" onclick="switchView('findings')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg>
+          <span data-i18n="navFindings">סודות ודליפות</span>
+          <span id="navBadgeFindings" class="tab-badge">0</span>
+        </button>
+
+        <button class="ws-tab-btn" data-view="timemachine" onclick="switchView('timemachine')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span data-i18n="navTimeMachine">מכונת זמן .env</span>
+          <span id="navBadgeTimeMachine" class="tab-badge">0</span>
+        </button>
+
+        <button class="ws-tab-btn" data-view="searchblobs" onclick="switchView('searchblobs')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <span data-i18n="navSearchBlobs">חיפוש עמוק</span>
+        </button>
+
+        <button class="ws-tab-btn" data-view="remediation" onclick="switchView('remediation')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <span data-i18n="navRemediation">ניקוי היסטוריה</span>
+        </button>
+      </nav>
+
+      <!-- Right Header Actions -->
+      <div class="ws-header-right">
+        <button class="btn btn-secondary btn-sm" onclick="openLogsConsole()" title="יומן פעילות ופורנזיקה">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span data-i18n="navLogs">לוגים</span>
+          <span id="wsLogsBadge" class="badge-mini">0</span>
+        </button>
+
+        <button class="btn btn-purple btn-sm" onclick="downloadRecoveryBundle()" title="חבילת שחזור מלאה (.ZIP)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span data-i18n="bundleBtn"><span data-i18n="bundleBtn">חבילת שחזור (.ZIP)</span></span>
+        </button>
+
+        <button class="btn btn-secondary btn-sm" onclick="downloadReport('json')" title="Export JSON"><span data-i18n="exportJson">ייצוא JSON</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="exportSARIF()" title="Export SARIF 2.1.0"><span data-i18n="exportSarif">ייצוא SARIF</span></button>
+
+        <button class="btn btn-secondary btn-sm" onclick="openSettingsModal()" title="Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Sleek High-Tech Progress Bar (Visible while scanning) -->
+    <div id="scanProgressContainer" class="scan-progress-box" style="display:none;">
+      <div class="progress-info-row">
+        <span id="progressStatusText" class="ltr-mono"><span data-i18n="acquiringMirror">מוריד מראה חשופה (Bare Mirror) מ-GitHub...</span></span>
+        <span id="progressPctText" class="ltr-mono">0%</span>
+      </div>
+      <div class="scan-progress-track">
+        <div id="scanProgressFill" class="scan-progress-fill"></div>
+      </div>
+    </div>
+
+    <!-- Main Workspace Content Scroll Viewport -->
+    <main class="ws-content-viewport">
+
+      <!-- ========================================================= -->
+      <!-- VIEW 1: OVERVIEW & HYGIENE SCORE                          -->
+      <!-- ========================================================= -->
+      <section id="viewOverview" class="view-panel active">
+        <!-- KPI Cards Grid -->
+        <div class="overview-cards-grid">
+          <div class="kpi-card" onclick="openCommitsWithSubtab('dangling')">
+            <div class="kpi-top">
+              <span data-i18n="kpiCommits">קומיטים יתומים / Force-Push</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--magenta)" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>
+            </div>
+            <div id="statCommits" class="kpi-val">0</div>
+            <div class="kpi-sub" data-i18n="kpiCommitsSub">קומיטים שנדרסו או נותקו מההיסטוריה</div>
+          </div>
+
+          <div class="kpi-card" onclick="openCommitsWithSubtab('branch')">
+            <div class="kpi-top">
+              <span data-i18n="kpiBranchCommits">קומיטים בהיסטוריית הריפו</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            </div>
+            <div id="statBranchCommits" class="kpi-val" style="color:var(--cyan-bright);">0</div>
+            <div class="kpi-sub" data-i18n="kpiBranchCommitsSub">זמינים לעיון מלא ב-Diff ובעץ הקבצים</div>
+          </div>
+
+          <div class="kpi-card" onclick="switchView('findings')">
+            <div class="kpi-top">
+              <span data-i18n="kpiSecrets">סודות ופרטי גישה שזוהו</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+            </div>
+            <div id="statSecrets" class="kpi-val" style="color:var(--neon-green);">0</div>
+            <div id="statSecretsBreakdown" class="kpi-sub" data-i18n="kpiSecretsSub">מוסווים קריפטוגרפית (Strict Redaction)</div>
+          </div>
+
+          <div class="kpi-card" onclick="switchView('timemachine')">
+            <div class="kpi-top">
+              <span data-i18n="kpiConfigs">קבצי .env / Blobs שנחשפו</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div id="statTotalObjects" class="kpi-val">0</div>
+            <div class="kpi-sub" data-i18n="kpiConfigsSub">קבצי הגדרות שנמחקו או עצמים מנותקים</div>
+          </div>
+        </div>
+
+        <!-- Hygiene Score & History Rewrite Events Row -->
+        <div class="overview-details-grid">
+          <div class="card score-card">
+            <div class="card-header-clean">
+              <span data-i18n="scoreTitle">ציון היגיינת ריפו</span>
+              <span id="scoreGrade" class="gauge-grade">A+ READY</span>
+            </div>
+            <div class="gauge-wrap">
+              <svg class="gauge-svg" viewBox="0 0 160 160">
+                <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
+                <circle id="gaugeCircle" class="gauge-arc" cx="80" cy="80" r="70"></circle>
+              </svg>
+              <div class="gauge-center">
+                <span id="scoreNumber" class="gauge-num">100</span>
+                <span class="gauge-pct">/ 100</span>
+              </div>
+            </div>
+            <div id="scoreSummary" class="score-summary-text" data-i18n="scoreReady">
+              הסריקה הושלמה בהצלחה.
+            </div>
+            <div id="deductionsList" class="deductions-list"></div>
+          </div>
+
+          <div class="card events-card">
+            <div class="card-header-clean">
+              <h3 style="font-size:14px;font-weight:800;color:var(--cyan-bright);" data-i18n="latestCommitsTitle">
+                קומיטים אחרונים ואירועי Force-Push
+              </h3>
+              <button class="btn btn-secondary btn-sm" onclick="switchView('commits')" data-i18n="openExplorerBtn">
+                לסייר הקומיטים ←
+              </button>
+            </div>
+            <div id="overviewRecentCommits" class="overview-commits-list">
+              <div class="empty-hint">אין קומיטים להצגה עדיין.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- VIEW 2: COMMIT & FILE-TREE FORENSICS EXPLORER             -->
+      <!-- ========================================================= -->
+      <section id="viewCommits" class="view-panel">
+        <div class="panel-toolbar">
+          <div class="segmented-bar">
+            <button class="seg-btn active" id="segBtnDangling" onclick="switchCommitSubtab('dangling')">
+              <span data-i18n="subtabDangling">קומיטים יתומים / Force-Push</span>
+              (<span id="subCountDangling">0</span>)
+            </button>
+            <button class="seg-btn" id="segBtnBranch" onclick="switchCommitSubtab('branch')">
+              <span data-i18n="subtabBranch">כל היסטוריית הקומיטים</span>
+              (<span id="subCountBranch">0</span>)
+            </button>
+            <button class="seg-btn" id="segBtnRemote" onclick="switchCommitSubtab('remote')">
+              <span data-i18n="subtabRemote">אירועי Force-Push ו-Forks</span>
+              (<span id="subCountRemote">0</span>)
+            </button>
+          </div>
+
+          <input
+            type="text"
+            id="commitFilterInput"
+            class="input-field"
+            style="min-width:260px;"
+            placeholder="סינון לפי הודעה, מחבר, קובץ, SHA..."
+            oninput="renderCommitsList()"
+          >
+        </div>
+
+        <!-- Split View: Commits List on Left + Inspector Pane on Right -->
+        <div id="subpanelCommitsSplit" class="recovery-split">
+          <div id="commitsListContainer" class="commit-card-list">
+            <div class="card empty-card" data-i18n="selectCommitPrompt">
+              סרוק ריפו כדי לצפות בקומיטים שנמחקו.
+            </div>
+          </div>
+
+          <div class="inspector-pane" id="commitInspectorPane">
+            <div id="commitInspectorEmpty" class="inspector-empty">
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.6"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>
+              <div data-i18n="selectCommitPrompt">בחר קומיט מהרשימה לצפייה ב-Diff המלא, דפדוף בעץ הקבצים או שחזור.</div>
+            </div>
+
+            <div id="commitInspectorContent" style="display:none;flex-direction:column;height:100%;">
+              <div class="inspector-header">
+                <div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span id="inspCommitSha" class="code-chip ltr-mono" style="font-weight:700;"></span>
+                    <span id="inspCommitTypeBadge" class="badge badge-high"></span>
+                  </div>
+                  <div id="inspCommitSubject" style="font-weight:800;font-size:14.5px;color:#ffffff;margin-top:4px;"></div>
+                  <div id="inspCommitMeta" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+                </div>
+
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <button class="btn btn-secondary btn-sm" onclick="exportActiveCommitPatch()" data-i18n="btnExportPatch"><span data-i18n="btnExportPatch">ייצא קובץ Patch</span></button>
+                  <button class="btn btn-secondary btn-sm" id="btnInspOpenGH" onclick="openActiveCommitOnGitHub()" data-i18n="btnOpenCommitGH">GitHub ↗</button>
+                  <button class="btn btn-secondary btn-sm" id="btnInspCherryPick" onclick="cherryPickActiveCommit()" data-i18n="btnCherryPick">שחזר לענף נוכחי</button>
+                  <button class="btn btn-primary btn-sm" id="btnInspRestoreBranch" onclick="restoreActiveCommitToBranch()" data-i18n="btnRestoreBranch">שחזר לענף חדש</button>
+                </div>
+              </div>
+
+              <!-- Inspector Inner Tabs: Diff vs File Tree -->
+              <div class="inspector-subtabs">
+                <button class="subtab-btn active" id="tabBtnDiff" onclick="switchInspectorSubtab('diff')" data-i18n="tabDiffView"><span data-i18n="tabDiffView">השוואת שינויים (Diff)</span></button>
+                <button class="subtab-btn" id="tabBtnTree" onclick="switchInspectorSubtab('tree')">
+                  <span data-i18n="tabFileTree">עץ קבצים</span> (<span id="inspFileCount">0</span>)
+                </button>
+              </div>
+
+              <div id="inspDiffPane" class="inspector-body active">
+                <div id="inspDiffContainer" class="diff-container"></div>
+              </div>
+
+              <div id="inspTreePane" class="inspector-body">
+                <div class="tree-layout">
+                  <div id="inspTreeList" class="tree-list"></div>
+                  <div class="tree-preview">
+                    <div class="tree-preview-header">
+                      <span id="treePreviewFilePath" class="ltr-mono" style="font-size:12px;color:var(--cyan-bright);font-weight:700;"><span data-i18n="noFileSelected">לא נבחר קובץ</span></span>
+                      <div style="display:flex;gap:6px;">
+                        <button class="btn btn-secondary btn-sm" id="btnSaveThisFile" onclick="savePreviewedFileAs()" data-i18n="btnSaveFile"><span data-i18n="btnSaveFile">שמור קובץ</span></button>
+                        <button class="btn btn-secondary btn-sm" id="btnCopyThisFile" onclick="copyPreviewedFile()" data-i18n="btnCopyFile"><span data-i18n="btnCopyFile">העתק תוכן</span></button>
+                      </div>
+                    </div>
+                    <div id="treePreviewContent" class="code-view" style="flex:1;"><span data-i18n="selectFileInspect">בחר קובץ מעץ הקבצים כדי לצפות בתוכנו</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Remote Force-Push Events Subpanel -->
+        <div id="subpanelRemoteEvents" style="display:none;">
+          <div id="remoteEventsContainer" style="display:flex;flex-direction:column;gap:16px;">
+            <div class="card">
+              <div style="font-weight:800;font-size:14px;color:var(--cyan-bright);margin-bottom:12px;" data-i18n="subtabRemote">אירועי Force-Push ודחיפות ל-GitHub</div>
+              <div id="historyEventsList" style="display:flex;flex-direction:column;gap:10px;"></div>
+            </div>
+            <div class="card">
+              <div style="font-weight:800;font-size:14px;color:var(--amber);margin-bottom:12px;" data-i18n="lblAuditForks">Fork-ים ציבוריים שנבדקו</div>
+              <div id="forksAuditList" style="display:flex;flex-direction:column;gap:10px;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- VIEW 3: SECRETS & LEAKS (Findings)                        -->
+      <!-- ========================================================= -->
+      <section id="viewFindings" class="view-panel">
+        <div class="panel-toolbar">
+          <input
+            type="text"
+            id="findingsFilterInput"
+            class="input-field"
+            style="min-width:280px;"
+            placeholder="סנן לפי קובץ, כלל, ערך מוסווה..."
+            oninput="filterFindings()"
+          >
+
+          <select id="severityFilter" class="select-field" onchange="filterFindings()">
+            <option value="all">כל דרגות החומרה</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:60px;" data-i18n="thId">מזהה</th>
+                <th style="width:100px;" data-i18n="thSeverity">חומרה</th>
+                <th data-i18n="thRule">סוג ממצא</th>
+                <th data-i18n="thMasked">סוד מוסווה</th>
+                <th data-i18n="thLocation">מיקום</th>
+                <th style="width:80px;" data-i18n="thEntropy">אנטרופיה</th>
+                <th style="width:140px;" data-i18n="thVerdict">פסק דין AI</th>
+                <th style="width:140px;" data-i18n="thActions">פעולות</th>
+              </tr>
+            </thead>
+            <tbody id="findingsTableBody">
+              <tr><td colspan="8" class="empty-cell">סרוק מאגר לצפייה בממצאי סודות ודליפות מידע.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- VIEW 4: .ENV TIME MACHINE                                 -->
+      <!-- ========================================================= -->
+      <section id="viewTimeMachine" class="view-panel">
+        <div class="panel-toolbar">
+          <input
+            type="text"
+            id="tmFilterInput"
+            class="input-field"
+            style="min-width:280px;"
+            placeholder="סנן קבצים (.env, secrets.json, id_rsa)..."
+            oninput="renderTimeMachineTable()"
+          >
+          <select id="tmTypeFilter" class="select-field" onchange="renderTimeMachineTable()">
+            <option value="all">כל סוגי הקבצים</option>
+            <option value="env">קבצי .env בלבד</option>
+            <option value="key">מפתחות פרטיים (Keys)</option>
+            <option value="credential">קבצי Credentials &amp; Secrets</option>
+          </select>
+        </div>
+
+        <div class="card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th data-i18n="thFileName">שם ונתיב קובץ</th>
+                <th style="width:120px;" data-i18n="thCategory">קטגוריה</th>
+                <th data-i18n="thOrigin">קומיט מקור / Blob</th>
+                <th style="width:160px;" data-i18n="thAuthorDate">מחבר ותאריך</th>
+                <th style="width:180px;" data-i18n="thActions">פעולות</th>
+              </tr>
+            </thead>
+            <tbody id="timeMachineTableBody">
+              <tr><td colspan="5" class="empty-cell">אין קבצי תצורה רגישים להצגה כרגע.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- VIEW 5: DEEP FORENSICS OBJECT SEARCH                      -->
+      <!-- ========================================================= -->
+      <section id="viewSearchBlobs" class="view-panel">
+        <div class="card" style="margin-bottom:16px;">
+          <h3 style="font-size:15px;font-weight:800;color:var(--cyan-bright);margin-bottom:8px;" data-i18n="deepSearchTitle">
+            חיפוש עמוק בכל הקומיטים, ה-Diffs ועצמי ה-Git
+          </h3>
+          <div style="display:flex;gap:8px;">
+            <input
+              type="text"
+              id="deepSearchInput"
+              class="input-field ltr-mono"
+              style="flex:1;"
+              placeholder="חפש מילת מפתח, שם משתנה, הודעת קומיט או hash..."
+              onkeydown="if(event.key==='Enter') executeDeepSearch()"
+            >
+            <button class="btn btn-primary" onclick="executeDeepSearch()" data-i18n="deepSearchBtn">
+              הרץ חיפוש
+            </button>
+          </div>
+        </div>
+
+        <div id="searchResultsCard" class="card" style="display:none;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h4 style="font-size:14px;font-weight:800;color:var(--neon-green);" id="searchResultsTitle">תוצאות חיפוש</h4>
+            <span id="searchResultsCount" class="badge badge-medium">0 תוצאות</span>
+          </div>
+          <div id="searchResultsList" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+
+        <div class="card table-card">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+            <h3 style="font-size:14px;font-weight:800;color:var(--amber);" data-i18n="detachedBlobsTitle">עצמי Git מנותקים (Detached Blobs)</h3>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:180px;">SHA / Object</th>
+                <th style="width:100px;">גודל</th>
+                <th style="width:120px;">סוג</th>
+                <th>תצוגה מקדימה מוסווית</th>
+                <th style="width:140px;">פעולות</th>
+              </tr>
+            </thead>
+            <tbody id="detachedBlobsTableBody">
+              <tr><td colspan="5" class="empty-cell">סרוק ריפו כדי לחלץ אובייקטים מנותקים.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- VIEW 6: HISTORY CLEANUP & REMEDIATION                     -->
+      <!-- ========================================================= -->
+      <section id="viewRemediation" class="view-panel">
+        <div class="card" style="margin-bottom:16px;">
+          <h2 style="font-size:18px;font-weight:800;color:var(--neon-green);margin-bottom:6px;" data-i18n="remTitle">
+            תוכנית עבודה: מחיקת היסטוריה מ-GitHub והסרת סודות
+          </h2>
+          <p style="font-size:13px;color:var(--text-secondary);">
+            פקודות Git מומלצות לטיהור סופי של סודות וקומיטים שנדרסו.
+          </p>
+        </div>
+
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header-clean">
+            <h3 style="font-size:14px;font-weight:800;color:var(--cyan-bright);">טיהור באמצעות git-filter-repo</h3>
+            <button class="btn btn-secondary btn-sm" onclick="copyFilterRepoCommands()">העתק פקודות</button>
+          </div>
+          <pre id="remediationScriptView" class="code-view ltr-mono" style="padding:12px 16px;font-size:12.5px;"></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-header-clean">
+            <h3 style="font-size:14px;font-weight:800;color:var(--amber);">פנייה לתמיכת GitHub (Cache Excision Ticket)</h3>
+            <button class="btn btn-secondary btn-sm" onclick="copySupportTicket()">העתק פנייה</button>
+          </div>
+          <pre id="supportTicketView" class="code-view" style="padding:12px 16px;font-size:12.5px;"></pre>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- DEDICATED FORENSICS ACTIVITY & LOGS DRAWER                      -->
+  <!-- =============================================================== -->
+  <div id="logsDrawer" class="logs-drawer-overlay" style="display:none;" onclick="if(event.target===this) closeLogsConsole()">
+    <div class="logs-drawer-panel">
+      <div class="logs-header">
+        <div class="logs-title-row">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span style="font-weight:800;font-size:14px;color:#ffffff;" data-i18n="logsTitle">יומן פעילות ופורנזיקה (Logs)</span>
+          <span id="logsTotalCountBadge" class="badge-pill">0</span>
+        </div>
+
+        <div class="logs-controls">
+          <div class="logs-filters">
+            <button class="log-filter-btn active" data-filter="all" onclick="filterLogs('all')" data-i18n="logsFilterAll">הכל</button>
+            <button class="log-filter-btn" data-filter="info" onclick="filterLogs('info')" data-i18n="logsFilterInfo">מידע</button>
+            <button class="log-filter-btn" data-filter="warn" onclick="filterLogs('warn')" data-i18n="logsFilterWarn">אזהרות</button>
+            <button class="log-filter-btn" data-filter="error" onclick="filterLogs('error')" data-i18n="logsFilterError">שגיאות</button>
+            <button class="log-filter-btn" data-filter="forensics" onclick="filterLogs('forensics')" data-i18n="logsFilterForensics">פורנזיקה</button>
+          </div>
+
+          <input type="text" id="logsSearchInput" class="input-field ltr-mono" style="height:28px;font-size:12px;width:180px;" placeholder="סינון..." oninput="renderLogsConsole()">
+
+          <label class="logs-autoscroll-label">
+            <input type="checkbox" id="logsAutoScrollCheck" checked onchange="toggleLogsAutoScroll(this.checked)">
+            <span data-i18n="logsAutoScroll">גלילה אוטומטית</span>
+          </label>
+
+          <button class="btn btn-secondary btn-sm" onclick="copyAllLogs()" data-i18n="logsCopy">העתק הכל</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearAllLogs()" data-i18n="logsClear">נקה</button>
+          <button class="btn btn-secondary btn-sm" onclick="closeLogsConsole()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+      </div>
+
+      <div id="logsConsoleBody" class="logs-body ltr-mono"></div>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- IN-APP VERSION UPDATE MODAL                                     -->
+  <!-- =============================================================== -->
+  <div id="updateModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeUpdateModal()">
+    <div class="modal-box" style="max-width:580px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path><path d="M12 9V4s3.03.55 4 2c1.08 1.62 0 5 0 5"></path></svg></span>
+          <div>
+            <h3 style="font-size:16px;font-weight:800;color:var(--neon-green);" data-i18n="updateModalTitle">עדכון גרסה זמין לתוכנה</h3>
+            <div style="font-size:12px;color:var(--text-muted);">
+              <span data-i18n="updateCurrent">גרסה נוכחית:</span> <strong class="ltr-mono">v0.7.2</strong>
+              &nbsp;→&nbsp;
+              <span data-i18n="updateLatest">גרסה חדשה:</span> <strong id="modalUpdateTargetVer" class="ltr-mono" style="color:var(--neon-green);">v0.7.2</strong>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeUpdateModal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+      </div>
+
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <div style="font-weight:700;font-size:13px;color:var(--cyan-bright);margin-bottom:6px;" data-i18n="updateReleaseNotes">
+            מה חדש בגרסה זו:
+          </div>
+          <div id="modalUpdateNotes" class="code-view" style="max-height:220px;overflow-y:auto;white-space:pre-wrap;font-size:12.5px;"></div>
+        </div>
+
+        <div id="updateDownloadProgressBox" style="display:none;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+            <span id="updateProgressText" data-i18n="updateDownloading">מוריד עדכון...</span>
+            <span id="updateProgressPct" class="ltr-mono">0%</span>
+          </div>
+          <div class="scan-progress-track">
+            <div id="updateProgressFill" class="scan-progress-fill" style="width:0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn btn-secondary btn-sm" onclick="openReleasePageGH()" data-i18n="updateViewGH">
+          צפה ב-GitHub ↗
+        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" onclick="closeUpdateModal()">סגור</button>
+          <button class="btn btn-primary" id="btnDownloadUpdate" onclick="downloadLatestRelease()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span data-i18n="updateDownloadBtn">הורד והתקן עדכון</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- MODAL: FINDING DETAIL & RECOVERY                                -->
+  <!-- =============================================================== -->
+  <div id="detailModal" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="modal-box" style="max-width:740px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="modalSevBadge" class="badge"></span>
+          <h3 id="modalTitle" style="font-size:15px;font-weight:800;"><span data-i18n="modalFindingTitle">פרטי ממצא אבטחה</span></h3>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div id="modalSubtitle" style="font-size:12px;color:var(--text-muted);font-weight:600;" class="ltr-mono"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;"><span data-i18n="lblRuleType">כלל זיהוי / סוג:</span></span><div id="modalRule" class="ltr-mono" style="font-size:12.5px;color:var(--cyan-bright);font-weight:700;"></div></div>
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;"><span data-i18n="lblLocation">מיקום בקוד:</span></span><div id="modalLocation" class="ltr-mono" style="font-size:12.5px;"></div></div>
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;"><span data-i18n="lblEntropy">רמת אנטרופיה:</span></span><div id="modalEntropy" class="ltr-mono" style="font-size:12.5px;"></div></div>
+          <div><span style="font-size:11px;color:var(--text-muted);font-weight:700;"><span data-i18n="lblLivenessVerdict">אימות מול שירות חי:</span></span><div id="modalLiveness" class="ltr-mono" style="font-size:12.5px;font-weight:700;"></div></div>
+        </div>
+        <div id="modalCodeView" class="code-view"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="modalVerifyBtn" class="btn btn-secondary" style="display:none;" onclick="verifyActiveModalKey()"><span data-i18n="btnVerifyLiveness">בדוק תקינות מפתח מול שרת חי</span></button>
+        <button id="modalCopyBtn" class="btn btn-secondary" style="display:none;" onclick="copyModalContent()"><span data-i18n="btnCopyFile">העתק תוכן</span></button>
+        <button id="modalRecoverBtn" class="btn btn-primary" style="display:none;" onclick="recoverFromActiveModal()"><span data-i18n="btnExportArtifact">שמור / ייצא קובץ...</span></button>
+        <button class="btn btn-secondary" onclick="closeModal()"><span data-i18n="btnClose">סגור</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- MODAL: SETTINGS & EPHEMERAL CREDENTIALS                         -->
+  <!-- =============================================================== -->
+  <div id="settingsModal" class="modal-overlay" onclick="if(event.target===this) closeSettingsModal()">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-header">
+        <h3 style="font-size:16px;font-weight:800;" data-i18n="settingsBtn">הגדרות</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeSettingsModal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:16px;">
+        <div>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:6px;"><span data-i18n="lblAiEngine">מנוע AI לניתוח הקשר וסינון רעשים</span></label>
+          <select id="aiProviderSelect" class="select-field" style="width:100%;" onchange="updateAISettingsUI()">
+            <option value="heuristic" selected><span data-i18n="lblHeuristicEngine">מנוע חוקים יוריסטי מקומי (מיידי / ללא השהייה)</span></option>
+            <option value="auto"><span data-i18n="lblAutoDetectLlm">זיהוי אוטומטי של מודל שפה מוגדר</span></option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI GPT-4o</option>
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="ollama">Local Ollama (http://127.0.0.1:11434)</option>
+            <option value="none"><span data-i18n="lblDisabled">מושבת</span></option>
+          </select>
+          <div id="aiKeyInputRow" style="display:none;margin-top:8px;gap:6px;">
+            <input type="password" id="aiApiKeyInput" class="input-field ltr-mono" style="flex:1;" placeholder="API Key (held strictly in-memory)" autocomplete="off">
+            <button class="btn btn-secondary" onclick="saveAIKey()"><span data-i18n="btnSaveKey">שמור מפתח</span></button>
+          </div>
+          <div id="aiKeyConfiguredRow" style="display:none;margin-top:8px;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.35);border-radius:8px;">
+            <span style="font-size:12px;color:var(--neon-green);font-weight:700;">[OK] AI Key Active (In-Memory)</span>
+            <button class="btn btn-secondary btn-sm" onclick="clearAIKey()"><span data-i18n="btnClear">נקה</span></button>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:4px;"><span data-i18n="lblGhToken">טוקן גישה אישי ל-GitHub (אופציונלי לקצב בקשות מוגדל)</span></label>
+          <div id="ghTokenInputRow" style="display:flex;gap:6px;">
+            <input type="password" id="githubTokenInput" class="input-field ltr-mono" style="flex:1;" placeholder="ghp_... (held strictly in-memory)" autocomplete="off">
+            <button class="btn btn-secondary" onclick="saveGHToken()"><span data-i18n="btnSaveToken">שמור טוקן</span></button>
+          </div>
+          <div id="ghTokenConfiguredRow" style="display:none;margin-top:8px;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.35);border-radius:8px;">
+            <span style="font-size:12px;color:var(--neon-green);font-weight:700;">[OK] Custom GitHub Token Active (In-Memory)</span>
+            <button class="btn btn-secondary btn-sm" onclick="clearGHToken()"><span data-i18n="btnClear">נקה</span></button>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-weight:700;font-size:13px;color:var(--cyan-bright);display:block;margin-bottom:6px;">
+            Shannon Entropy Sensitivity: <span id="entropyVal" class="ltr-mono">4.0</span>
+          </label>
+          <input type="range" id="entropyThreshold" min="3.0" max="5.5" step="0.1" value="4.0" style="width:100%;" oninput="document.getElementById('entropyVal').innerText=this.value">
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="scanForksToggle" checked>
+            <span><span data-i18n="lblAuditForks">סרוק Fork-ים ציבוריים לאיתור קומיטים שנדרסו</span></span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="includeRawToggle" onchange="toggleRawRecoveryMode(this.checked)">
+            <span>Allow Unredacted (Raw) File Recovery <span style="color:var(--amber);font-size:11.5px;"><span data-i18n="lblExportsUnmasked">(ייצוא סודות מקוריים ללא מיסוך כוכביות)</span></span></span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn btn-secondary btn-sm" onclick="checkAppVersion(true)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-inline-end:5px;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg><span data-i18n="updateCheckNow">בדוק עדכונים כעת</span>
+        </button>
+        <button class="btn btn-primary" onclick="closeSettingsModal()"><span data-i18n="btnDone">סיום ואישור</span></button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">
+    <span id="toastIcon" class="toast-icon"></span>
+    <span id="toastMessage"><span data-i18n="toastReady">מוכן לפעולה</span></span>
+  </div>
+
+  <!-- __UNFORCE_INLINE_JS__ -->
+</body>
+</html>
