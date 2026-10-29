@@ -1,0 +1,132 @@
+name: UnForce CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-validate:
+    name: Code & Asset Validation (Python 3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Validate Python Syntax
+        run: |
+          python -m compileall -q gitghost tests scripts
+
+      - name: Validate UI Bundle & Icon Generators
+        run: |
+          python scripts/generate_icons.py
+          python scripts/build_ui_bundle.py
+
+  test:
+    name: Test on Python ${{ matrix.python-version }} (${{ matrix.os }})
+    needs: lint-and-validate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python-version: "3.9"
+          - os: macos-latest
+            python-version: "3.9"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global init.defaultBranch main
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+          pip install -e .
+
+      - name: Run Pytest Test Suite
+        run: |
+          pytest -v tests/
+
+      - name: Verify CLI Version & End-to-End Live Repository Scan
+        run: |
+          python -m gitghost --version
+          python -m gitghost scan . --no-ai
+
+      - name: Verify Forensic Export Formats (JSON & SARIF)
+        run: |
+          python -m gitghost scan . --no-ai --format json --output scan_report.json
+          python -m gitghost scan . --no-ai --format sarif --output scan_report.sarif
+
+  desktop-verify:
+    name: Desktop UI & Package Verification (${{ matrix.os }})
+    needs: lint-and-validate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Build UI Bundle
+        run: |
+          python scripts/generate_icons.py
+          python scripts/build_ui_bundle.py
+
+      - name: Verify Desktop Node Dependencies
+        working-directory: desktop
+        run: |
+          npm install
