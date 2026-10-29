@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+build_backend/
+dist/
+release/
+*.egg-info/
+.eggs/
+*.spec
+
+# Desktop Chromium / Electron build artifacts
+desktop/node_modules/
+desktop/dist/
+
+# Environments
+.venv
+env/
+venv/
+
+# Testing
+.pytest_cache/
+audit_report.*
+*.sarif
