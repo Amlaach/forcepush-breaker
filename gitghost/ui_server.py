@@ -287,6 +287,10 @@ _MIRROR_LOCK = threading.Lock()
 _DEMO_DIRS: List[Path] = []
 _DEMO_LOCK = threading.Lock()
 
+# Persistent conversational AI Chat Session
+_AI_CHAT_SESSION: Optional[Any] = None
+_CHAT_LOCK = threading.Lock()
+
 
 def _register_session_mirror(mirror_path: Optional[Path]) -> None:
     if not mirror_path:
@@ -553,6 +557,10 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._handle_version_check()
         elif self.path == "/api/logs" or self.path.startswith("/api/logs?"):
             self._handle_get_logs()
+        elif self.path == "/api/vault/list":
+            self._handle_vault_list()
+        elif self.path == "/api/ai/chat/history":
+            self._handle_ai_chat_history()
         else:
             self._send_error(404, "Not Found")
 
@@ -594,6 +602,12 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             "/api/hook": lambda: self._handle_hook(data),
             "/api/version/check": lambda: self._handle_version_check(data),
             "/api/version/download": lambda: self._handle_version_download(data),
+            "/api/vault/save": lambda: self._handle_vault_save(data),
+            "/api/vault/list": lambda: self._handle_vault_list(),
+            "/api/vault/delete": lambda: self._handle_vault_delete(data),
+            "/api/ai/chat": lambda: self._handle_ai_chat(data),
+            "/api/ai/chat/history": lambda: self._handle_ai_chat_history(),
+            "/api/ai/chat/clear": lambda: self._handle_ai_chat_clear(),
             "/api/logs": lambda: self._handle_add_log(data),
             "/api/logs/clear": lambda: self._handle_clear_logs(),
             "/api/shutdown": lambda: self._handle_shutdown(),
@@ -692,7 +706,7 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             self._send_json({
                 "status": "ok",
                 "saved_path": str(dest_path),
-                "filename": filename,
+                "filename": safe_fname,
             })
         except Exception as exc:
             LogStore.add("ERROR", "updater", f"Download failed: {exc}")
@@ -721,6 +735,81 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
     def _handle_clear_logs(self):
         LogStore.clear()
         self._send_json({"status": "ok"})
+
+    def _handle_vault_save(self, data: Dict[str, Any]):
+        from gitghost.crypto_vault import SecretVault
+
+        key_name = str(data.get("key_name") or data.get("key") or "").strip().lower()
+        token_val = str(data.get("token") or data.get("value") or "").strip()
+        if not key_name or not token_val:
+            self._send_error(400, "Missing required key_name or token value.")
+            return
+
+        SecretVault.set(key_name, token_val)
+        masked = SecretVault.list_keys_masked()
+        LogStore.add("INFO", "vault", f"Secret '{key_name}' saved to hardware-encrypted vault.")
+        self._send_json({
+            "status": "ok",
+            "message": f"Secret '{key_name}' securely encrypted and saved to local hardware-backed vault.",
+            "keys": masked,
+        })
+
+    def _handle_vault_list(self):
+        from gitghost.crypto_vault import SecretVault
+
+        masked = SecretVault.list_keys_masked()
+        self._send_json({"status": "ok", "keys": masked})
+
+    def _handle_vault_delete(self, data: Dict[str, Any]):
+        from gitghost.crypto_vault import SecretVault
+
+        key_name = str(data.get("key_name") or data.get("key") or "").strip().lower()
+        removed = SecretVault.remove(key_name)
+        masked = SecretVault.list_keys_masked()
+        LogStore.add("INFO", "vault", f"Secret '{key_name}' purged from vault.")
+        self._send_json({"status": "ok", "removed": removed, "keys": masked})
+
+    def _handle_ai_chat(self, data: Dict[str, Any]):
+        from gitghost.ai_chat import AIChatSession
+
+        message = str(data.get("message") or "").strip()
+        if not message:
+            self._send_error(400, "Missing required 'message' field.")
+            return
+
+        provider = str(data.get("provider") or "auto").strip().lower()
+        api_key = data.get("api_key")
+        model = data.get("model")
+        repo_path_str = (data.get("repo_path") or "").strip()
+
+        pipeline_res = None
+        if repo_path_str:
+            pipeline_res = self._resolve_pipeline_result(repo_path_str)
+        if not pipeline_res:
+            with _CACHE_LOCK:
+                pipeline_res = _SCAN_CACHE.get("__latest__")
+
+        global _AI_CHAT_SESSION
+        with _CHAT_LOCK:
+            if _AI_CHAT_SESSION is None or _AI_CHAT_SESSION.provider != provider:
+                _AI_CHAT_SESSION = AIChatSession(provider=provider, api_key=api_key, model=model)
+            result = _AI_CHAT_SESSION.chat(message, pipeline_res=pipeline_res)
+
+        LogStore.add("INFO", "ai_chat", f"AI response generated via {result.get('provider')}.", {"tools": result.get("tools_executed", [])})
+        self._send_json({"status": "ok", **result})
+
+    def _handle_ai_chat_history(self):
+        global _AI_CHAT_SESSION
+        with _CHAT_LOCK:
+            history = _AI_CHAT_SESSION.history if _AI_CHAT_SESSION else []
+            self._send_json({"status": "ok", "history": history})
+
+    def _handle_ai_chat_clear(self):
+        global _AI_CHAT_SESSION
+        with _CHAT_LOCK:
+            if _AI_CHAT_SESSION:
+                _AI_CHAT_SESSION.history.clear()
+        self._send_json({"status": "ok", "message": "AI conversation history cleared."})
 
     def _handle_system_info(self):
         from gitghost.github_remote import resolve_system_github_token
@@ -1089,7 +1178,6 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
             "repo_path": pipeline_res.repo_path,
             "is_remote": getattr(pipeline_res, "is_remote", False),
             "remote_platform": remote_target.platform if remote_target else ("remote" if getattr(pipeline_res, "is_remote", False) else "local"),
-            "is_remote": pipeline_res.is_remote,
             "remote_url": pipeline_res.remote_url,
             "github_html_url": gh_html_url,
             "github_full_name": gh_parsed.full_name if gh_parsed else "",
@@ -1714,6 +1802,11 @@ class GitGhostRequestHandler(BaseHTTPRequestHandler):
         custom_out = (data.get("output_path") or "").strip()
         if custom_out:
             out_file = Path(custom_out).resolve()
+            if not getattr(pipeline_res, "is_remote", False):
+                repo_root = Path(pipeline_res.repo_path).resolve()
+                if repo_root not in out_file.parents and out_file != repo_root and Path.cwd() not in out_file.parents:
+                    self._send_error(400, "output_path cannot write outside repository or current working directory.")
+                    return
         else:
             target_dir = Path.cwd() if is_github_target(repo_path_str) else Path(repo_path_str).resolve()
             out_file = target_dir / filename

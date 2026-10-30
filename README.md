@@ -2,9 +2,9 @@
 
 <img src="assets/logo.png" width="168" height="168" alt="UnForce Official Logo">
 
-# UnForce — ForcePush-Breaker (`v0.7.2`)
+# UnForce — ForcePush-Breaker (`v0.8.1`)
 
-### **Cyber-Forensics Chromium Desktop Studio & CLI for Git History Exhumation, Branch Restoration & Secret Hunting**
+### **Cyber-Forensics Chromium Desktop Studio, CLI & MCP Server for Git History Exhumation, Branch Restoration & Secret Hunting**
 
 *"Think `git push --force`, `git reset --hard`, or `git rm .env` erased your commits or leaked API keys? Think again."*
 
@@ -12,6 +12,7 @@
 [![Desktop Releases](https://github.com/Amlaach/forcepush-breaker/actions/workflows/release.yml/badge.svg)](https://github.com/Amlaach/forcepush-breaker/releases)
 [![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://github.com/Amlaach/forcepush-breaker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![MCP Protocol](https://img.shields.io/badge/MCP-JSON--RPC%202.0%20Ready-blueviolet.svg)](#model-context-protocol-mcp-server-for-ai-agents)
 [![SARIF 2.1.0](https://img.shields.io/badge/SARIF-2.1.0%20Compliant-purple.svg)](https://sarifweb.azurewebsites.net/)
 [![Bilingual HUD](https://img.shields.io/badge/UI-English%20LTR%20%7C%20%D7%A2%D7%91%D7%A8%D7%99%D7%AA%20RTL-00ff9d.svg)](#bilingual-cyberpunk-hud-english--%D7%A2%D7%91%D7%A8%D7%99%D7%AA)
 
@@ -32,6 +33,13 @@
   - [6. High-Entropy Secret Hunting & Passive Token Liveness](#6-high-entropy-secret-hunting--passive-token-liveness)
   - [7. Excision Recipes & Automated Purge Playbooks](#7-excision-recipes--automated-purge-playbooks)
   - [8. Multi-Format Audit Exports (SARIF 2.1.0, JSON, ZIP)](#8-multi-format-audit-exports-sarif-210-json-zip)
+  - [9. Conversational Cyber-Forensics AI Assistant (Tool Calling)](#9-conversational-cyber-forensics-ai-assistant-tool-calling)
+  - [10. Zero-Knowledge Encrypted Vault (DPAPI & PBKDF2)](#10-zero-knowledge-encrypted-vault-dpapi--pbkdf2)
+- [Model Context Protocol (MCP) Server for AI Agents](#model-context-protocol-mcp-server-for-ai-agents)
+  - [Connecting to Claude Code & Claude Desktop](#connecting-to-claude-code--claude-desktop)
+  - [Connecting to Cursor & Windsurf](#connecting-to-cursor--windsurf)
+  - [Connecting to Antigravity & Codex](#connecting-to-antigravity--codex)
+  - [Exposed MCP Tools](#exposed-mcp-tools)
 - [Chromium Desktop UI/UX Engineering](#chromium-desktop-uiux-engineering)
 - [Bilingual Cyberpunk HUD (English / עברית)](#bilingual-cyberpunk-hud-english--עברית)
 - [CLI Reference Guide](#cli-reference-guide)
@@ -56,7 +64,7 @@ git rm .env && git commit --amend
 
 **Git does not delete the commit or its contents.** It merely swings branch pointers. The underlying commits, trees, deleted configuration files, and plaintext credentials continue to reside inside the object database, reflogs (`HEAD@{...}`), and public fork networks.
 
-**UnForce (ForcePush-Breaker)** is an enterprise cyber-forensics platform that systematically exhumes unreachable objects, restores deleted branches and commits with one click, detects leaked API keys with Shannon entropy analysis, verifies passive credential liveness, and generates verifiable excision playbooks.
+**UnForce (ForcePush-Breaker)** is an enterprise cyber-forensics platform that systematically exhumes unreachable objects, restores deleted branches and commits with one click, detects leaked API keys with Shannon entropy analysis, verifies passive credential liveness, provides an interactive conversational AI agent with function calling, operates as a Model Context Protocol (MCP) server for modern AI coding agents, and generates verifiable excision playbooks.
 
 ---
 
@@ -66,10 +74,10 @@ git rm .env && git commit --amend
 
 | Operating System | Package | Description |
 | :--- | :--- | :--- |
-| **Windows (x64)** | [**UnForce-Setup-0.7.2.exe**](https://github.com/Amlaach/forcepush-breaker/releases/latest) | Full desktop installer with Start Menu & Desktop shortcuts |
-| **Windows Portable** | [**UnForce-Portable-0.7.2.exe**](https://github.com/Amlaach/forcepush-breaker/releases/latest) | Zero-install portable executable for incident response USB drives |
-| **macOS (Intel & Apple Silicon)** | [**UnForce-macOS-0.7.2-x64.dmg**](https://github.com/Amlaach/forcepush-breaker/releases/latest) | Native macOS `.dmg` and `.zip` distribution |
-| **Linux (x64)** | [**UnForce-Linux-0.7.2-x64.AppImage**](https://github.com/Amlaach/forcepush-breaker/releases/latest) | Universal `.AppImage` and Debian/Ubuntu `.deb` packages |
+| **Windows (x64)** | [**UnForce-Setup-0.8.1.exe**](https://github.com/Amlaach/forcepush-breaker/releases/latest) | Full desktop installer with Start Menu & Desktop shortcuts |
+| **Windows Portable** | [**UnForce-Portable-0.8.1.exe**](https://github.com/Amlaach/forcepush-breaker/releases/latest) | Zero-install portable executable for incident response USB drives |
+| **macOS (Intel & Apple Silicon)** | [**UnForce-macOS-0.8.1-x64.dmg**](https://github.com/Amlaach/forcepush-breaker/releases/latest) | Native macOS `.dmg` and `.zip` distribution |
+| **Linux (x64)** | [**UnForce-Linux-0.8.1-x64.AppImage**](https://github.com/Amlaach/forcepush-breaker/releases/latest) | Universal `.AppImage` and Debian/Ubuntu `.deb` packages |
 
 > Every release package is cryptographically verified with accompanying `SHA256SUMS.txt` digests published in the [Releases](https://github.com/Amlaach/forcepush-breaker/releases) section.
 
@@ -85,6 +93,7 @@ UnForce works seamlessly across both local disk repositories and major cloud Git
 
 ### 2. Dangling Commit & Blob Exhumation Engine
 - Scans loose and packed Git object databases using low-level Git plumbing (`fsck --lost-found --unreachable`, `rev-list`, `cat-file`).
+- Supports both classical **SHA-1** (20-byte) and modern **SHA-256** (32-byte) Git repositories.
 - Reconstructs orphan commit parentage, authors, commit timestamps, and commit messages.
 - Discovers unreachable blobs disconnected from active trees.
 - Provides interactive unified diffs and complete historical file-tree navigation at any ghost snapshot.
@@ -134,6 +143,83 @@ Purging leaked secrets from Git requires comprehensive remediation:
 - **Human-Readable Markdown**: Executive audit reports ready for management and compliance reviews.
 - **Forensic Recovery ZIP Bundle**: Downloadable archive containing recovered file trees, patches, and structured findings.
 
+### 9. Conversational Cyber-Forensics AI Assistant (Tool Calling)
+UnForce features an interactive AI assistant tab embedded directly into the studio:
+- **Multiple AI Providers**: Seamlessly connects to **Google Gemini**, **OpenAI (ChatGPT)**, **Anthropic (Claude)**, or uses the built-in **Local Forensics Heuristic Assistant** without requiring any external API key.
+- **Forensics Function Calling (Tools)**: The AI is equipped with executable tools to inspect scan metrics (`get_scan_summary`), query overwritten commits (`list_dangling_commits`), retrieve commit patches (`get_commit_diff`), identify leaked secrets (`list_secret_findings`), verify token vitality (`verify_credential_liveness`), and generate tailored excision commands (`get_remediation_guide`).
+- **Real-Time Visual Tool Feedback**: Tool calls are rendered as live neon execution badges in the conversation stream.
+
+### 10. Zero-Knowledge Encrypted Vault (DPAPI & PBKDF2)
+User credentials (GitHub PATs, GitLab tokens, AI API keys) entered into UnForce are protected by hardware-backed zero-knowledge cryptography:
+- **Windows DPAPI Integration**: Uses Windows Data Protection API (`CryptProtectData`/`CryptUnprotectData` via `ctypes.windll.crypt32`), tying encryption directly to the Windows user account and security subsystem.
+- **Cross-Platform Authenticated Fallback**: On Linux and macOS, uses machine-bound PBKDF2-HMAC-SHA256 authenticated encryption.
+- **Protected at Rest**: Secrets are saved only in encrypted ciphertext at `~/.unforce/vault.enc` and are never written to plaintext configuration files or logs.
+
+---
+
+## Model Context Protocol (MCP) Server for AI Agents
+
+UnForce exposes full cyber-forensics capabilities to AI developer agents over the standard **Model Context Protocol (MCP)** via JSON-RPC 2.0 over standard I/O (`stdio`).
+
+Launch the MCP server directly via:
+```bash
+unforce mcp
+# or
+python -m gitghost mcp
+```
+
+### Connecting to Claude Code & Claude Desktop
+
+Add UnForce to your `claude_desktop_config.json` (or Claude Code project configuration):
+
+```json
+{
+  "mcpServers": {
+    "unforce": {
+      "command": "python",
+      "args": ["-m", "gitghost", "mcp"],
+      "env": {
+        "PYTHONPATH": "c:\\path\\to\\gitghost"
+      }
+    }
+  }
+}
+```
+
+### Connecting to Cursor & Windsurf
+
+Add UnForce to `.cursor/mcp.json` or Windsurf settings:
+
+```json
+{
+  "mcpServers": {
+    "unforce": {
+      "command": "unforce",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+### Connecting to Antigravity & Codex
+
+Connect the agent's MCP configuration directly to the command:
+```bash
+unforce mcp
+```
+
+### Exposed MCP Tools
+
+| Tool Name | Description | Key Arguments |
+| :--- | :--- | :--- |
+| `unforce_scan` | Runs full forensics pipeline on local folder or remote Git URL | `repo_path`, `entropy_threshold`, `scan_forks` |
+| `unforce_list_dangling_commits` | Lists overwritten/orphaned commits in object DB with metadata | `repo_path`, `limit` |
+| `unforce_get_commit_diff` | Retrieves unified diff patch of any dangling commit | `commit_hash`, `include_raw` |
+| `unforce_recover_file` | Restores a lost file from unreachable blob/tree to disk or memory | `commit_hash`, `file_path`, `destination_path` |
+| `unforce_check_liveness` | Checks if a discovered secret/token is still live against vendor API | `finding_id` |
+| `unforce_hygiene_report` | Returns repository hygiene score (0-100), grade, and deductions | `repo_path` |
+| `unforce_remediation_plan` | Generates `git-filter-repo` and `git gc` excision scripts | `repo_path`, `format` (`bash`/`powershell`) |
+
 ---
 
 ## Chromium Desktop UI/UX Engineering
@@ -180,6 +266,9 @@ unforce scan . --configs-only
 
 # CI/CD Strict Quality Gate: exit with code 1 if critical secrets or score < 70
 unforce scan . --strict --no-ai
+
+# Launch Model Context Protocol (MCP) server on stdio for AI agents
+unforce mcp
 
 # Launch Chromium Desktop Studio
 unforce ui
@@ -251,7 +340,7 @@ cd forcepush-breaker
 # Install Python package in editable mode with development dependencies
 pip install -e ".[all]"
 
-# Run full Pytest test suite (99 comprehensive tests)
+# Run full Pytest test suite (109 comprehensive tests)
 pytest -v tests/
 ```
 
@@ -261,7 +350,7 @@ pytest -v tests/
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/build_desktop.ps1
 ```
-*Generates NSIS installer (`UnForce-Setup-0.7.2.exe`) and portable binary (`UnForce-Portable-0.7.2.exe`) in `release/`.*
+*Generates NSIS installer (`UnForce-Setup-0.8.1.exe`) and portable binary (`UnForce-Portable-0.8.1.exe`) in `release/`.*
 
 **On macOS / Linux (Bash):**
 ```bash
@@ -275,7 +364,8 @@ bash scripts/build_desktop.sh
 
 1. **Local Execution**: All repository parsing, Git plumbing commands, entropy calculations, and regex evaluations execute locally on your machine.
 2. **In-Memory Credential Safety**: When authenticating with remote private repositories, tokens are held transiently in memory for the duration of the scan process and are never committed to disk.
-3. **Strict Redaction by Default**: All sensitive credentials are cryptographically redacted in console displays, user interfaces, and exported reports unless `--raw` / unredacted export is explicitly requested by authorized forensic analysts.
+3. **Hardware-Backed Encryption**: Stored tokens and AI API keys are protected using Windows DPAPI and PBKDF2 authenticated encryption in `~/.unforce/vault.enc`.
+4. **Strict Redaction by Default**: All sensitive credentials are cryptographically redacted in console displays, user interfaces, and exported reports unless `--raw` / unredacted export is explicitly requested by authorized forensic analysts.
 
 ---
 

@@ -51,6 +51,12 @@ def get_dashboard_html(force_reload: bool = False) -> str:
 
     inline_css = f"<style>\n{css}\n</style>"
     scripts = []
+    try:
+        from gitghost.ui_server import SESSION_TOKEN
+        import json
+        scripts.append(f"<script>window.UNFORCE_SESSION_TOKEN = {json.dumps(SESSION_TOKEN)};</script>")
+    except Exception:
+        pass
     if logo_js:
         scripts.append(f"<script>\n{logo_js}\n</script>")
     scripts.append(f"<script>\n{i18n_js}\n</script>")

@@ -347,6 +347,11 @@ async function ensureApiBase() {
 
 async function apiFetch(endpoint, options = {}) {
   const base = await ensureApiBase();
+  const headers = Object.assign({}, options.headers || {});
+  if (window.UNFORCE_SESSION_TOKEN) {
+    headers["X-UnForce-Token"] = window.UNFORCE_SESSION_TOKEN;
+  }
+  options.headers = headers;
   return fetch(`${base}${endpoint}`, options);
 }
 
@@ -818,6 +823,7 @@ function switchView(viewName) {
     timemachine: "viewTimeMachine",
     searchblobs: "viewSearchBlobs",
     remediation: "viewRemediation",
+    aichat: "viewAIChat",
   };
   Object.entries(map).forEach(([k, id]) => {
     const panel = document.getElementById(id);
@@ -826,6 +832,9 @@ function switchView(viewName) {
   document.querySelectorAll(".nav-item, .ws-tab-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.getAttribute("data-view") === viewName);
   });
+  if (viewName === "aichat") {
+    initAIChatView();
+  }
 }
 
 function openCommitsWithSubtab(subtab) {
@@ -1261,10 +1270,14 @@ function renderDiffLines(container, diffText) {
 }
 
 function switchInspectorMode(mode) {
-  document.getElementById("inspTabDiff").classList.toggle("active", mode === "diff");
-  document.getElementById("inspTabFiles").classList.toggle("active", mode === "files");
-  document.getElementById("inspDiffBody").style.display = mode === "diff" ? "block" : "none";
-  document.getElementById("inspFilesBody").style.display = mode === "files" ? "block" : "none";
+  const tabDiff = document.getElementById("inspTabDiff") || document.getElementById("tabBtnDiff");
+  const tabFiles = document.getElementById("inspTabFiles") || document.getElementById("tabBtnTree");
+  const diffBody = document.getElementById("inspDiffBody") || document.getElementById("subpanelDiff");
+  const filesBody = document.getElementById("inspFilesBody") || document.getElementById("subpanelTree");
+  if (tabDiff) tabDiff.classList.toggle("active", mode === "diff");
+  if (tabFiles) tabFiles.classList.toggle("active", mode === "files" || mode === "tree");
+  if (diffBody) diffBody.style.display = mode === "diff" ? "block" : "none";
+  if (filesBody) filesBody.style.display = (mode === "files" || mode === "tree") ? "block" : "none";
 }
 
 async function loadCommitFileTree(commitSha) {
@@ -1980,8 +1993,9 @@ async function inspectDetachedBlob(blobSha) {
 
 /* ---- View 6: GitHub History Purge & Remediation ---- */
 function renderRemediation(rem) {
-  if (rem.rotation_warning) {
-    document.getElementById("remediationRotationWarning").textContent = rem.rotation_warning;
+  const rotWarn = document.getElementById("remediationRotationWarning");
+  if (rotWarn && rem.rotation_warning) {
+    rotWarn.textContent = rem.rotation_warning;
   }
   const stepsBox = document.getElementById("remediationStepsList");
   const steps = rem.steps || [];
@@ -2013,10 +2027,14 @@ function renderRemediation(rem) {
 
 function switchScriptTab(lang) {
   activeScriptLang = lang;
-  document.getElementById("btnScriptBash").classList.toggle("active", lang === "bash");
-  document.getElementById("btnScriptPS").classList.toggle("active", lang === "ps");
-  document.getElementById("bashScriptContainer").style.display = lang === "bash" ? "block" : "none";
-  document.getElementById("psScriptContainer").style.display = lang === "ps" ? "block" : "none";
+  const bBash = document.getElementById("btnScriptBash");
+  const bPS = document.getElementById("btnScriptPS");
+  const cBash = document.getElementById("bashScriptContainer");
+  const cPS = document.getElementById("psScriptContainer");
+  if (bBash) bBash.classList.toggle("active", lang === "bash");
+  if (bPS) bPS.classList.toggle("active", lang === "ps");
+  if (cBash) cBash.style.display = lang === "bash" ? "block" : "none";
+  if (cPS) cPS.style.display = lang === "ps" ? "block" : "none";
 }
 
 async function copyActiveScript() {
@@ -2211,32 +2229,70 @@ function updateAISettingsUI() {
   if (okRow) okRow.style.display = hasKey ? "flex" : "none";
 }
 
-function saveAIKey() {
+async function saveAIKey() {
   const val = (document.getElementById("aiApiKeyInput").value || "").trim();
   if (!val) return;
   ephemeralSession.aiKey = val;
   document.getElementById("aiApiKeyInput").value = "";
+  try {
+    await apiFetch("/api/vault/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key_name: "ai_api_key", token: val }),
+    });
+    showToast("מפתח AI הוצפן ונשמר בבטחה בכספת חומרה מקומית (DPAPI)");
+  } catch (_) {
+    showToast("מפתח AI נשמר בזיכרון המקומי");
+  }
   updateAISettingsUI();
-  showToast("AI API Key held strictly in-memory");
+  syncVaultKeysUI();
 }
 
-function clearAIKey() {
+async function clearAIKey() {
   ephemeralSession.aiKey = "";
+  try {
+    await apiFetch("/api/vault/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key_name: "ai_api_key" }),
+    });
+    showToast("מפתח AI הוסר לחלוטין מהכספת");
+  } catch (_) {}
   updateAISettingsUI();
+  syncVaultKeysUI();
 }
 
-function saveGHToken() {
+async function saveGHToken() {
   const val = (document.getElementById("githubTokenInput").value || "").trim();
   if (!val) return;
   ephemeralSession.ghToken = val;
   document.getElementById("githubTokenInput").value = "";
+  try {
+    await apiFetch("/api/vault/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key_name: "github_token", token: val }),
+    });
+    showToast("טוקן GitHub הוצפן ונשמר בכספת חומרה מקומית (DPAPI)");
+  } catch (_) {
+    showToast("טוקן GitHub נשמר בזיכרון");
+  }
   refreshGHStatusUI();
-  showToast("GitHub Token held strictly in-memory");
+  syncVaultKeysUI();
 }
 
-function clearGHToken() {
+async function clearGHToken() {
   ephemeralSession.ghToken = "";
+  try {
+    await apiFetch("/api/vault/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key_name: "github_token" }),
+    });
+    showToast("טוקן GitHub הוסר מהכספת");
+  } catch (_) {}
   refreshGHStatusUI();
+  syncVaultKeysUI();
 }
 
 function refreshGHStatusUI() {
@@ -2453,7 +2509,215 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initBackendTelemetry();
   setUiState("landing");
+  syncVaultKeysUI();
   checkAppVersion(false);
   setInterval(() => checkAppVersion(false), 10 * 60 * 1000);
   setInterval(syncLogsFromServer, 3500);
 });
+
+/* ========================================================================= */
+/* VAULT & PERSISTENT CREDENTIALS SYNCHRONIZATION                           */
+/* ========================================================================= */
+async function syncVaultKeysUI() {
+  try {
+    const res = await apiFetch("/api/vault/status");
+    if (res && res.status === "ok" && res.keys) {
+      if (res.keys.github_token) {
+        ephemeralSession.ghToken = res.keys.github_token;
+      }
+      if (res.keys.ai_api_key) {
+        ephemeralSession.aiKey = res.keys.ai_api_key;
+      }
+      refreshGHStatusUI();
+      updateAISettingsUI();
+    }
+  } catch (_) {}
+}
+
+/* ========================================================================= */
+/* INTERACTIVE AI FORENSICS CHAT AGENT & FUNCTION CALLING                   */
+/* ========================================================================= */
+let aiChatConversationHistory = [];
+let aiChatIsLoading = false;
+
+function initAIChatView() {
+  const container = document.getElementById("aiChatMessages");
+  if (container && (!container.children || container.children.length === 0)) {
+    renderAIChatWelcome();
+  }
+}
+
+function renderAIChatWelcome() {
+  const container = document.getElementById("aiChatMessages");
+  if (!container) return;
+  container.innerHTML = `
+    <div style="background:rgba(0,217,255,0.04);border:1px solid rgba(0,217,255,0.15);border-radius:10px;padding:16px;margin-bottom:8px;">
+      <h3 style="font-size:14px;color:var(--cyan-bright);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+        <span>🤖 סוכן UnForce מוכן לפעולה</span>
+      </h3>
+      <p style="font-size:12.5px;color:var(--text-secondary);margin:0 0 10px 0;line-height:1.5;">
+        אני מחובר ישירות למנוע השחזור והפורנזיקה. יש לי כלים חכמים לתשאל את ה-Dangling Commits, לחלץ קבצים מנותקים, לבדוק סודות שדלפו ולבנות תוכנית Remediation נקייה.
+      </p>
+      <div style="font-size:11.5px;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap;">
+        <span>🛡️ מחובר ל-Vault המקומי המוצפן</span>
+        <span>⚡ תומך בכלים (Tool Calling) מלאים</span>
+      </div>
+    </div>
+  `;
+}
+
+function onChatProviderChange() {
+  const sel = document.getElementById("chatProviderSelect");
+  if (sel) {
+    ephemeralSession.aiProvider = sel.value;
+  }
+}
+
+function onChatInputKeyDown(event) {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    submitAIChatMessage();
+  }
+}
+
+function sendAIChatPrompt(presetText) {
+  const input = document.getElementById("aiChatInput");
+  if (input) {
+    input.value = presetText;
+  }
+  submitAIChatMessage();
+}
+
+function clearAIChatHistory() {
+  aiChatConversationHistory = [];
+  const container = document.getElementById("aiChatMessages");
+  if (container) container.innerHTML = "";
+  renderAIChatWelcome();
+  showToast("היסטוריית הצ'אט אופסה");
+}
+
+function appendChatMessageToUI(role, text, toolCalls) {
+  const container = document.getElementById("aiChatMessages");
+  if (!container) return;
+
+  const msgDiv = document.createElement("div");
+  const isUser = role === "user";
+  msgDiv.style.display = "flex";
+  msgDiv.style.flexDirection = "column";
+  msgDiv.style.alignItems = isUser ? "flex-end" : "flex-start";
+  msgDiv.style.gap = "4px";
+
+  const bubble = document.createElement("div");
+  bubble.style.maxWidth = "82%";
+  bubble.style.borderRadius = "10px";
+  bubble.style.padding = "10px 14px";
+  bubble.style.fontSize = "13px";
+  bubble.style.lineHeight = "1.5";
+  bubble.style.wordBreak = "break-word";
+  bubble.style.whiteSpace = "pre-wrap";
+
+  if (isUser) {
+    bubble.style.background = "linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(0, 100, 200, 0.25))";
+    bubble.style.border = "1px solid rgba(0, 217, 255, 0.3)";
+    bubble.style.color = "#ffffff";
+    bubble.textContent = text;
+  } else {
+    bubble.style.background = "var(--bg-card)";
+    bubble.style.border = "1px solid var(--border)";
+    bubble.style.color = "var(--text-primary)";
+    
+    if (toolCalls && toolCalls.length > 0) {
+      const toolBox = document.createElement("div");
+      toolBox.style.marginBottom = "8px";
+      toolBox.style.display = "flex";
+      toolBox.style.flexWrap = "wrap";
+      toolBox.style.gap = "6px";
+      toolCalls.forEach(tc => {
+        const badge = document.createElement("span");
+        badge.style.fontSize = "11px";
+        badge.style.padding = "2px 8px";
+        badge.style.borderRadius = "4px";
+        badge.style.background = "rgba(0, 255, 136, 0.12)";
+        badge.style.color = "var(--neon-green)";
+        badge.style.border = "1px solid rgba(0, 255, 136, 0.3)";
+        badge.textContent = `🔧 כלי: ${tc.tool}`;
+        toolBox.appendChild(badge);
+      });
+      bubble.appendChild(toolBox);
+    }
+
+    const textEl = document.createElement("div");
+    textEl.textContent = text || "";
+    bubble.appendChild(textEl);
+  }
+
+  msgDiv.appendChild(bubble);
+  container.appendChild(msgDiv);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function submitAIChatMessage() {
+  if (aiChatIsLoading) return;
+  const input = document.getElementById("aiChatInput");
+  if (!input) return;
+  const text = (input.value || "").trim();
+  if (!text) return;
+
+  input.value = "";
+  appendChatMessageToUI("user", text);
+  aiChatConversationHistory.push({ role: "user", content: text });
+
+  const sendBtn = document.getElementById("aiChatSendBtn");
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.style.opacity = "0.6";
+  }
+  aiChatIsLoading = true;
+
+  const container = document.getElementById("aiChatMessages");
+  const loadingIndicator = document.createElement("div");
+  loadingIndicator.id = "aiChatLoadingIndicator";
+  loadingIndicator.style.fontSize = "12px";
+  loadingIndicator.style.color = "var(--cyan-bright)";
+  loadingIndicator.style.padding = "6px 12px";
+  loadingIndicator.textContent = "UnForce AI חושב ומפעיל כלים פורנזיים...";
+  if (container) {
+    container.appendChild(loadingIndicator);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  const prov = (document.getElementById("chatProviderSelect")?.value) || ephemeralSession.aiProvider || "auto";
+
+  try {
+    const res = await apiFetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: aiChatConversationHistory,
+        provider: prov,
+        api_key: ephemeralSession.aiKey || ""
+      })
+    });
+
+    if (loadingIndicator.parentNode) loadingIndicator.parentNode.removeChild(loadingIndicator);
+
+    if (res && res.status === "ok") {
+      const reply = res.reply || "התקבלה תשובה ריקה מהסוכן.";
+      appendChatMessageToUI("assistant", reply, res.tool_calls_executed);
+      aiChatConversationHistory.push({ role: "assistant", content: reply });
+    } else {
+      const errMsg = (res && res.error) ? res.error : "שגיאה בתקשורת עם שרת ה-AI";
+      appendChatMessageToUI("assistant", `⚠️ שגיאה: ${errMsg}`);
+    }
+  } catch (err) {
+    if (loadingIndicator.parentNode) loadingIndicator.parentNode.removeChild(loadingIndicator);
+    appendChatMessageToUI("assistant", `⚠️ שגיאת רשת/שרת: ${err.message || err}`);
+  } finally {
+    aiChatIsLoading = false;
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.style.opacity = "1";
+    }
+  }
+}
+

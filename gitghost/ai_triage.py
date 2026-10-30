@@ -120,6 +120,16 @@ class AITriage:
                 return "gemini"
             if self.api_key.startswith("sk-"):
                 return "openai"
+        try:
+            from gitghost.crypto_vault import SecretVault
+            if SecretVault.get("gemini_api_key"):
+                return "gemini"
+            if SecretVault.get("openai_api_key"):
+                return "openai"
+            if SecretVault.get("anthropic_api_key"):
+                return "anthropic"
+        except Exception:
+            pass
         if os.getenv("GEMINI_API_KEY"):
             return "gemini"
         if os.getenv("OPENAI_API_KEY"):
@@ -162,7 +172,8 @@ Return ONLY a valid JSON object matching this schema:
 }}"""
 
     def _call_openai(self, prompt: str) -> AITriageResult:
-        api_key = self.api_key or os.getenv("OPENAI_API_KEY", "")
+        from gitghost.crypto_vault import SecretVault
+        api_key = self.api_key or SecretVault.get("openai_api_key") or SecretVault.get("ai_api_key") or os.getenv("OPENAI_API_KEY", "")
         model = self.model or "gpt-4o-mini"
         url = "https://api.openai.com/v1/chat/completions"
         payload = {
@@ -185,7 +196,8 @@ Return ONLY a valid JSON object matching this schema:
             return self._build_result_from_dict(parsed, f"OpenAI ({model})")
 
     def _call_anthropic(self, prompt: str) -> AITriageResult:
-        api_key = self.api_key or os.getenv("ANTHROPIC_API_KEY", "")
+        from gitghost.crypto_vault import SecretVault
+        api_key = self.api_key or SecretVault.get("anthropic_api_key") or SecretVault.get("ai_api_key") or os.getenv("ANTHROPIC_API_KEY", "")
         model = self.model or "claude-3-5-sonnet-20241022"
         url = "https://api.anthropic.com/v1/messages"
         payload = {"model": model, "max_tokens": 512, "temperature": 0.1, "messages": [{"role": "user", "content": prompt}]}
@@ -201,7 +213,8 @@ Return ONLY a valid JSON object matching this schema:
             return self._build_result_from_dict(parsed, f"Anthropic ({model})")
 
     def _call_gemini(self, prompt: str) -> AITriageResult:
-        api_key = self.api_key or os.getenv("GEMINI_API_KEY", "")
+        from gitghost.crypto_vault import SecretVault
+        api_key = self.api_key or SecretVault.get("gemini_api_key") or SecretVault.get("ai_api_key") or os.getenv("GEMINI_API_KEY", "")
         model = self.model or "gemini-1.5-flash"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"responseMimeType": "application/json"}}

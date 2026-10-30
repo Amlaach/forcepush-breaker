@@ -35,8 +35,12 @@ def _run_daemon_server() -> None:
         "url": f"http://127.0.0.1:{active_port}",
         "version": __version__,
     }
-    sys.stdout.write(json.dumps(ready_payload) + "\n")
-    sys.stdout.flush()
+    if sys.stdout is not None:
+        try:
+            sys.stdout.write(json.dumps(ready_payload) + "\n")
+            sys.stdout.flush()
+        except Exception:
+            pass
 
     try:
         while not getattr(server, "_shutdown_requested", False):
@@ -54,6 +58,11 @@ def _run_daemon_server() -> None:
 def main() -> None:
     if "--daemon" in sys.argv:
         _run_daemon_server()
+        return
+
+    if "--mcp" in sys.argv or (len(sys.argv) > 1 and sys.argv[1] == "mcp"):
+        from gitghost.mcp_server import run_mcp_server
+        run_mcp_server()
         return
 
     if len(sys.argv) == 1:

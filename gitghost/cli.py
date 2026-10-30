@@ -28,7 +28,7 @@ from gitghost.ai_triage import AITriageResult
 from gitghost.demo_builder import DemoBuilder
 from gitghost.exporters import ReportExporter
 from gitghost.git_forensics import DeletedConfigFile, ForensicsScanResult, GitForensics
-from gitghost.github_remote import is_github_target, sanitize_token_in_text
+from gitghost.github_remote import is_github_target, is_remote_target, sanitize_token_in_text
 from gitghost.pipeline import run_scan_pipeline
 from gitghost.recovery import ObjectRecoveryEngine
 from gitghost.redactor import SecretFinding
@@ -108,7 +108,7 @@ def scan_cmd(
         raise typer.Exit(1)
 
     target: str | Path
-    if is_github_target(path):
+    if is_remote_target(path):
         target = path.strip()
     else:
         repo_path = Path(path).resolve()
@@ -309,6 +309,13 @@ def install_hook_cmd(path: str = typer.Argument(".", help="Target repository pat
     else:
         console.print(f"[bold red]Failed:[/bold red] {hook_path}")
         raise typer.Exit(1)
+
+
+@app.command(name="mcp")
+def mcp_cmd():
+    """Launch the Model Context Protocol (MCP) stdio server for Claude Code, Cursor, Codex, and Antigravity."""
+    from gitghost.mcp_server import run_mcp_server
+    run_mcp_server()
 
 
 @app.command(name="clean")

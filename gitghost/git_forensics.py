@@ -602,6 +602,7 @@ class GitForensics:
                             blob_path_map[b_hash] = path.strip()
 
         trees_to_read = [t for t in unreachable_trees if t]
+        hash_len = 32 if (trees_to_read and len(trees_to_read[0]) == 64) else 20
         if trees_to_read:
             p = subprocess.Popen(
                 ["git", "cat-file", "--batch"],
@@ -633,14 +634,14 @@ class GitForensics:
                     while idx < len(tree_bytes):
                         space_idx = tree_bytes.find(b" ", idx)
                         null_idx = tree_bytes.find(b"\x00", space_idx)
-                        if space_idx == -1 or null_idx == -1 or null_idx + 21 > len(tree_bytes):
+                        if space_idx == -1 or null_idx == -1 or null_idx + 1 + hash_len > len(tree_bytes):
                             break
                         mode = tree_bytes[idx:space_idx].decode(errors="replace")
                         name = tree_bytes[space_idx + 1:null_idx].decode(errors="replace")
-                        sha = binascii.hexlify(tree_bytes[null_idx + 1:null_idx + 21]).decode("ascii")
+                        sha = binascii.hexlify(tree_bytes[null_idx + 1:null_idx + 1 + hash_len]).decode("ascii")
                         if not mode.startswith("40000"):
                             blob_path_map[sha] = name
-                        idx = null_idx + 21
+                        idx = null_idx + 1 + hash_len
                 elif len(header_parts) == 2 and header_parts[1] == "missing":
                     continue
                 else:

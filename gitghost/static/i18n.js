@@ -157,7 +157,19 @@ window.UNFORCE_I18N = {
     updateViewGH: "צפה בעמוד שחרור ב-GitHub ↗",
     updateDownloading: "מוריד עדכון...",
     updateDone: "ההורדה הושלמה בהצלחה!",
-    updateCheckNow: "בדוק עדכונים עכשיו"
+    updateCheckNow: "בדוק עדכונים עכשיו",
+    branchPrompt: "הזן שם עבור הענף החדש:",
+    branchRestored: "הקומיט שוחזר בהצלחה כענף חדש!",
+    clipboardEmpty: "לוח הגזירים ריק — העתק כתובת מאגר או נתיב מקומי תחילה",
+    invalidGhUrl: "אנא הדבק כתובת מאגר תקינה (GitHub / GitLab / Bitbucket) או נתיב תיקייה מקומי",
+    pastedSuccess: "כתובת המאגר הודבקה בהצלחה",
+    gcPurgedBadge: "נמחק ב-GC של השרת",
+    gcPurgedTitle: "קומיט נמחק ב-Garbage Collection של השרת (404)",
+    gcPurgedDesc: "הקומיט זוהה בלוגים של force-push אך נמחק ממטמון הענן של השרת (HTTP 404). סרוק עותק מקומי של מפתח לשחזור מ-reflog.",
+    scanLocalCloneBtn: "סרוק עותק מקומי של מפתח",
+    promptLocalPath: "הזן נתיב תיקיית Git מקומית:",
+    scanBtn: "התחל סריקה פורנזית",
+    scanningBtn: "סורק..."
   },
   en: {
     engineOnline: "Forensics Engine Online v0.8.0",

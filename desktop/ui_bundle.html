@@ -1807,6 +1807,12 @@ body.state-workspace #workspaceView {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
           <span data-i18n="navRemediation">ניקוי היסטוריה</span>
         </button>
+
+        <button class="ws-tab-btn" data-view="aichat" onclick="switchView('aichat')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+          <span data-i18n="navAIChat">עוזר AI וצ'אט</span>
+          <span id="navBadgeAIChat" class="tab-badge" style="background:var(--cyan);color:#000;">AI</span>
+        </button>
       </nav>
 
       <!-- Right Header Actions -->
@@ -2201,6 +2207,53 @@ body.state-workspace #workspaceView {
         </div>
       </section>
 
+      <!-- ========================================================= -->
+      <!-- VIEW 7: CONVERSATIONAL FORENSICS AI ASSISTANT             -->
+      <!-- ========================================================= -->
+      <section id="viewAIChat" class="view-panel">
+        <div class="card" style="margin-bottom:14px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="font-size:17px;font-weight:800;color:var(--cyan-bright);margin-bottom:3px;display:flex;align-items:center;gap:8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-bright)" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+              <span>עוזר פורנזיקה וסייבר מבוסס AI</span>
+            </h2>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin:0;">
+              התכתב עם ה-AI של UnForce — לסוכן יש גישה ישירה לכלים הפנימיים לתחקור קומיטים, חילוץ סודות וביצוע פעולות.
+            </p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <select id="chatProviderSelect" class="input-field" style="height:32px;font-size:12px;padding:2px 8px;" onchange="onChatProviderChange()">
+              <option value="auto">זיהוי אוטומטי (Auto)</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI (ChatGPT)</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="heuristic">סייר פורנזיקה מקומי (ללא מפתח)</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="clearAIChatHistory()">נקה שיחה</button>
+          </div>
+        </div>
+
+        <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 280px);min-height:480px;padding:0;overflow:hidden;">
+          <div style="padding:10px 14px;background:rgba(255,255,255,0.02);border-bottom:1px solid var(--border);display:flex;gap:8px;overflow-x:auto;white-space:nowrap;">
+            <button class="btn btn-secondary btn-sm" style="font-size:11.5px;padding:4px 10px;" onclick="sendAIChatPrompt('תן לי סקירת סטטוס מלאה של המאגר וההיגיינה שלו')">📊 סקירת סטטוס המאגר</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:11.5px;padding:4px 10px;" onclick="sendAIChatPrompt('הצג לי את הקומיטים המנותקים שנדרסו (Dangling Commits) ומי יצר אותם')">🔍 קומיטים שנדרסו</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:11.5px;padding:4px 10px;" onclick="sendAIChatPrompt('אילו סודות ומפתחות API דלפו בקומיטים שנמחקו?')">🚨 בדיקת סודות שדלפו</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:11.5px;padding:4px 10px;" onclick="sendAIChatPrompt('ייצר עבורי סקריפט ניקוי וטיהור היסטוריה מלא באמצעות git-filter-repo')">🛡️ תוכנית טיהור וניקוי</button>
+          </div>
+
+          <div id="aiChatMessages" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px;">
+          </div>
+
+          <div style="padding:12px 16px;background:var(--bg-card);border-top:1px solid var(--border);display:flex;gap:10px;align-items:flex-end;">
+            <textarea id="aiChatInput" class="input-field" rows="2" style="resize:none;font-size:13px;line-height:1.4;" placeholder="שאל את ה-AI על המאגר, קומיטים שנמחקו או בקש פעולת שחזור... (Enter לשליחה, Shift+Enter לשורה חדשה)" onkeydown="onChatInputKeyDown(event)"></textarea>
+            <button id="aiChatSendBtn" class="btn btn-primary" style="height:44px;padding:0 20px;font-weight:700;" onclick="submitAIChatMessage()">
+              <span>שלח</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-inline-start:4px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -2405,7 +2458,8 @@ body.state-workspace #workspaceView {
     <span id="toastMessage"><span data-i18n="toastReady">מוכן לפעולה</span></span>
   </div>
 
-  <script>
+  <script>window.UNFORCE_SESSION_TOKEN = "fxBbBymHVmGgrJOdndscGVH-m0QxTSTFAzJcGqzlaz8";</script>
+<script>
 window.UNFORCE_LOGO_DATA_URI = "data:image/webp;base64,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";
 
 </script>
@@ -2569,7 +2623,19 @@ window.UNFORCE_I18N = {
     updateViewGH: "צפה בעמוד שחרור ב-GitHub ↗",
     updateDownloading: "מוריד עדכון...",
     updateDone: "ההורדה הושלמה בהצלחה!",
-    updateCheckNow: "בדוק עדכונים עכשיו"
+    updateCheckNow: "בדוק עדכונים עכשיו",
+    branchPrompt: "הזן שם עבור הענף החדש:",
+    branchRestored: "הקומיט שוחזר בהצלחה כענף חדש!",
+    clipboardEmpty: "לוח הגזירים ריק — העתק כתובת מאגר או נתיב מקומי תחילה",
+    invalidGhUrl: "אנא הדבק כתובת מאגר תקינה (GitHub / GitLab / Bitbucket) או נתיב תיקייה מקומי",
+    pastedSuccess: "כתובת המאגר הודבקה בהצלחה",
+    gcPurgedBadge: "נמחק ב-GC של השרת",
+    gcPurgedTitle: "קומיט נמחק ב-Garbage Collection של השרת (404)",
+    gcPurgedDesc: "הקומיט זוהה בלוגים של force-push אך נמחק ממטמון הענן של השרת (HTTP 404). סרוק עותק מקומי של מפתח לשחזור מ-reflog.",
+    scanLocalCloneBtn: "סרוק עותק מקומי של מפתח",
+    promptLocalPath: "הזן נתיב תיקיית Git מקומית:",
+    scanBtn: "התחל סריקה פורנזית",
+    scanningBtn: "סורק..."
   },
   en: {
     engineOnline: "Forensics Engine Online v0.8.0",
@@ -3079,6 +3145,11 @@ async function ensureApiBase() {
 
 async function apiFetch(endpoint, options = {}) {
   const base = await ensureApiBase();
+  const headers = Object.assign({}, options.headers || {});
+  if (window.UNFORCE_SESSION_TOKEN) {
+    headers["X-UnForce-Token"] = window.UNFORCE_SESSION_TOKEN;
+  }
+  options.headers = headers;
   return fetch(`${base}${endpoint}`, options);
 }
 
@@ -3550,6 +3621,7 @@ function switchView(viewName) {
     timemachine: "viewTimeMachine",
     searchblobs: "viewSearchBlobs",
     remediation: "viewRemediation",
+    aichat: "viewAIChat",
   };
   Object.entries(map).forEach(([k, id]) => {
     const panel = document.getElementById(id);
@@ -3558,6 +3630,9 @@ function switchView(viewName) {
   document.querySelectorAll(".nav-item, .ws-tab-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.getAttribute("data-view") === viewName);
   });
+  if (viewName === "aichat") {
+    initAIChatView();
+  }
 }
 
 function openCommitsWithSubtab(subtab) {
@@ -3993,10 +4068,14 @@ function renderDiffLines(container, diffText) {
 }
 
 function switchInspectorMode(mode) {
-  document.getElementById("inspTabDiff").classList.toggle("active", mode === "diff");
-  document.getElementById("inspTabFiles").classList.toggle("active", mode === "files");
-  document.getElementById("inspDiffBody").style.display = mode === "diff" ? "block" : "none";
-  document.getElementById("inspFilesBody").style.display = mode === "files" ? "block" : "none";
+  const tabDiff = document.getElementById("inspTabDiff") || document.getElementById("tabBtnDiff");
+  const tabFiles = document.getElementById("inspTabFiles") || document.getElementById("tabBtnTree");
+  const diffBody = document.getElementById("inspDiffBody") || document.getElementById("subpanelDiff");
+  const filesBody = document.getElementById("inspFilesBody") || document.getElementById("subpanelTree");
+  if (tabDiff) tabDiff.classList.toggle("active", mode === "diff");
+  if (tabFiles) tabFiles.classList.toggle("active", mode === "files" || mode === "tree");
+  if (diffBody) diffBody.style.display = mode === "diff" ? "block" : "none";
+  if (filesBody) filesBody.style.display = (mode === "files" || mode === "tree") ? "block" : "none";
 }
 
 async function loadCommitFileTree(commitSha) {
@@ -4712,8 +4791,9 @@ async function inspectDetachedBlob(blobSha) {
 
 /* ---- View 6: GitHub History Purge & Remediation ---- */
 function renderRemediation(rem) {
-  if (rem.rotation_warning) {
-    document.getElementById("remediationRotationWarning").textContent = rem.rotation_warning;
+  const rotWarn = document.getElementById("remediationRotationWarning");
+  if (rotWarn && rem.rotation_warning) {
+    rotWarn.textContent = rem.rotation_warning;
   }
   const stepsBox = document.getElementById("remediationStepsList");
   const steps = rem.steps || [];
@@ -4745,10 +4825,14 @@ function renderRemediation(rem) {
 
 function switchScriptTab(lang) {
   activeScriptLang = lang;
-  document.getElementById("btnScriptBash").classList.toggle("active", lang === "bash");
-  document.getElementById("btnScriptPS").classList.toggle("active", lang === "ps");
-  document.getElementById("bashScriptContainer").style.display = lang === "bash" ? "block" : "none";
-  document.getElementById("psScriptContainer").style.display = lang === "ps" ? "block" : "none";
+  const bBash = document.getElementById("btnScriptBash");
+  const bPS = document.getElementById("btnScriptPS");
+  const cBash = document.getElementById("bashScriptContainer");
+  const cPS = document.getElementById("psScriptContainer");
+  if (bBash) bBash.classList.toggle("active", lang === "bash");
+  if (bPS) bPS.classList.toggle("active", lang === "ps");
+  if (cBash) cBash.style.display = lang === "bash" ? "block" : "none";
+  if (cPS) cPS.style.display = lang === "ps" ? "block" : "none";
 }
 
 async function copyActiveScript() {
@@ -4943,32 +5027,70 @@ function updateAISettingsUI() {
   if (okRow) okRow.style.display = hasKey ? "flex" : "none";
 }
 
-function saveAIKey() {
+async function saveAIKey() {
   const val = (document.getElementById("aiApiKeyInput").value || "").trim();
   if (!val) return;
   ephemeralSession.aiKey = val;
   document.getElementById("aiApiKeyInput").value = "";
+  try {
+    await apiFetch("/api/vault/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key_name: "ai_api_key", token: val }),
+    });
+    showToast("מפתח AI הוצפן ונשמר בבטחה בכספת חומרה מקומית (DPAPI)");
+  } catch (_) {
+    showToast("מפתח AI נשמר בזיכרון המקומי");
+  }
   updateAISettingsUI();
-  showToast("AI API Key held strictly in-memory");
+  syncVaultKeysUI();
 }
 
-function clearAIKey() {
+async function clearAIKey() {
   ephemeralSession.aiKey = "";
+  try {
+    await apiFetch("/api/vault/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key_name: "ai_api_key" }),
+    });
+    showToast("מפתח AI הוסר לחלוטין מהכספת");
+  } catch (_) {}
   updateAISettingsUI();
+  syncVaultKeysUI();
 }
 
-function saveGHToken() {
+async function saveGHToken() {
   const val = (document.getElementById("githubTokenInput").value || "").trim();
   if (!val) return;
   ephemeralSession.ghToken = val;
   document.getElementById("githubTokenInput").value = "";
+  try {
+    await apiFetch("/api/vault/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key_name: "github_token", token: val }),
+    });
+    showToast("טוקן GitHub הוצפן ונשמר בכספת חומרה מקומית (DPAPI)");
+  } catch (_) {
+    showToast("טוקן GitHub נשמר בזיכרון");
+  }
   refreshGHStatusUI();
-  showToast("GitHub Token held strictly in-memory");
+  syncVaultKeysUI();
 }
 
-function clearGHToken() {
+async function clearGHToken() {
   ephemeralSession.ghToken = "";
+  try {
+    await apiFetch("/api/vault/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key_name: "github_token" }),
+    });
+    showToast("טוקן GitHub הוסר מהכספת");
+  } catch (_) {}
   refreshGHStatusUI();
+  syncVaultKeysUI();
 }
 
 function refreshGHStatusUI() {
@@ -5185,10 +5307,218 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initBackendTelemetry();
   setUiState("landing");
+  syncVaultKeysUI();
   checkAppVersion(false);
   setInterval(() => checkAppVersion(false), 10 * 60 * 1000);
   setInterval(syncLogsFromServer, 3500);
 });
+
+/* ========================================================================= */
+/* VAULT & PERSISTENT CREDENTIALS SYNCHRONIZATION                           */
+/* ========================================================================= */
+async function syncVaultKeysUI() {
+  try {
+    const res = await apiFetch("/api/vault/status");
+    if (res && res.status === "ok" && res.keys) {
+      if (res.keys.github_token) {
+        ephemeralSession.ghToken = res.keys.github_token;
+      }
+      if (res.keys.ai_api_key) {
+        ephemeralSession.aiKey = res.keys.ai_api_key;
+      }
+      refreshGHStatusUI();
+      updateAISettingsUI();
+    }
+  } catch (_) {}
+}
+
+/* ========================================================================= */
+/* INTERACTIVE AI FORENSICS CHAT AGENT & FUNCTION CALLING                   */
+/* ========================================================================= */
+let aiChatConversationHistory = [];
+let aiChatIsLoading = false;
+
+function initAIChatView() {
+  const container = document.getElementById("aiChatMessages");
+  if (container && (!container.children || container.children.length === 0)) {
+    renderAIChatWelcome();
+  }
+}
+
+function renderAIChatWelcome() {
+  const container = document.getElementById("aiChatMessages");
+  if (!container) return;
+  container.innerHTML = `
+    <div style="background:rgba(0,217,255,0.04);border:1px solid rgba(0,217,255,0.15);border-radius:10px;padding:16px;margin-bottom:8px;">
+      <h3 style="font-size:14px;color:var(--cyan-bright);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+        <span>🤖 סוכן UnForce מוכן לפעולה</span>
+      </h3>
+      <p style="font-size:12.5px;color:var(--text-secondary);margin:0 0 10px 0;line-height:1.5;">
+        אני מחובר ישירות למנוע השחזור והפורנזיקה. יש לי כלים חכמים לתשאל את ה-Dangling Commits, לחלץ קבצים מנותקים, לבדוק סודות שדלפו ולבנות תוכנית Remediation נקייה.
+      </p>
+      <div style="font-size:11.5px;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap;">
+        <span>🛡️ מחובר ל-Vault המקומי המוצפן</span>
+        <span>⚡ תומך בכלים (Tool Calling) מלאים</span>
+      </div>
+    </div>
+  `;
+}
+
+function onChatProviderChange() {
+  const sel = document.getElementById("chatProviderSelect");
+  if (sel) {
+    ephemeralSession.aiProvider = sel.value;
+  }
+}
+
+function onChatInputKeyDown(event) {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    submitAIChatMessage();
+  }
+}
+
+function sendAIChatPrompt(presetText) {
+  const input = document.getElementById("aiChatInput");
+  if (input) {
+    input.value = presetText;
+  }
+  submitAIChatMessage();
+}
+
+function clearAIChatHistory() {
+  aiChatConversationHistory = [];
+  const container = document.getElementById("aiChatMessages");
+  if (container) container.innerHTML = "";
+  renderAIChatWelcome();
+  showToast("היסטוריית הצ'אט אופסה");
+}
+
+function appendChatMessageToUI(role, text, toolCalls) {
+  const container = document.getElementById("aiChatMessages");
+  if (!container) return;
+
+  const msgDiv = document.createElement("div");
+  const isUser = role === "user";
+  msgDiv.style.display = "flex";
+  msgDiv.style.flexDirection = "column";
+  msgDiv.style.alignItems = isUser ? "flex-end" : "flex-start";
+  msgDiv.style.gap = "4px";
+
+  const bubble = document.createElement("div");
+  bubble.style.maxWidth = "82%";
+  bubble.style.borderRadius = "10px";
+  bubble.style.padding = "10px 14px";
+  bubble.style.fontSize = "13px";
+  bubble.style.lineHeight = "1.5";
+  bubble.style.wordBreak = "break-word";
+  bubble.style.whiteSpace = "pre-wrap";
+
+  if (isUser) {
+    bubble.style.background = "linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(0, 100, 200, 0.25))";
+    bubble.style.border = "1px solid rgba(0, 217, 255, 0.3)";
+    bubble.style.color = "#ffffff";
+    bubble.textContent = text;
+  } else {
+    bubble.style.background = "var(--bg-card)";
+    bubble.style.border = "1px solid var(--border)";
+    bubble.style.color = "var(--text-primary)";
+    
+    if (toolCalls && toolCalls.length > 0) {
+      const toolBox = document.createElement("div");
+      toolBox.style.marginBottom = "8px";
+      toolBox.style.display = "flex";
+      toolBox.style.flexWrap = "wrap";
+      toolBox.style.gap = "6px";
+      toolCalls.forEach(tc => {
+        const badge = document.createElement("span");
+        badge.style.fontSize = "11px";
+        badge.style.padding = "2px 8px";
+        badge.style.borderRadius = "4px";
+        badge.style.background = "rgba(0, 255, 136, 0.12)";
+        badge.style.color = "var(--neon-green)";
+        badge.style.border = "1px solid rgba(0, 255, 136, 0.3)";
+        badge.textContent = `🔧 כלי: ${tc.tool}`;
+        toolBox.appendChild(badge);
+      });
+      bubble.appendChild(toolBox);
+    }
+
+    const textEl = document.createElement("div");
+    textEl.textContent = text || "";
+    bubble.appendChild(textEl);
+  }
+
+  msgDiv.appendChild(bubble);
+  container.appendChild(msgDiv);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function submitAIChatMessage() {
+  if (aiChatIsLoading) return;
+  const input = document.getElementById("aiChatInput");
+  if (!input) return;
+  const text = (input.value || "").trim();
+  if (!text) return;
+
+  input.value = "";
+  appendChatMessageToUI("user", text);
+  aiChatConversationHistory.push({ role: "user", content: text });
+
+  const sendBtn = document.getElementById("aiChatSendBtn");
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.style.opacity = "0.6";
+  }
+  aiChatIsLoading = true;
+
+  const container = document.getElementById("aiChatMessages");
+  const loadingIndicator = document.createElement("div");
+  loadingIndicator.id = "aiChatLoadingIndicator";
+  loadingIndicator.style.fontSize = "12px";
+  loadingIndicator.style.color = "var(--cyan-bright)";
+  loadingIndicator.style.padding = "6px 12px";
+  loadingIndicator.textContent = "UnForce AI חושב ומפעיל כלים פורנזיים...";
+  if (container) {
+    container.appendChild(loadingIndicator);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  const prov = (document.getElementById("chatProviderSelect")?.value) || ephemeralSession.aiProvider || "auto";
+
+  try {
+    const res = await apiFetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: aiChatConversationHistory,
+        provider: prov,
+        api_key: ephemeralSession.aiKey || ""
+      })
+    });
+
+    if (loadingIndicator.parentNode) loadingIndicator.parentNode.removeChild(loadingIndicator);
+
+    if (res && res.status === "ok") {
+      const reply = res.reply || "התקבלה תשובה ריקה מהסוכן.";
+      appendChatMessageToUI("assistant", reply, res.tool_calls_executed);
+      aiChatConversationHistory.push({ role: "assistant", content: reply });
+    } else {
+      const errMsg = (res && res.error) ? res.error : "שגיאה בתקשורת עם שרת ה-AI";
+      appendChatMessageToUI("assistant", `⚠️ שגיאה: ${errMsg}`);
+    }
+  } catch (err) {
+    if (loadingIndicator.parentNode) loadingIndicator.parentNode.removeChild(loadingIndicator);
+    appendChatMessageToUI("assistant", `⚠️ שגיאת רשת/שרת: ${err.message || err}`);
+  } finally {
+    aiChatIsLoading = false;
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.style.opacity = "1";
+    }
+  }
+}
+
 
 </script>
 </body>

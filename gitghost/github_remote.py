@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -60,11 +61,28 @@ _PROBED_REMOTE_HOSTS: Set[str] = set()
 
 
 def resolve_system_remote_token(host: str = "github.com") -> Optional[str]:
-    """Safely probes Git Credential Manager in-memory for an existing token for the specified host.
+    """Safely probes Git Credential Manager in-memory and the encrypted secret vault for an existing token.
 
-    Never writes to disk and never blocks on interactive prompts (`GIT_TERMINAL_PROMPT=0`).
+    Never writes to disk in plain text and never blocks on interactive prompts (`GIT_TERMINAL_PROMPT=0`).
     """
     clean_host = host.lower().strip()
+    try:
+        from gitghost.crypto_vault import SecretVault
+        if "github" in clean_host:
+            vault_tok = SecretVault.get("github_token")
+            if vault_tok:
+                return vault_tok
+        elif "gitlab" in clean_host:
+            vault_tok = SecretVault.get("gitlab_token")
+            if vault_tok:
+                return vault_tok
+        elif "bitbucket" in clean_host:
+            vault_tok = SecretVault.get("bitbucket_token")
+            if vault_tok:
+                return vault_tok
+    except Exception:
+        pass
+
     if "github" in clean_host:
         env_tok = (os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
         if env_tok:
@@ -477,11 +495,11 @@ class GitLabAPIForensicsClient:
                                 seen_shas.add(commit_from)
                                 candidate_shas.append(commit_from)
                         elif commit_to and commit_from != commit_to:
-                            desc = f"GitLab force-push on {ref} (previous tip {commit_from[:10]} replaced by {commit_to[:10]})"
+                            desc = f"GitLab push on {ref} (previous tip {commit_from[:10]} -> {commit_to[:10]})"
                             events.append(
                                 HistoryOverwriteEvent(
                                     event_id=f"gl-{ev_id}",
-                                    event_type="force_push",
+                                    event_type="push_before",
                                     ref=f"refs/heads/{ref}",
                                     before_sha=commit_from,
                                     after_sha=commit_to,
@@ -1238,7 +1256,7 @@ class SmartGitCloner:
                             ["fetch", fork.clone_url, f"+refs/heads/*:refs/forks/{fork.owner}/*"],
                             cwd=temp_dir,
                             token=resolved_token,
-                            target_host=fork.host or target.host,
+                            target_host=getattr(fork, "host", None) or target.host,
                             timeout=cls.FETCH_TIMEOUT_SECONDS,
                             check=False,
                         )
